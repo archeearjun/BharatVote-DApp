@@ -5,24 +5,28 @@ import useWallet from "./useWallet";
 
 const addr = import.meta.env.VITE_CONTRACT_ADDRESS as string;
 
+// 🆕 Define a candidate type with id + name
+type Cand = { id: number; name: string };
+
 export default function Candidates() {
   const { provider } = useWallet();
-  const [names, setNames] = useState<string[]>([]);
+  const [cands, setCands] = useState<Cand[]>([]);
 
   useEffect(() => {
     if (!provider) return;
     (async () => {
       const c = new ethers.Contract(addr, abi, provider);
       const count = await c.candidateCount();
-      const list: string[] = [];
+      const list: Cand[] = [];
       for (let i = 0; i < count; i++) {
-        const cand = await c.candidates(i);
-        list.push(cand.name);
+        const cand = await c.candidates(i); // returns struct {id, name}
+        list.push({ id: cand.id, name: cand.name });
       }
-      setNames(list);
-      // listen for new candidates in real time
-      c.on("CandidateAdded", (_id: number, n: string) =>
-        setNames((old) => [...old, n])
+      setCands(list);
+
+      // 🆕 Real-time updates
+      c.on("CandidateAdded", (id: number, name: string) =>
+        setCands((old) => [...old, { id, name }])
       );
     })();
   }, [provider]);
@@ -30,7 +34,13 @@ export default function Candidates() {
   return (
     <div style={{ padding: 20 }}>
       <h2>Current Candidates</h2>
-      <ul>{names.map((n) => <li key={n}>{n}</li>)}</ul>
+      <ul>
+        {cands.map((c) => (
+          <li key={c.id}>
+            {c.name} (ID: {c.id})
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
