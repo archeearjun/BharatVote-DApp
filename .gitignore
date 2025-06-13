@@ -15,3 +15,9 @@ node_modules
 
 # Hardhat Ignition default folder for deployments against a local node
 ignition/deployments/chain-31337
+
+# Added by Cursor for temporary/build files
+package-lock.json
+**/tsconfig.tsbuildinfo
+npx
+taskkill

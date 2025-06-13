@@ -1,15 +1,16 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
+import type { BharatVote } from "../typechain-types";
 
 describe("BharatVote", () => {
-  let vote: any;
+  let vote: BharatVote;
   let admin: any;
   let alice: any;
 
   beforeEach(async () => {
     [admin, alice] = await ethers.getSigners();
     const BV = await ethers.getContractFactory("BharatVote");
-    vote = await BV.connect(admin).deploy();
+    vote = (await BV.connect(admin).deploy()) as BharatVote;
     await vote.waitForDeployment();
   });
 
@@ -27,7 +28,7 @@ describe("BharatVote", () => {
     ).to.be.revertedWith("Not admin");
   });
 
-  it("still blocks double-voting", async () => {
+  it("blocks double voting", async () => {
     const commit = ethers.keccak256(ethers.toUtf8Bytes("hash1"));
     await vote.connect(alice).commitVote(commit);
 
