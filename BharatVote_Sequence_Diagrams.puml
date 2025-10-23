@@ -1,0 +1,657 @@
+@startuml KYC_Registration
+title 5.3.a KYC Registration Process
+note top
+**Description:** This diagram shows the KYC (Know Your Customer) registration process where voters verify their identity
+using their Voter ID (EPIC), undergo document verification, and complete biometric authentication.
+The process validates voter eligibility against electoral rolls and links their identity to a wallet address.
+end note
+
+actor Voter
+participant "Frontend\nApplication" as Frontend
+participant "KYC Service\n(Backend API)" as KYC
+participant "Face Recognition\nService" as FaceAuth
+database "KYC Database" as KYCDb
+database "Electoral Rolls" as ElectoralDB
+
+== KYC Registration Flow ==
+Voter -> Frontend: Access KYC Registration Page
+Frontend -> Voter: Display Voter ID Input Form
+
+Voter -> Frontend: Enter Voter ID (EPIC Number)
+Frontend -> Frontend: Validate EPIC format (min 6 chars)
+
+Frontend -> KYC: GET /api/kyc?voter_id={VOTER_ID}
+KYC -> ElectoralDB: Query voter eligibility
+ElectoralDB -> KYC: Return voter record or not found
+
+alt Voter ID Valid
+    KYC -> Frontend: Return {eligible: true, address: "0x..."}
+    Frontend -> Voter: Display "Voter ID Verified" message
+    Frontend -> Voter: Show OTP verification step
+    
+    Voter -> Frontend: Enter 6-digit OTP
+    Frontend -> Frontend: Validate OTP (demo: predefined codes)
+    
+    alt OTP Valid
+        Frontend -> Voter: Request face verification
+        Frontend -> FaceAuth: Initialize camera for face capture
+        FaceAuth -> Voter: Capture biometric data
+        FaceAuth -> FaceAuth: Process facial recognition
+        
+        alt Face Recognition Successful
+            FaceAuth -> Frontend: Face verification successful
+            Frontend -> KYCDb: Store verified voter profile
+            KYCDb -> Frontend: Confirmation
+            Frontend -> Voter: KYC Registration Complete
+            Frontend -> Frontend: Enable wallet connection
+        else Face Recognition Failed
+            FaceAuth -> Frontend: Face verification failed
+            Frontend -> Voter: Display retry option
+        end
+    else OTP Invalid
+        Frontend -> Voter: Display error "Invalid OTP"
+    end
+else Voter ID Invalid
+    KYC -> Frontend: Return {eligible: false}
+    Frontend -> Voter: Display "Voter ID not found in electoral rolls"
+end
+
+@enduml
+
+@startuml Secure_Login
+title 5.3.b Secure Login (Face + OTP) Process
+note top
+**Description:** This diagram illustrates the secure two-factor authentication process combining
+facial recognition and OTP verification. The system ensures voter identity verification
+before allowing access to voting functions, maintaining security and preventing unauthorized access.
+end note
+
+actor Voter
+participant "Frontend\nApplication" as Frontend
+participant "Face Recognition\nService" as FaceAuth
+participant "OTP Service\n(Backend)" as OTPService
+participant "Wallet Service\n(MetaMask)" as Wallet
+database "Voter Profile\nDatabase" as VoterDB
+
+== Secure Login Flow ==
+Voter -> Frontend: Click "Secure Login"
+Frontend -> Voter: Display authentication options
+
+== Step 1: Face Recognition ==
+Frontend -> FaceAuth: Initialize face recognition
+FaceAuth -> Voter: Request camera access
+Voter -> FaceAuth: Grant camera permission
+FaceAuth -> FaceAuth: Capture face image
+FaceAuth -> FaceAuth: Process biometric matching
+
+alt Face Recognition Successful
+    FaceAuth -> VoterDB: Query stored biometric profile
+    VoterDB -> FaceAuth: Return matching profile
+    FaceAuth -> Frontend: Face authentication success
+    Frontend -> Voter: Display "Face verified successfully"
+    
+    == Step 2: OTP Verification ==
+    Frontend -> OTPService: Request OTP for verified user
+    OTPService -> Voter: Send OTP to registered mobile
+    Frontend -> Voter: Display OTP input form
+    
+    Voter -> Frontend: Enter received OTP
+    Frontend -> OTPService: Validate OTP
+    OTPService -> OTPService: Verify OTP against generated code
+    
+    alt OTP Valid
+        OTPService -> Frontend: OTP verification successful
+        Frontend -> Voter: Display "Login successful"
+        
+        == Step 3: Wallet Connection ==
+        Frontend -> Wallet: Request wallet connection
+        Wallet -> Voter: Prompt for wallet approval
+        Voter -> Wallet: Approve connection
+        Wallet -> Frontend: Return connected address
+        Frontend -> Frontend: Verify address matches KYC record
+        
+        alt Address Matches KYC
+            Frontend -> VoterDB: Update login session
+            Frontend -> Voter: Grant access to voting interface
+        else Address Mismatch
+            Frontend -> Voter: Display "Wallet mismatch error"
+        end
+    else OTP Invalid
+        OTPService -> Frontend: OTP verification failed
+        Frontend -> Voter: Display "Invalid OTP, please retry"
+    end
+else Face Recognition Failed
+    FaceAuth -> Frontend: Face authentication failed
+    Frontend -> Voter: Display "Face verification failed, please retry"
+end
+
+@enduml
+
+@startuml Cast_Vote_Commit
+title 5.3.c Cast Vote (Commit Phase) Process
+note top
+**Description:** This diagram shows the commit phase of the voting process where voters select their candidate
+and commit their encrypted vote to the blockchain. The system uses commit-reveal scheme to ensure vote privacy
+during the voting period, with Merkle proofs validating voter eligibility.
+end note
+
+actor Voter
+participant "Frontend\nApplication" as Frontend
+participant "Backend API" as Backend
+participant "Crypto Service" as Crypto
+participant "BharatVote\nSmart Contract" as Contract
+participant "Blockchain\nNetwork" as Blockchain
+
+== Vote Commit Flow ==
+Voter -> Frontend: Access voting interface
+Frontend -> Contract: Check current election phase
+Contract -> Frontend: Return phase = 0 (Commit Phase)
+
+Frontend -> Contract: Fetch available candidates
+Contract -> Frontend: Return candidate list
+Frontend -> Voter: Display candidate selection form
+
+== Candidate Selection ==
+Voter -> Frontend: Select preferred candidate
+Frontend -> Frontend: Store candidateId (e.g., candidateId = 1)
+
+== Vote Commitment Generation ==
+Voter -> Frontend: Enter/Generate private salt
+Frontend -> Crypto: generateCommit(candidateId, salt)
+Crypto -> Crypto: Create hash = keccak256(candidateId + salt)
+Crypto -> Frontend: Return commit hash
+
+Frontend -> Voter: Display commit preview
+note right: Shows: "Committing vote for Candidate #1 with hash: 0xabc123..."
+
+== Merkle Proof Generation ==
+Frontend -> Backend: GET /api/merkle-proof?voter_id={VOTER_ID}
+Backend -> Backend: Lookup voter address from KYC data
+Backend -> Backend: Generate Merkle proof for voter address
+Backend -> Frontend: Return proof array ["0x...", "0x..."]
+
+== Blockchain Transaction ==
+Voter -> Frontend: Confirm vote commitment
+Frontend -> Contract: commitVote(commitHash, merkleProof[])
+Contract -> Contract: Verify voter eligibility using Merkle proof
+Contract -> Contract: Check if voter already committed
+
+alt Verification Successful
+    Contract -> Contract: Store commit hash for voter address
+    Contract -> Contract: Mark voter as committed
+    Contract -> Blockchain: Emit VoteCommitted event
+    Blockchain -> Frontend: Transaction confirmed
+    Frontend -> Voter: Display "Vote committed successfully!"
+    Frontend -> Frontend: Store salt locally for reveal phase
+else Verification Failed
+    Contract -> Frontend: Transaction reverted with error
+    alt Already Committed
+        Frontend -> Voter: Display "You have already committed a vote"
+    else Not Eligible
+        Frontend -> Voter: Display "You are not eligible to vote"
+    else Wrong Phase
+        Frontend -> Voter: Display "Voting is not in commit phase"
+    end
+end
+
+@enduml
+
+@startuml Reveal_Vote
+title 5.3.d Reveal Vote (Reveal Phase) Process
+note top
+**Description:** This diagram illustrates the reveal phase where voters disclose their actual vote choice
+and the salt used during commitment. The smart contract verifies that the revealed vote matches
+the previously committed hash, ensuring vote integrity and finalizing the vote count.
+end note
+
+actor Voter
+participant "Frontend\nApplication" as Frontend
+participant "Local Storage" as LocalStorage
+participant "BharatVote\nSmart Contract" as Contract
+participant "Blockchain\nNetwork" as Blockchain
+
+== Vote Reveal Flow ==
+Voter -> Frontend: Access voting interface during reveal phase
+Frontend -> Contract: Check current election phase
+Contract -> Frontend: Return phase = 1 (Reveal Phase)
+
+Frontend -> Frontend: Check if voter has committed vote
+Frontend -> LocalStorage: Retrieve stored salt from commit phase
+LocalStorage -> Frontend: Return salt value
+
+== Reveal Process ==
+Frontend -> Voter: Display reveal interface
+note right: Shows previously selected candidate and asks for salt confirmation
+
+Voter -> Frontend: Confirm candidate choice and salt
+Frontend -> Frontend: Validate that candidate and salt match commitment
+
+== Blockchain Verification ==
+Frontend -> Contract: revealVote(candidateId, salt)
+Contract -> Contract: Retrieve stored commit hash for voter
+Contract -> Contract: Generate expectedHash = keccak256(candidateId + salt)
+Contract -> Contract: Compare expectedHash with stored commit
+
+alt Hash Verification Successful
+    Contract -> Contract: Check if voter already revealed
+    alt Not Yet Revealed
+        Contract -> Contract: Mark voter as revealed
+        Contract -> Contract: Increment candidate vote tally
+        Contract -> Blockchain: Emit VoteRevealed event
+        Blockchain -> Frontend: Transaction confirmed
+        Frontend -> Voter: Display "Vote revealed successfully!"
+        Frontend -> Frontend: Update vote status to "Revealed"
+        Frontend -> LocalStorage: Clear sensitive data (salt)
+    else Already Revealed
+        Contract -> Frontend: Transaction reverted "Already revealed"
+        Frontend -> Voter: Display "You have already revealed your vote"
+    end
+else Hash Mismatch
+    Contract -> Frontend: Transaction reverted "Hash mismatch"
+    Frontend -> Voter: Display "Vote verification failed - incorrect candidate or salt"
+else No Commit Found
+    Contract -> Frontend: Transaction reverted "No commit found"
+    Frontend -> Voter: Display "No committed vote found for your address"
+else Wrong Phase
+    Contract -> Frontend: Transaction reverted "Wrong phase"
+    Frontend -> Voter: Display "Reveal phase has not started yet"
+end
+
+== Vote Confirmation ==
+alt Reveal Successful
+    Frontend -> Contract: Fetch updated tally
+    Contract -> Frontend: Return current vote counts
+    Frontend -> Voter: Display updated results (if allowed)
+end
+
+@enduml
+
+@startuml View_Receipt
+title 5.3.e View Receipt Process
+note top
+**Description:** This diagram shows how voters can view their voting receipt/proof after completing
+the voting process. The receipt includes transaction hashes, timestamps, and verification information
+that can be used to audit their vote on the blockchain.
+end note
+
+actor Voter
+participant "Frontend\nApplication" as Frontend
+participant "Local Storage" as LocalStorage
+participant "Blockchain\nExplorer" as Explorer
+participant "BharatVote\nSmart Contract" as Contract
+database "Transaction\nHistory" as TxHistory
+
+== Receipt Generation Flow ==
+Voter -> Frontend: Click "View Receipt" or "Voting History"
+Frontend -> Frontend: Check voter authentication status
+
+== Retrieve Voting Data ==
+Frontend -> LocalStorage: Get stored voting session data
+LocalStorage -> Frontend: Return commit/reveal transaction hashes
+
+Frontend -> Contract: getVoterStatus(voterAddress)
+Contract -> Frontend: Return voting status (committed, revealed, etc.)
+
+Frontend -> TxHistory: Query blockchain for transaction details
+TxHistory -> Frontend: Return transaction metadata
+
+== Display Receipt Information ==
+Frontend -> Frontend: Compile receipt data
+Frontend -> Voter: Display voting receipt
+
+note right
+**Receipt Contains:**
+- Voter ID (masked for privacy)
+- Election ID/Name
+- Voting Session Timestamp
+- Commit Transaction Hash
+- Reveal Transaction Hash
+- Vote Status: "Successfully Recorded"
+- Blockchain Verification Links
+end note
+
+== Verification Options ==
+Voter -> Frontend: Click "Verify on Blockchain"
+Frontend -> Explorer: Open transaction in blockchain explorer
+Explorer -> Voter: Display transaction details
+
+alt Advanced Verification
+    Voter -> Frontend: Request detailed verification
+    Frontend -> Contract: Verify transaction inclusion
+    Contract -> Frontend: Return transaction proof
+    Frontend -> Voter: Display cryptographic proof
+    
+    Voter -> Frontend: Download receipt as PDF/image
+    Frontend -> Frontend: Generate downloadable receipt
+    Frontend -> Voter: Provide receipt file
+end
+
+== Privacy Protection ==
+note over Frontend
+Receipt shows verification data but does not
+reveal the actual candidate choice to maintain
+vote secrecy while proving participation.
+end note
+
+@enduml
+
+@startuml Admin_Election_Management
+title 5.3.f Manage Election (Admin Workflow) Process
+note top
+**Description:** This diagram illustrates the comprehensive election management workflow available to administrators.
+It covers election setup, candidate management, phase transitions, and election lifecycle management
+ensuring proper governance and control over the voting process.
+end note
+
+actor Admin
+participant "Admin Panel\n(Frontend)" as AdminPanel
+participant "BharatVote\nSmart Contract" as Contract
+participant "Backend API" as Backend
+participant "Blockchain\nNetwork" as Blockchain
+database "Election\nConfiguration" as ElectionDB
+
+== Election Setup Phase ==
+Admin -> AdminPanel: Access admin dashboard
+AdminPanel -> Contract: Verify admin privileges
+Contract -> AdminPanel: Confirm admin status
+
+== Candidate Management ==
+Admin -> AdminPanel: Navigate to candidate management
+AdminPanel -> Contract: getCandidates()
+Contract -> AdminPanel: Return current candidate list
+
+Admin -> AdminPanel: Add new candidate
+AdminPanel -> Admin: Display candidate input form
+Admin -> AdminPanel: Enter candidate name
+AdminPanel -> Contract: addCandidate("Candidate Name")
+Contract -> Contract: Validate name length (1-100 chars)
+Contract -> Contract: Check current phase (must be Commit)
+
+alt Candidate Addition Successful
+    Contract -> Contract: Create candidate with unique ID
+    Contract -> Blockchain: Emit CandidateAdded event
+    Contract -> AdminPanel: Transaction confirmed
+    AdminPanel -> Admin: Display "Candidate added successfully"
+else Candidate Addition Failed
+    Contract -> AdminPanel: Transaction reverted
+    AdminPanel -> Admin: Display error message
+end
+
+== Voter Eligibility Setup ==
+Admin -> AdminPanel: Configure eligible voters
+AdminPanel -> Backend: Upload voter list / Set Merkle root
+Backend -> Backend: Generate Merkle tree from voter addresses
+Backend -> AdminPanel: Return Merkle root hash
+AdminPanel -> Contract: setMerkleRoot(merkleRoot)
+Contract -> AdminPanel: Merkle root updated
+
+== Phase Management ==
+Admin -> AdminPanel: Initiate phase transition
+AdminPanel -> Contract: getCurrentPhase()
+Contract -> AdminPanel: Return current phase
+
+alt Start Reveal Phase
+    Admin -> AdminPanel: Click "Start Reveal Phase"
+    AdminPanel -> Contract: startReveal()
+    Contract -> Contract: Transition from Commit (0) to Reveal (1)
+    Contract -> Blockchain: Emit PhaseChanged event
+    Contract -> AdminPanel: Phase transition successful
+    AdminPanel -> Admin: Display "Reveal phase started"
+else Finish Election
+    Admin -> AdminPanel: Click "Finish Election"
+    AdminPanel -> Contract: finishElection()
+    Contract -> Contract: Transition from Reveal (1) to Finished (2)
+    Contract -> Contract: Finalize vote tally
+    Contract -> Blockchain: Emit TallyFinalized event
+    Contract -> AdminPanel: Election finished successfully
+    AdminPanel -> Admin: Display final results
+end
+
+== Election Reset/Cleanup ==
+Admin -> AdminPanel: Reset election (post-completion)
+AdminPanel -> Contract: resetElection()
+Contract -> Contract: Reset all voter states
+Contract -> Contract: Clear vote tallies
+Contract -> Contract: Reset phase to Commit (0)
+Contract -> Blockchain: Emit ElectionReset event
+AdminPanel -> Admin: Display "Election reset successful"
+
+== Candidate Removal (if needed) ==
+Admin -> AdminPanel: Remove candidate
+AdminPanel -> Contract: removeCandidate(candidateId)
+Contract -> Contract: Mark candidate as inactive
+Contract -> Blockchain: Emit CandidateRemoved event
+AdminPanel -> Admin: Display "Candidate removed"
+
+@enduml
+
+@startuml Monitor_Tally
+title 5.3.g Monitor Tally Process
+note top
+**Description:** This diagram shows how real-time vote tallying is monitored during and after the election.
+The system provides live updates during the reveal phase and final results after election completion,
+with various stakeholders able to view results based on election phase and permissions.
+end note
+
+actor "Election\nObserver" as Observer
+actor "Voter" as Voter
+actor "Admin" as Admin
+participant "Frontend\nApplication" as Frontend
+participant "BharatVote\nSmart Contract" as Contract
+participant "Blockchain\nEvents" as Events
+database "Vote Tally\nStorage" as TallyDB
+
+== Tally Monitoring Setup ==
+Observer -> Frontend: Access tally monitoring page
+Frontend -> Contract: getCurrentPhase()
+Contract -> Frontend: Return current election phase
+
+== Real-time Monitoring (Reveal Phase) ==
+alt Phase = Reveal (1) or Finished (2)
+    Frontend -> Contract: getTally()
+    Contract -> Frontend: Return current vote counts per candidate
+    
+    Frontend -> Contract: getCandidates()
+    Contract -> Frontend: Return candidate information
+    
+    Frontend -> Frontend: Calculate percentages and statistics
+    Frontend -> Observer: Display live tally dashboard
+    
+    note right of Frontend
+    **Tally Display includes:**
+    - Total votes cast
+    - Votes per candidate
+    - Percentage distribution
+    - Real-time updates
+    - Progress indicators
+    end note
+    
+    == Event-based Updates ==
+    Events -> Frontend: Listen for VoteRevealed events
+    loop Continuous Monitoring
+        Events -> Frontend: New VoteRevealed event detected
+        Frontend -> Contract: Fetch updated tally
+        Contract -> Frontend: Return latest vote counts
+        Frontend -> Observer: Update dashboard in real-time
+    end
+    
+else Phase = Commit (0)
+    Frontend -> Observer: Display "Tally not available during commit phase"
+    Frontend -> Observer: Show "Results will be available after reveal phase starts"
+end
+
+== Different User Access Levels ==
+alt Admin Access
+    Admin -> Frontend: View detailed analytics
+    Frontend -> Contract: getVoterParticipation()
+    Frontend -> Admin: Display detailed statistics
+    note right: Shows commit vs reveal rates, voter turnout, etc.
+    
+else Public Access
+    Voter -> Frontend: View public results
+    Frontend -> Frontend: Filter sensitive information
+    Frontend -> Voter: Display public tally information
+    note right: Shows only candidate results without voter details
+end
+
+== Final Results (Election Finished) ==
+alt Phase = Finished (2)
+    Frontend -> Contract: getTally()
+    Contract -> Frontend: Return final vote counts
+    
+    Frontend -> Frontend: Determine election winner
+    Frontend -> Observer: Display final election results
+    
+    note right of Frontend
+    **Final Results include:**
+    - Winner announcement
+    - Complete vote breakdown
+    - Voter participation statistics
+    - Election verification data
+    end note
+    
+    Frontend -> TallyDB: Archive final results
+    TallyDB -> Frontend: Results archived successfully
+end
+
+== Export Functionality ==
+Observer -> Frontend: Request results export
+Frontend -> Frontend: Generate results report
+Frontend -> Observer: Provide downloadable report (CSV/PDF)
+
+@enduml
+
+@startuml Export_Audit_Log
+title 5.3.h Export Audit Log Process
+note top
+**Description:** This diagram illustrates the comprehensive audit log export functionality that provides
+complete traceability of all election activities. The system generates detailed logs for compliance,
+verification, and transparency purposes, ensuring election integrity can be verified.
+end note
+
+actor "Audit\nAuthority" as Auditor
+actor "Admin" as Admin
+participant "Admin Panel\n(Frontend)" as AdminPanel
+participant "Audit Service\n(Backend)" as AuditService
+participant "BharatVote\nSmart Contract" as Contract
+participant "Blockchain\nNetwork" as Blockchain
+database "Audit Log\nDatabase" as AuditDB
+participant "File System" as FileSystem
+
+== Audit Log Export Request ==
+Auditor -> AdminPanel: Access audit export section
+AdminPanel -> AdminPanel: Verify auditor permissions
+AdminPanel -> Auditor: Display audit export options
+
+Auditor -> AdminPanel: Select audit parameters
+note right of Auditor
+**Audit Parameters:**
+- Date range (from/to)
+- Event types (all/specific)
+- Export format (JSON/CSV/PDF)
+- Include transaction hashes
+- Include voter anonymized data
+end note
+
+== Data Collection Phase ==
+AdminPanel -> AuditService: Request audit log generation
+AuditService -> AuditDB: Query stored audit events
+AuditDB -> AuditService: Return database audit records
+
+AuditService -> Contract: Fetch blockchain events
+Contract -> Blockchain: Query event logs
+note right of Contract
+**Blockchain Events:**
+- CandidateAdded
+- CandidateRemoved  
+- VoteCommitted
+- VoteRevealed
+- PhaseChanged
+- TallyFinalized
+- ElectionReset
+end note
+
+Blockchain -> Contract: Return filtered events
+Contract -> AuditService: Provide blockchain audit trail
+
+== Data Processing and Anonymization ==
+AuditService -> AuditService: Merge database and blockchain logs
+AuditService -> AuditService: Sort events chronologically
+AuditService -> AuditService: Apply privacy filters
+
+note over AuditService
+**Privacy Protection:**
+- Hash voter addresses
+- Remove personally identifiable information
+- Maintain vote secrecy
+- Keep only audit-relevant data
+end note
+
+== Report Generation ==
+AuditService -> AuditService: Generate comprehensive audit report
+
+note right of AuditService
+**Audit Report Contents:**
+1. Election Overview
+   - Election ID and timeline
+   - Total registered voters
+   - Participation statistics
+
+2. System Events Log
+   - Admin actions with timestamps
+   - Phase transitions
+   - Candidate management activities
+
+3. Voting Activity Analysis
+   - Vote commitment timeline
+   - Reveal phase participation
+   - Transaction verification data
+
+4. Security Events
+   - Failed authentication attempts
+   - Invalid voting attempts
+   - System errors and recoveries
+
+5. Blockchain Verification
+   - Transaction hashes
+   - Block numbers and timestamps
+   - Smart contract interactions
+end note
+
+== Export Delivery ==
+AuditService -> FileSystem: Generate export files
+FileSystem -> AuditService: Confirm file creation
+
+alt JSON Export
+    AuditService -> AdminPanel: Provide JSON download link
+    AdminPanel -> Auditor: Deliver structured data file
+else CSV Export
+    AuditService -> AdminPanel: Provide CSV download link
+    AdminPanel -> Auditor: Deliver spreadsheet-compatible file
+else PDF Report
+    AuditService -> AdminPanel: Provide PDF download link
+    AdminPanel -> Auditor: Deliver formatted audit report
+end
+
+== Verification and Integrity ==
+Auditor -> AdminPanel: Request integrity verification
+AdminPanel -> AuditService: Generate audit log hash
+AuditService -> AuditService: Calculate SHA-256 of complete log
+AuditService -> AdminPanel: Return verification hash
+AdminPanel -> Auditor: Provide integrity proof
+
+== Archive and Compliance ==
+AuditService -> AuditDB: Archive export request
+AuditDB -> AuditService: Log export activity
+AuditService -> AdminPanel: Confirm compliance recording
+AdminPanel -> Auditor: Display "Audit export completed successfully"
+
+note over AuditDB
+**Compliance Features:**
+- Tamper-evident logging
+- Export request tracking
+- Long-term data retention
+- Regulatory compliance ready
+end note
+
+@enduml 

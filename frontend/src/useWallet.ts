@@ -103,6 +103,18 @@ export default function useWallet() {
       }
       console.log('DEBUG useWallet: Contract address:', contractAddress);
 
+      // Verify bytecode exists at the address to avoid BAD_DATA from calls
+      try {
+        const code = await provider.getCode(contractAddress);
+        console.log('DEBUG useWallet: Code length at address:', code?.length);
+        if (!code || code === '0x') {
+          handleError(new Error('No contract code at address. Ensure Hardhat node is running and contract is deployed.'), CONTRACT_ERRORS.NO_CONTRACT_FOUND);
+          return;
+        }
+      } catch (codeErr) {
+        console.error('DEBUG useWallet: Error fetching contract code:', codeErr);
+      }
+
       const contract = BharatVote__factory.connect(
         contractAddress,
         signer

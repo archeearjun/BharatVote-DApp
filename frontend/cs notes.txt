@@ -1,0 +1,83 @@
+A bit is the atom of computing. It is the most basic, undivided, unit of computing. Computing deals with computation of data. Here, data is any digital file- be it a text document or a music video. All data we see on our computer is a sequence of 1s and 0s. A bit can hold only two values, and all computation revolves around combinations of these  bits. A byte essentially is a combination of 8 bits grouped together. Such a combination is easier for the computer to handle and encode. A file size is always denoted by or measured in bytes. Eg: 1MB file is 1 megabyte of data. During the transfer of files, the speed is written as megabytes per second (MB/s) or megabits per second (Mb/s), depending on the system. The notation for a bit is a lowercase 'b' while the notation for a byte is an uppercase B. 
+
+
+A bit is the atom of computing. It is the most basic, undivided unit of computing. Computing deals with the computation of data. Here, data means any digital file — be it a text document or a music video. All data we see on a computer is a sequence of 1s and 0s. A bit can hold only two values, and all computation revolves around combinations of these bits. A byte is a group of 8 bits combined together. Grouping bits into bytes makes data easier for computers to handle and encode. File sizes are always measured in bytes. For example, a 1MB file means one megabyte of data. During file transfer, speed is often written as megabytes per second (MB/s) or megabits per second (Mb/s), depending on the system. The notation for bit is a lowercase 'b' while the notation for byte is an uppercase 'B'.
+
+Hashing in a blockchain is a key component. Hashing as i understand it is the act of securing a data by takin input data and then returning a 64 byte string of alpha numeric. Any change in the input gives an entirely different output string. Each block of the chain has the cruicial data and its hash and the previous hash. A hash is like a fingerprint. The key thing is no one can reversere engineer a hash to its original data. The way two blocks are connected is because of this hash. This is all i know/.
+
+
+Why production-grade Aadhaar KYC is not realistic for a semester project
+Licensing hurdles
+• Only UIDAI-approved KUAs/AUAs may hit the live e-KYC endpoint.
+• Approval demands MoUs, security‐policy paperwork and a ₹ 2–5 lakh performance bank guarantee—far beyond a student team’s reach.
+
+Cost per lookup
+• UIDAI bills about ₹ 20–₹ 25 every time you verify one Aadhaar.
+• Even a tiny 1 000-voter pilot would burn roughly ₹ 25 000; no academic budget covers that.
+
+Infrastructure & audits
+• KUAs must run inside ISO-27001 data-centres, use hardware-security-modules for keys, keep five-year audit logs and pass annual third-party reviews.
+• A localhost / Vercel / Heroku stack cannot satisfy those controls.
+
+Legal liability
+• Aadhaar Act §29 and India’s DPDP Act impose heavy fines—and even jail—for mishandling real Aadhaar or e-KYC XML.
+• Storing a single real resident’s data on a student laptop would break the law.
+
+Use-case whitelist
+• UIDAI currently allows live e-KYC only for regulated verticals such as banks, telcos and government subsidy programmes.
+• “Online voting research” is not on that list, so a production key would be rejected.
+
+Timeline mismatch
+• The paperwork and audits take months; your final demo is due in weeks.
+
+Why a mock / sandbox KYC layer is the practical choice
+Identical protocol, zero compliance
+UIDAI’s free sandbox returns synthetic e-KYC XML that is bit-for-bit compatible with production, so the code you write now will run unchanged once real credentials are available.
+
+Demonstrates full integration
+Reviewers still see the complete flow—encrypted PID block, digitally-signed XML, contract whitelisting, audit logs and explicit user consent—without legal risk.
+
+Unlimited voters, zero rupees
+You can load-test tens of thousands of voters without paying per-transaction fees or being throttled by UIDAI.
+
+Easy swap-in later
+Wrap all KYC logic inside a single kycService. In demo mode it points to sandbox or fixture data; in production mode it will call a real KUA endpoint as soon as an Election Commission supplies the licence and keys. No contract or UI rewrite is needed.
+
+Ethically and academically safe
+No real personally-identifiable information is collected or stored, so you comply with university research-ethics requirements and national data-protection law.
+
+One-liner for your mentor
+“Live Aadhaar KYC needs a licensed, audited KUA and costs ₹ 20 per lookup—impossible within a semester—so we’ll ship a mock KYC service that mirrors UIDAI’s flow, prove the end-to-end pipeline and leave a config switch for the Election Commission to plug in real credentials later.”
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -3,6 +3,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { setupPorts } from "./utils/killPorts";
 import { MerkleTree } from 'merkletreejs';
+import eligibleVoters from "../eligibleVoters.json";
 
 declare const ethers: any; // Declare ethers as a global variable to satisfy TypeScript
 
@@ -21,21 +22,20 @@ const keccak256Hasher = (data: string | Buffer) => {
   }
 };
 
-// For demonstration: A hardcoded list of eligible voter addresses.
-// This list MUST match the one used in your backend server (backend/server.js).
-const eligibleVoters = [
-  "0x90F79bf6EB2c4f870365E785982E1f101E93b906", // Your Brave MetaMask account ID (Voter)
-  "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266", // Hardhat Account #0 (Admin)
-  "0x0000000000000000000000000000000000000002", // Example voter 2
-  "0x0000000000000000000000000000000000000003", // Example voter 3
-  // Add more voter addresses here if needed
-];
-
 async function main() {
   console.log("🛠️  Checking environment...");
   await new Promise((r) => setTimeout(r, 2000));
   await setupPorts();
   console.log("✓ Environment OK");
+
+  // Get the signer accounts
+  const [deployer] = await ethers.getSigners();
+  console.log("🔑 Deploying with account:", deployer.address);
+  
+  // Check if this matches the expected admin address
+  const expectedAdmin = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
+  console.log("🎯 Expected admin address:", expectedAdmin);
+  console.log("✅ Admin address match:", deployer.address.toLowerCase() === expectedAdmin.toLowerCase());
 
   console.log("\n🚀 Deploying BharatVote...");
   const BharatVoteFactory = await ethers.getContractFactory("BharatVote");
@@ -44,6 +44,11 @@ async function main() {
 
   const address = await bharatVote.getAddress();
   console.log(`✓ Deployed at: ${address}`);
+
+  // Verify the admin address in the deployed contract
+  const contractAdmin = await bharatVote.admin();
+  console.log(`🔍 Contract admin address: ${contractAdmin}`);
+  console.log(`✅ Admin verification: ${contractAdmin.toLowerCase() === expectedAdmin.toLowerCase()}`);
 
   // Calculate Merkle Root dynamically
   const leaves = eligibleVoters.map(addr => keccak256Hasher(addr.toLowerCase()));

@@ -31,6 +31,23 @@ export default tseslint.config({
 })
 ```
 
+## Environment
+
+Create a `.env.local` in `frontend/`:
+
+```
+VITE_BACKEND_URL=http://localhost:3001
+VITE_CHAIN_ID=31337
+```
+
+Run sequence for local dev:
+
+1. Terminal A: `npx hardhat node`
+2. Terminal B: `npm run deploy` (from repo root) — writes `src/contracts/BharatVote.json`
+3. Terminal C: `cd backend && npm start`
+4. Terminal D: `cd frontend && npm run dev`
+
+
 You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
 
 ```js

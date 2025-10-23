@@ -4,28 +4,29 @@ const theme = createTheme({
   palette: {
     mode: "light",
     primary: {
-      main: "#1976d2",
-      light: "#42a5f5",
-      dark: "#1565c0",
+      main: "#4f46e5", // indigo-600
+      light: "#818cf8",
+      dark: "#3730a3",
     },
     secondary: {
-      main: "#dc004e",
-      light: "#ff4081",
-      dark: "#c51162",
+      main: "#10b981", // emerald-500
+      light: "#34d399",
+      dark: "#059669",
     },
     background: {
-      default: "#f5f5f5",
+      default: "#f7f7fb",
       paper: "#ffffff",
     },
     error: {
-      main: "#d32f2f",
+      main: "#ef4444",
     },
     success: {
-      main: "#2e7d32",
+      main: "#22c55e",
     },
   },
   typography: {
     fontFamily: [
+      'Inter',
       '-apple-system',
       'BlinkMacSystemFont',
       '"Segoe UI"',
@@ -34,12 +35,13 @@ const theme = createTheme({
       'Arial',
       'sans-serif',
     ].join(','),
-    h4: {
-      fontWeight: 600,
-    },
-    h6: {
-      fontWeight: 500,
-    },
+    h1: { fontWeight: 700 },
+    h2: { fontWeight: 700 },
+    h3: { fontWeight: 600 },
+    h4: { fontWeight: 600 },
+    h5: { fontWeight: 600 },
+    h6: { fontWeight: 600 },
+    button: { fontWeight: 600 },
   },
   components: {
     MuiPaper: {
@@ -48,7 +50,7 @@ const theme = createTheme({
       },
       styleOverrides: {
         root: {
-          borderRadius: 8,
+          borderRadius: 12,
           padding: '24px',
         },
       },
@@ -57,8 +59,8 @@ const theme = createTheme({
       styleOverrides: {
         root: {
           textTransform: 'none',
-          borderRadius: 8,
-          padding: '8px 16px',
+          borderRadius: 10,
+          padding: '10px 18px',
         },
         contained: {
           boxShadow: 'none',
@@ -71,7 +73,7 @@ const theme = createTheme({
     MuiAlert: {
       styleOverrides: {
         root: {
-          borderRadius: 8,
+          borderRadius: 10,
         },
       },
     },
@@ -82,7 +84,7 @@ const theme = createTheme({
       styleOverrides: {
         root: {
           '& .MuiOutlinedInput-root': {
-            borderRadius: 8,
+            borderRadius: 10,
           },
         },
       },
@@ -97,8 +99,8 @@ const theme = createTheme({
     MuiChip: {
       styleOverrides: {
         root: {
-          borderRadius: 4,
-          fontWeight: 500,
+          borderRadius: 999,
+          fontWeight: 600,
         },
         outlined: {
           borderWidth: 2,
@@ -111,8 +113,8 @@ const theme = createTheme({
     MuiLinearProgress: {
       styleOverrides: {
         root: {
-          borderRadius: 4,
-          height: 8,
+          borderRadius: 999,
+          height: 10,
         },
       },
     },

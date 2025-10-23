@@ -1,5 +1,7 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const { MerkleTree } = require('merkletreejs');
 const { keccak256, solidityPackedKeccak256 } = require('ethers');
 
@@ -23,17 +25,20 @@ const port = 3001;
 
 app.use(cors());
 app.use(express.json());
+app.use(helmet());
 
-// For demonstration: A hardcoded list of eligible voter addresses.
-// In a real application, this would come from a more dynamic source (e.g., smart contract, database).
-const eligibleVoters = [
-    "0x90F79bf6EB2c4f870365E785982E1f101E93b906", // Your Brave MetaMask account ID (Voter)
-    "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266", // Hardhat Account #0 (Admin) - Added to match deployment
-    "0x0000000000000000000000000000000000000002", // Example voter 2
-    "0x0000000000000000000000000000000000000003", // Example voter 3
-    // Replace with your actual voter addresses if you have a known list for testing
-];
+// Basic rate limiting to protect public endpoints
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+});
+app.use('/api/', apiLimiter);
 
+// Minimal input sanitizer for voter_id to alphanumerics/underscore only
+const sanitizeVoterId = (id) => (typeof id === 'string' ? id.replace(/[^\w-]/g, '').slice(0, 64) : '');
+
+// Load eligible voter addresses from shared JSON
+const eligibleVoters = require("../eligibleVoters.json");
 console.log('Loaded Eligible Voters:', eligibleVoters);
 
 // Hash the eligible voter addresses to create leaves (Buffers) for the Merkle tree.
@@ -54,21 +59,47 @@ const merkleRootHex = tree.getRoot().toString('hex');
 console.log('Merkle Root:', merkleRootHex);
 console.log('Debug: Merkle Root (Buffer):', tree.getRoot().toString('hex'), 'Type:', typeof tree.getRoot());
 
+// ---------------------
+// Mock KYC microservice
+// ---------------------
+const kycData = require("./kyc-data.json");
+app.get('/api/kyc', (req, res) => {
+  const voterId = sanitizeVoterId(req.query.voter_id);
+  if (!voterId) {
+    return res.status(400).json({ eligible: false, error: 'voter_id is required' });
+  }
+  const record = kycData.find(r => r.voterId === voterId);
+  if (!record) {
+    return res.json({ eligible: false });
+  }
+  // Successful KYC: return eligibility and expected Ethereum address
+  return res.json({ eligible: true, address: record.address });
+});
+// ---------------------
+
 app.get('/api/merkle-proof', (req, res) => {
-    const voterId = req.query.voter_id;
+    const voterId = sanitizeVoterId(req.query.voter_id);
     console.log(`Received Merkle proof request for voterId: ${voterId}`);
 
     if (!voterId) {
         return res.status(400).json({ error: 'voter_id is required' });
     }
 
-    // Hash the incoming voter ID to match the leaf format (Buffer).
-    // `toLowerCase()` is important here to canonicalize the address.
-    const hashedVoterId = keccak256Hasher(voterId.toLowerCase());
-    console.log('Checking voter ID:', voterId);
-    console.log('Hashed voter ID for proof generation:', hashedVoterId.toString('hex'));
+    // First, look up the voter ID in KYC data to get their Ethereum address
+    const kycRecord = kycData.find(r => r.voterId === voterId);
+    if (!kycRecord) {
+        return res.status(403).json({ error: 'Voter ID not found in KYC records' });
+    }
 
-    const proofElements = tree.getProof(hashedVoterId);
+    const voterAddress = kycRecord.address;
+    console.log('Found voter address for', voterId, ':', voterAddress);
+
+    // Hash the voter's Ethereum address to match the leaf format (Buffer).
+    // `toLowerCase()` is important here to canonicalize the address.
+    const hashedAddress = keccak256Hasher(voterAddress.toLowerCase());
+    console.log('Hashed voter address for proof generation:', hashedAddress.toString('hex'));
+
+    const proofElements = tree.getProof(hashedAddress);
     console.log('Debug: Proof Elements (first):', proofElements[0]?.data.toString('hex'), 'Type:', typeof proofElements[0]?.data);
 
     // Convert proof elements to 0x-prefixed hex strings for the frontend/contract.
@@ -76,7 +107,7 @@ app.get('/api/merkle-proof', (req, res) => {
     console.log('DEBUG: Backend sending proof:', proof);
 
     // Verify the proof internally for debugging.
-    const isEligible = tree.verify(proofElements, hashedVoterId, tree.getRoot());
+    const isEligible = tree.verify(proofElements, hashedAddress, tree.getRoot());
     console.log('Is eligible:', isEligible);
 
     if (!isEligible) {

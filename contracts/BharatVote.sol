@@ -50,6 +50,7 @@ contract BharatVote {
     event PhaseChanged(uint8 newPhase); // Emitting uint8 instead of Phase enum
     event TallyFinalized(uint256[] finalTally);
     event ElectionReset();
+    event AllCandidatesCleared();
 
     /* ───── Modifiers ───── */
     modifier onlyAdmin() {
@@ -93,9 +94,8 @@ contract BharatVote {
         external
         onlyAdmin
         onlyPhase(0) // 0: Commit
+        validCandidateId(_id)
     {
-        require(_id < candidates.length, "Invalid ID");
-        require(candidates[_id].isActive, "Already removed");
         candidates[_id].isActive = false;
         emit CandidateRemoved(_id);
     }
@@ -135,9 +135,39 @@ contract BharatVote {
         emit PhaseChanged(phase);
     }
 
-    function clearAllCandidates() external onlyAdmin {
+    // Emergency reset function - can be called from any phase
+    function emergencyReset() external onlyAdmin {
+        // Reset candidates
+        for (uint i = 0; i < candidates.length; i++) {
+            candidates[i].isActive = true;
+            tally[i] = 0;
+        }
+
+        // Reset voter states
+        for (uint i = 0; i < voters.length; i++) {
+            address v = voters[i];
+            commits[v] = bytes32(0);
+            hasCommitted[v] = false;
+            hasRevealed[v] = false;
+        }
+
+        delete voters;
+        phase = 0; // 0: Commit
+
+        emit ElectionReset();
+        emit PhaseChanged(phase);
+    }
+
+    function clearAllCandidates() external onlyAdmin onlyPhase(2) {
+        // Capture current candidate count before clearing
+        uint256 count = candidates.length;
+        // Remove all candidate entries
         delete candidates;
-        emit CandidateRemoved(0); // Emitting a generic event for all candidates removed, or create a specific one
+        // Reset tallies for each old candidate index
+        for (uint256 i = 0; i < count; i++) {
+            delete tally[i];
+        }
+        emit AllCandidatesCleared();
     }
 
     /* ───── Voting ───── */

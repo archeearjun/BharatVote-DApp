@@ -1,6 +1,10 @@
-export const CONTRACT_ADDRESS = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+// Contract address is loaded from deployment artifacts; remove hard-coded default
+//export const CONTRACT_ADDRESS = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+// Backend API URL for Merkle proof
+export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3001";
 
 // Phase constants - using numbers instead of enum for consistency with contract
+export type Phase = 0 | 1 | 2;
 export const COMMIT_PHASE = 0;
 export const REVEAL_PHASE = 1;
 export const FINISH_PHASE = 2;
@@ -95,7 +99,8 @@ export const SUCCESS_MESSAGES = {
   WALLET_DISCONNECTED: "Wallet disconnected successfully",
   CANDIDATE_ADDED: "Candidate added successfully",
   ELECTION_RESET: "Election has been reset successfully",
-  PHASE_ADVANCED: "Phase advanced successfully"
+  PHASE_ADVANCED: "Phase advanced successfully",
+  CANDIDATES_CLEARED: "All candidates cleared successfully"
 } as const;
 
 export const ERROR_MESSAGES = {

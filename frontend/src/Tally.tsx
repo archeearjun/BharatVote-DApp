@@ -1,177 +1,374 @@
-import { useEffect, useState, useCallback } from "react";
-import {
-  Box,
-  Typography,
-  CircularProgress,
-  List,
-  ListItem,
-  ListItemText,
-  Paper,
+import React, { useState, useEffect } from 'react';
+import { useI18n } from './i18n';
+import { 
+  Card, 
+  CardContent, 
+  Typography, 
+  LinearProgress, 
+  Chip,
+  Stepper,
+  Step,
+  StepLabel,
   Alert,
-  AlertTitle,
-  LinearProgress,
-  Divider,
-  Stack,
-} from "@mui/material";
-import { COMMIT_PHASE, REVEAL_PHASE, FINISH_PHASE, UI_MESSAGES, WALLET_ERRORS, CONTRACT_ERRORS } from "./constants";
-import { BigNumberish } from "ethers";
-import type { BharatVote as BharatVoteContract } from "@typechain/BharatVote.sol/BharatVote";
-
-interface VoteCount {
-  candidateId: number;
-  candidateName: string;
-  votes: number;
-  percentage: number;
-}
+  IconButton,
+  Tooltip
+} from '@mui/material';
+import { 
+  BarChart as ChartIcon,
+  TrendingUp as TrendingIcon,
+  CheckCircle as CheckIcon,
+  Info as InfoIcon,
+  Refresh as RefreshIcon
+} from '@mui/icons-material';
 
 interface TallyProps {
-  contract: BharatVoteContract | null;
+  contract: any;
   phase: number;
   refreshTrigger: number;
 }
 
-export default function Tally({ contract, phase, refreshTrigger }: TallyProps) {
-  const [tally, setTally] = useState<VoteCount[]>([]);
-  const [totalVotes, setTotalVotes] = useState<number>(0);
-  const [loading, setLoading] = useState<boolean>(true);
+interface Candidate {
+  id: number;
+  name: string;
+  voteCount: number;
+}
+
+const Tally: React.FC<TallyProps> = ({ contract, phase, refreshTrigger }) => {
+  const { t } = useI18n();
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [totalVotes, setTotalVotes] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  const fetchTally = useCallback(async () => {
-    if (!contract) return;
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const [rawResults, rawCandidates] = await Promise.all([
-        contract.getTally(),
-        contract.getCandidates(),
-      ]);
-
-      const total = rawResults.reduce((sum: number, v: BigNumberish) => sum + Number(v), 0);
-
-      const counts: VoteCount[] = rawResults.map((v: BigNumberish, i: number) => ({
-        candidateId: i,
-        candidateName: rawCandidates[i].name,
-        votes: Number(v),
-        percentage: total > 0 ? (Number(v) / total) * 100 : 0,
-      }));
-
-      setTotalVotes(total);
-      setTally(counts.sort((a, b) => b.votes - a.votes));
-    } catch (e: any) {
-      console.error("Tally fetch error:", e);
-      setError(WALLET_ERRORS.CONNECT_FAILED ?? "Failed to fetch tally");
-    } finally {
-      setLoading(false);
-    }
-  }, [contract]);
+  const phases = [
+    { id: 0, label: t('tally.commit'), description: t('tally.votesBeingCollected'), status: 'active' },
+    { id: 1, label: t('tally.reveal'), description: t('tally.votesBeingCounted'), status: 'active' },
+    { id: 2, label: t('tally.finished'), description: t('tally.resultsFinalized'), status: 'active' }
+  ];
 
   useEffect(() => {
-    if (!contract || (phase !== FINISH_PHASE && phase !== REVEAL_PHASE)) {
-      setLoading(false);
-      return;
-    }
-    fetchTally();
-  }, [contract, phase, fetchTally, refreshTrigger]);
+    fetchResults();
+  }, [contract, phase, refreshTrigger]);
 
-  const getPhaseLabel = (currentPhase: number) => {
-    switch (currentPhase) {
-      case COMMIT_PHASE:
-        return "Commit Phase";
-      case REVEAL_PHASE:
-        return "Reveal Phase";
-      case FINISH_PHASE:
-        return "Election Finished";
-      default:
-        return "Unknown Phase";
+  const fetchResults = async () => {
+    if (!contract) return;
+    
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const fetchedCandidates = await contract.getCandidates();
+      const candidatesWithVotes = await Promise.all(
+        fetchedCandidates.map(async (candidate: any) => {
+          // Contract exposes getVotes(uint256) -> uint256
+          const raw = await contract.getVotes(candidate.id);
+          const voteCount = typeof raw === 'bigint' ? Number(raw) : Number(raw || 0);
+          return {
+            id: Number(candidate.id),
+            name: candidate.name,
+            voteCount
+          };
+        })
+      );
+      
+      setCandidates(candidatesWithVotes);
+      setTotalVotes(candidatesWithVotes.reduce((sum, c) => sum + c.voteCount, 0));
+      setLastUpdated(new Date());
+    } catch (err: any) {
+      setError(err.message || t('tally.failedToFetch'));
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // ──── Render ────
-
-  if (!contract) {
-    return (
-      <Alert severity="warning">
-        <AlertTitle>Connection Error</AlertTitle>
-        {CONTRACT_ERRORS.NO_CONTRACT}
-      </Alert>
+  const getWinner = () => {
+    if (candidates.length === 0 || totalVotes === 0) return null;
+    return candidates.reduce((winner, current) => 
+      current.voteCount > winner.voteCount ? current : winner
     );
-  }
+  };
 
-  if (loading) {
-    return (
-      <Paper sx={{ p: 3 }}>
-        <Stack spacing={2} alignItems="center">
-          <CircularProgress size={24} />
-          <Typography color="text.secondary">
-            {UI_MESSAGES.LOADING}
-          </Typography>
-        </Stack>
-      </Paper>
-    );
-  }
+  const getPhaseStatus = (phaseId: number) => {
+    if (phaseId < phase) return 'completed';
+    if (phaseId === phase) return 'active';
+    return 'pending';
+  };
 
-  if (error) {
-    return (
-      <Alert
-        severity="error"
-        onClose={() => setError(null)}
-        sx={{ mb: 2 }}
-      >
-        <AlertTitle>Error</AlertTitle>
-        {error}
-      </Alert>
-    );
-  }
+  const getPhaseIcon = (phaseId: number) => {
+    const status = getPhaseStatus(phaseId);
+    if (status === 'completed') return <CheckIcon color="success" />;
+    if (status === 'active') return <TrendingIcon color="primary" />;
+    return <InfoIcon color="disabled" />;
+  };
+
+  const formatPercentage = (votes: number) => {
+    if (totalVotes === 0) return '0%';
+    return `${((votes / totalVotes) * 100).toFixed(1)}%`;
+  };
+
+  // const getStatusColor = (phaseId: number) => {
+  //   const status = getPhaseStatus(phaseId);
+  //   if (status === 'completed') return 'success';
+  //   if (status === 'active') return 'primary';
+  //   return 'default';
+  // };
 
   return (
-    <Paper sx={{ p: 3 }}>
-      <Stack spacing={3}>
-        <Box>
-          <Typography variant="h6" gutterBottom>
-            Election Results
-          </Typography>
-          <Typography variant="subtitle2" color="text.secondary">
-            Total Votes: {totalVotes}
-          </Typography>
-        </Box>
+    <div className="space-y-6">
+      {/* Header with Refresh */}
+      <div className="flex items-center justify-between">
+        <Typography variant="h5" className="font-semibold text-gray-800">
+          {t('tally.electionResults')}
+        </Typography>
+        <Tooltip title={t('tally.refreshResults')}>
+          <IconButton 
+            onClick={fetchResults} 
+            disabled={isLoading}
+            className="text-blue-600 hover:bg-blue-50"
+          >
+            <RefreshIcon />
+          </IconButton>
+        </Tooltip>
+      </div>
 
-        <Divider />
+      {/* Error Message */}
+      {error && (
+        <Alert severity="error" onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
 
-        {tally.length === 0 ? (
-          <Alert severity="info">
-            <AlertTitle>No Votes</AlertTitle>
-            {UI_MESSAGES.NO_VOTES}
-          </Alert>
-        ) : (
-          <List>
-            {tally.map(({ candidateId, candidateName, votes, percentage }) => (
-              <ListItem
-                key={candidateId}
-                sx={{
-                  flexDirection: "column",
-                  alignItems: "stretch",
-                  py: 2,
-                }}
-              >
-                <ListItemText
-                  primary={candidateName}
-                  secondary={`${votes} vote${votes !== 1 ? "s" : ""} (${percentage.toFixed(
-                    1
-                  )}%)`}
-                  primaryTypographyProps={{ fontWeight: 500 }}
-                />
-                <LinearProgress
-                  variant="determinate"
-                  value={percentage}
-                  sx={{ height: 8, borderRadius: 4, mt: 1 }}
-                />
-              </ListItem>
+      {/* Phase-specific messages */}
+      {phase === 0 && (
+        <Alert severity="info" className="mb-4">
+          <Typography variant="body2">
+            <strong>{t('tally.commitPhase')}:</strong> {t('tally.votesBeingCollected')}
+          </Typography>
+        </Alert>
+      )}
+
+      {phase === 1 && (
+        <Alert severity="warning" className="mb-4">
+          <Typography variant="body2">
+            <strong>{t('tally.revealPhase')}:</strong> {t('tally.votesBeingRevealed')}
+          </Typography>
+        </Alert>
+      )}
+
+      {phase === 2 && (
+        <Alert severity="success" className="mb-4">
+          <Typography variant="body2">
+            <strong>{t('tally.electionComplete')}:</strong> {t('tally.allVotesCounted')}
+          </Typography>
+        </Alert>
+      )}
+
+      {/* Election Progress */}
+      <Card className="shadow-sm border border-gray-100">
+        <CardContent className="p-6">
+          <Typography variant="h6" className="font-semibold text-gray-800 mb-4">
+            {t('tally.electionProgress')}
+          </Typography>
+          
+          <Stepper activeStep={phase} orientation="horizontal" className="mb-4">
+            {phases.map((phaseItem) => (
+              <Step key={phaseItem.id} completed={phase > phaseItem.id}>
+                <StepLabel
+                  StepIconComponent={() => getPhaseIcon(phaseItem.id)}
+                  className={phase === phaseItem.id ? 'text-blue-600' : ''}
+                >
+                  <div className="text-center">
+                    <Typography 
+                      variant="body2" 
+                      className={`font-medium ${phase === phaseItem.id ? 'text-blue-600' : 'text-gray-500'}`}
+                    >
+                      {phaseItem.label}
+                    </Typography>
+                    <Typography 
+                      variant="caption" 
+                      className="text-gray-400 block mt-1 max-w-24"
+                    >
+                      {phaseItem.description}
+                    </Typography>
+                  </div>
+                </StepLabel>
+              </Step>
             ))}
-          </List>
-        )}
-      </Stack>
-    </Paper>
+          </Stepper>
+
+          {lastUpdated && (
+            <Typography variant="caption" className="text-gray-500 text-center block">
+              {t('tally.lastUpdated')}: {lastUpdated.toLocaleTimeString()}
+            </Typography>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Results Summary - Show during reveal and finished phases */}
+      {(phase === 1 || phase === 2) && candidates.length > 0 && (
+        <Card className="shadow-sm border border-gray-100">
+          <CardContent className="p-6">
+            <Typography variant="h4" className="text-center mb-6 font-bold text-gray-800">
+              {phase === 1 ? t('tally.liveResults') : t('tally.finalResults')}
+            </Typography>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div className="text-center p-4 bg-blue-50 rounded-lg">
+                <Typography variant="h4" className="text-blue-600 font-bold">
+                  {candidates.length}
+                </Typography>
+                <Typography variant="body2" className="text-blue-700">
+                  {t('tally.candidates')}
+                </Typography>
+              </div>
+              
+              <div className="text-center p-4 bg-green-50 rounded-lg">
+                <Typography variant="h4" className="text-green-600 font-bold">
+                  {totalVotes}
+                </Typography>
+                <Typography variant="body2" className="text-green-700">
+                  {t('tally.totalVotes')}
+                </Typography>
+              </div>
+              
+              <div className="text-center p-4 bg-purple-50 rounded-lg">
+                <Typography variant="h4" className="text-purple-600 font-bold">
+                  {phase === 2 ? t('tally.final') : t('tally.live')}
+                </Typography>
+                <Typography variant="body2" className="text-purple-700">
+                  {t('tally.status')}
+                </Typography>
+              </div>
+            </div>
+
+            {/* Winner Highlight */}
+            {phase === 2 && getWinner() && (
+              <div className="mb-6 p-4 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg border border-yellow-200">
+                <div className="flex items-center justify-center space-x-3">
+                  <CheckIcon className="w-8 h-8 text-yellow-600" />
+                  <div className="text-center">
+                    <Typography variant="h6" className="text-yellow-800 font-semibold">
+                      {t('tally.electionWinner')}
+                    </Typography>
+                    <Typography variant="h5" className="text-yellow-700 font-bold">
+                      {getWinner()?.name}
+                    </Typography>
+                    <Typography variant="body2" className="text-yellow-600">
+                      {t('tally.withVotes')}: {getWinner()?.voteCount} ({formatPercentage(getWinner()?.voteCount || 0)})
+                    </Typography>
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Detailed Results - Show during reveal and finished phases */}
+      {(phase === 1 || phase === 2) && candidates.length > 0 && (
+        <Card className="shadow-sm border border-gray-100">
+          <CardContent className="p-6">
+            <Typography variant="h6" className="font-semibold text-gray-800 mb-4">
+              {phase === 1 ? t('tally.liveVoteCounts') : t('tally.finalVoteCounts')}
+            </Typography>
+            
+            <div className="space-y-4">
+              {candidates.map((candidate) => {
+                const percentage = formatPercentage(candidate.voteCount);
+                const isWinner = phase === 2 && getWinner()?.id === candidate.id;
+                
+                return (
+                  <div key={candidate.id} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <Chip 
+                          label={`#${candidate.id}`} 
+                          size="small" 
+                          color="primary" 
+                          variant="outlined" 
+                        />
+                        <Typography variant="body1" className="font-medium">
+                          {candidate.name}
+                          {isWinner && (
+                            <Chip 
+                              label={t('tally.winner')} 
+                              size="small" 
+                              color="success" 
+                              className="ml-2" 
+                            />
+                          )}
+                        </Typography>
+                      </div>
+                      <div className="text-right">
+                        <Typography variant="h6" className="font-semibold text-gray-800">
+                          {candidate.voteCount}
+                        </Typography>
+                        <Typography variant="caption" className="text-gray-500">
+                          {percentage}
+                        </Typography>
+                      </div>
+                    </div>
+                    
+                    <LinearProgress
+                      variant="determinate"
+                      value={totalVotes > 0 ? (candidate.voteCount / totalVotes) * 100 : 0}
+                      className="h-2"
+                      sx={{
+                        backgroundColor: '#e5e7eb',
+                        '& .MuiLinearProgress-bar': {
+                          backgroundColor: isWinner ? '#10b981' : '#3b82f6',
+                        }
+                      }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* No Results State - Show appropriate message for each phase */}
+      {candidates.length === 0 && (
+        <Card className="shadow-sm border border-gray-100">
+          <CardContent className="p-6">
+            <div className="text-center py-8">
+              <ChartIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <Typography variant="h6" className="text-gray-600 mb-2">
+                {phase === 0 ? t('tally.electionNotStarted') : t('tally.noResultsAvailable')}
+              </Typography>
+              <Typography variant="body2" className="text-gray-500">
+                {phase === 0 
+                  ? t('tally.addCandidates')
+                  : phase === 1 
+                  ? t('tally.votesRevealed')
+                  : t('tally.electionComplete')
+                }
+              </Typography>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Commit Phase Message - Show when no results yet */}
+      {phase === 0 && candidates.length > 0 && (
+        <Card className="shadow-sm border border-gray-100">
+          <CardContent className="p-6">
+            <div className="text-center py-8">
+              <InfoIcon className="w-16 h-16 text-blue-400 mx-auto mb-4" />
+              <Typography variant="h6" className="text-blue-600 mb-2">
+                {t('tally.votingInProgress')}
+              </Typography>
+              <Typography variant="body2" className="text-blue-700">
+                {t('tally.commitPhaseActive')}
+              </Typography>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
   );
-}
+};
+
+export default Tally;

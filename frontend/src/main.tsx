@@ -1,9 +1,12 @@
+import './polyfills';
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { ThemeProvider } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
 import App from "./App";
+import { I18nProvider } from './i18n';
 import theme from "./theme";
+import './index.css';
 
 const initializeApp = () => {
   const rootElement = document.getElementById("root");
@@ -16,7 +19,9 @@ const initializeApp = () => {
     <React.StrictMode>
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <App />
+        <I18nProvider>
+          <App />
+        </I18nProvider>
       </ThemeProvider>
     </React.StrictMode>
   );

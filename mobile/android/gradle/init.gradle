@@ -1,0 +1,14 @@
+allprojects {
+    tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+        kotlinOptions {
+            freeCompilerArgs += [
+                "-Xjsr305=strict",
+                "-Xjvm-default=all",
+                "-Xsuppress-version-warnings",
+                "-Xno-warn"
+            ]
+            // Remove -Werror if it exists
+            freeCompilerArgs.removeAll { it == "-Werror" }
+        }
+    }
+}
