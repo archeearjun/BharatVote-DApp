@@ -142,6 +142,12 @@ contract BharatVote {
 
         delete voters;
         phase = 0; // 0: Commit
+        // Week 9: Reset statistics
+        totalCommits = 0;
+        totalReveals = 0;
+        electionStartTime = block.timestamp;
+        commitPhaseEndTime = 0;
+        revealPhaseEndTime = 0;
 
         emit ElectionReset();
         emit PhaseChanged(phase);
