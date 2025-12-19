@@ -19,22 +19,6 @@ const NETWORKS: NetworkConfig[] = [
     explorer: 'http://localhost:8545',
     contractAddress: contractJson.address,
     isLocal: true
-  },
-  {
-    name: 'Sepolia Testnet',
-    chainId: 11155111,
-    rpcUrl: 'https://sepolia.infura.io/v3/YOUR-PROJECT-ID',
-    explorer: 'https://sepolia.etherscan.io',
-    contractAddress: 'YOUR_SEPOLIA_CONTRACT_ADDRESS',
-    isLocal: false
-  },
-  {
-    name: 'Mumbai Testnet',
-    chainId: 80001,
-    rpcUrl: 'https://polygon-mumbai.infura.io/v3/YOUR-PROJECT-ID',
-    explorer: 'https://mumbai.polygonscan.com',
-    contractAddress: 'YOUR_MUMBAI_CONTRACT_ADDRESS',
-    isLocal: false
   }
 ];
 

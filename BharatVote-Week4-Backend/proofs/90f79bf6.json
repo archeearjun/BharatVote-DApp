@@ -1,0 +1,10 @@
+{
+  "address": "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
+  "leaf": "0x1ebaa930b8e9130423c183bf38b0564b0103180b7dad301013b18e59880541ae",
+  "proof": [
+    "0x8a3552d60a98e0ade765adddad0a2e420ca9b1eef5f326ba7ab860bb4ea72c94",
+    "0xd84f24ce26cdc438583e0cc569188f900c6589d87c866189904bdb1ad02a6e10"
+  ],
+  "merkleRoot": "0x5fb8671ab85baa9ceee77d6e69e37a4fc0d74835daeef64ab90dc0394bb73389",
+  "verified": true
+}

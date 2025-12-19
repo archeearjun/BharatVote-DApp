@@ -1,0 +1,6 @@
+node -e "(async()=>{const {ethers}=require('hardhat'); const addr='0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0'; const p = new (require('ethers')).JsonRpcProvider('http://127.0.0.1:8545'); const code=await p.getCode(addr); console.log('codeLen', code.length, 'isDeployed', code!=='0x'); process.exit(0)})().catch(e=>{console.error(e); process.exit(1)})"
+npx hardhat test | cat
+npx hardhat run scripts/deploy.ts --network localhost
+npx hardhat run scripts/quick-deploy.js --network localhost
+node scripts/quick-deploy.js
+taskkill /f /im node.exe

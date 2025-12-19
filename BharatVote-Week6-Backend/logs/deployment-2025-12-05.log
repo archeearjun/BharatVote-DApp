@@ -1,0 +1,11 @@
+[2025-12-05T14:05:07.687Z] === Demo Deployment Started ===
+[2025-12-05T14:05:16.594Z] Network: localhost (31337)
+[2025-12-05T14:05:16.702Z] Deployer: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+[2025-12-05T14:05:16.711Z] Balance: 10000.0 ETH
+[2025-12-05T14:05:16.712Z] Deploying contract...
+[2025-12-05T14:05:16.812Z] Contract deployed: 0x5FbDB2315678afecb367f032d93F642f64180aa3
+[2025-12-05T14:05:16.828Z] Admin: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+[2025-12-05T14:05:16.843Z] Setting Merkle root for 4 voters
+[2025-12-05T14:05:19.050Z] Merkle root: 0x5fb8671ab85baa9ceee77d6e69e37a4fc0d74835daeef64ab90dc0394bb73389
+[2025-12-05T14:05:19.078Z] Deployment state saved
+[2025-12-05T14:05:19.083Z] === Demo Deployment Completed in 11.39s ===

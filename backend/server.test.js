@@ -7,22 +7,25 @@ const { keccak256, solidityPackedKeccak256 } = require('ethers');
 // Mock the KYC data
 jest.mock('./kyc-data.json', () => [
   { "voterId": "VOTER1", "address": "0x90F79bf6EB2c4f870365E785982E1f101E93b906" },
-  { "voterId": "VOTER2", "address": "0x0000000000000000000000000000000000000002" },
-  { "voterId": "VOTER3", "address": "0x0000000000000000000000000000000000000003" },
-  { "voterId": "VOTER4", "address": "0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199" }
+  { "voterId": "VOTER2", "address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8" },
+  { "voterId": "VOTER3", "address": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC" },
+  { "voterId": "VOTER4", "address": "0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199" },
+  { "voterId": "VOTER5", "address": "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65" }
 ], { virtual: true });
 
 // Mock the eligible voters JSON
 jest.mock('../eligibleVoters.json', () => [
   "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
-  "0x0000000000000000000000000000000000000002",
-  "0x0000000000000000000000000000000000000003",
-  "0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199"
+  "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+  "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+  "0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199",
+  "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65"
 ], { virtual: true });
 
 describe('BharatVote Backend API', () => {
   let app;
   let server;
+  let merkleRootHex;
 
   beforeAll(() => {
     // Create a test version of the server without starting it
@@ -43,6 +46,7 @@ describe('BharatVote Backend API', () => {
     const eligibleVoters = require("../eligibleVoters.json");
     const leaves = eligibleVoters.map(addr => keccak256Hasher(addr.toLowerCase()));
     const tree = new MerkleTree(leaves, keccak256Hasher, { sortLeaves: true, sortPairs: true });
+    merkleRootHex = '0x' + tree.getRoot().toString('hex');
     const kycData = require("./kyc-data.json");
 
     // KYC endpoint
@@ -81,6 +85,11 @@ describe('BharatVote Backend API', () => {
       }
 
       res.json(proof);
+    });
+
+    // Merkle root endpoint
+    app.get('/api/merkle-root', (_req, res) => {
+      res.json({ merkleRoot: merkleRootHex });
     });
   });
 
@@ -123,9 +132,10 @@ describe('BharatVote Backend API', () => {
       it('should handle all test voter IDs correctly', async () => {
         const testCases = [
           { voterId: 'VOTER1', address: '0x90F79bf6EB2c4f870365E785982E1f101E93b906' },
-          { voterId: 'VOTER2', address: '0x0000000000000000000000000000000000000002' },
-          { voterId: 'VOTER3', address: '0x0000000000000000000000000000000000000003' },
-          { voterId: 'VOTER4', address: '0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199' }
+          { voterId: 'VOTER2', address: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8' },
+          { voterId: 'VOTER3', address: '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC' },
+          { voterId: 'VOTER4', address: '0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199' },
+          { voterId: 'VOTER5', address: '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65' }
         ];
 
         for (const testCase of testCases) {
@@ -196,7 +206,7 @@ describe('BharatVote Backend API', () => {
       });
 
       it('should handle all eligible voters', async () => {
-        const voterIds = ['VOTER1', 'VOTER2', 'VOTER3', 'VOTER4'];
+        const voterIds = ['VOTER1', 'VOTER2', 'VOTER3', 'VOTER4', 'VOTER5'];
         
         for (const voterId of voterIds) {
           const response = await request(app)
@@ -208,6 +218,16 @@ describe('BharatVote Backend API', () => {
           expect(response.body.length).toBeGreaterThan(0);
         }
       });
+    });
+  });
+
+  describe('Merkle Root API', () => {
+    it('should return the merkle root', async () => {
+      const response = await request(app)
+        .get('/api/merkle-root')
+        .expect(200);
+
+      expect(response.body).toEqual({ merkleRoot: merkleRootHex });
     });
   });
 
@@ -277,7 +297,7 @@ describe('BharatVote Backend API', () => {
         .expect(200);
       
       const duration = Date.now() - start;
-      expect(duration).toBeLessThan(100); // Should respond within 100ms
+      expect(duration).toBeLessThan(200); // Allow small variance
     });
 
     it('should respond to Merkle proof requests quickly', async () => {

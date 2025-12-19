@@ -25,6 +25,7 @@ interface TallyProps {
   contract: any;
   phase: number;
   refreshTrigger: number;
+  eligibleCount?: number;
 }
 
 interface Candidate {
@@ -33,13 +34,14 @@ interface Candidate {
   voteCount: number;
 }
 
-const Tally: React.FC<TallyProps> = ({ contract, phase, refreshTrigger }) => {
+const Tally: React.FC<TallyProps> = ({ contract, phase, refreshTrigger, eligibleCount }) => {
   const { t } = useI18n();
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [totalVotes, setTotalVotes] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const hasData = candidates.length > 0;
 
   const phases = [
     { id: 0, label: t('tally.commit'), description: t('tally.votesBeingCollected'), status: 'active' },
@@ -107,12 +109,9 @@ const Tally: React.FC<TallyProps> = ({ contract, phase, refreshTrigger }) => {
     return `${((votes / totalVotes) * 100).toFixed(1)}%`;
   };
 
-  // const getStatusColor = (phaseId: number) => {
-  //   const status = getPhaseStatus(phaseId);
-  //   if (status === 'completed') return 'success';
-  //   if (status === 'active') return 'primary';
-  //   return 'default';
-  // };
+  const completionPct = eligibleCount && eligibleCount > 0
+    ? `${Math.min(100, (totalVotes / eligibleCount) * 100).toFixed(1)}%`
+    : '—';
 
   return (
     <div className="space-y-6">
@@ -130,6 +129,22 @@ const Tally: React.FC<TallyProps> = ({ contract, phase, refreshTrigger }) => {
             <RefreshIcon />
           </IconButton>
         </Tooltip>
+      </div>
+
+      {/* High-level participation stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="p-4 rounded-lg bg-slate-50 border border-slate-100">
+          <p className="text-xs uppercase tracking-wide text-slate-600">Eligible Voters</p>
+          <p className="text-2xl font-semibold text-slate-900 mt-1">{eligibleCount ?? '—'}</p>
+        </div>
+        <div className="p-4 rounded-lg bg-blue-50 border border-blue-100">
+          <p className="text-xs uppercase tracking-wide text-blue-600">Votes Cast</p>
+          <p className="text-2xl font-semibold text-blue-700 mt-1">{totalVotes}</p>
+        </div>
+        <div className="p-4 rounded-lg bg-green-50 border border-green-100">
+          <p className="text-xs uppercase tracking-wide text-green-600">Completion</p>
+          <p className="text-2xl font-semibold text-green-700 mt-1">{completionPct}</p>
+        </div>
       </div>
 
       {/* Error Message */}
@@ -206,7 +221,7 @@ const Tally: React.FC<TallyProps> = ({ contract, phase, refreshTrigger }) => {
       </Card>
 
       {/* Results Summary - Show during reveal and finished phases */}
-      {(phase === 1 || phase === 2) && candidates.length > 0 && (
+      {(phase === 1 || phase === 2) && hasData && (
         <Card className="shadow-sm border border-gray-100">
           <CardContent className="p-6">
             <Typography variant="h4" className="text-center mb-6 font-bold text-gray-800">
@@ -265,8 +280,20 @@ const Tally: React.FC<TallyProps> = ({ contract, phase, refreshTrigger }) => {
         </Card>
       )}
 
+      {/* Empty states */}
+      {(phase === 1 || phase === 2) && !isLoading && candidates.length === 0 && (
+        <Alert severity="info">
+          {t('tally.noCandidates') || 'No candidates have been registered yet.'}
+        </Alert>
+      )}
+      {(phase === 1 || phase === 2) && !isLoading && candidates.length > 0 && totalVotes === 0 && (
+        <Alert severity="info">
+          {t('tally.noVotesYet') || 'No votes have been revealed yet. Results will appear once votes are revealed.'}
+        </Alert>
+      )}
+
       {/* Detailed Results - Show during reveal and finished phases */}
-      {(phase === 1 || phase === 2) && candidates.length > 0 && (
+      {(phase === 1 || phase === 2) && hasData && (
         <Card className="shadow-sm border border-gray-100">
           <CardContent className="p-6">
             <Typography variant="h6" className="font-semibold text-gray-800 mb-4">

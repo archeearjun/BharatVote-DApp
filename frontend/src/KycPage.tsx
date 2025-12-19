@@ -158,6 +158,13 @@ const KycPage: React.FC<KycPageProps> = ({ account, onVerified }) => {
     setToast({ type: 'success', message: t('kyc.faceVerified') });
     setTimeout(() => {
       console.log('DEBUG KYC: Calling onVerified with voterId:', voterId);
+      try {
+        const key = `bv_kyc_${account.toLowerCase()}`;
+        localStorage.setItem(key, '1');
+        localStorage.setItem(`${key}_id`, voterId);
+      } catch (err) {
+        console.error('DEBUG KYC: Failed to persist voter id', err);
+      }
       onVerified(voterId);
     }, 1500);
   };
@@ -173,7 +180,7 @@ const KycPage: React.FC<KycPageProps> = ({ account, onVerified }) => {
                 <Shield className="w-8 h-8 text-white" />
               </div>
               <h1 className="text-2xl font-semibold text-slate-900 mb-2">BharatVote</h1>
-              <p className="text-sm text-slate-600">Secure Voter Verification</p>
+              <p className="text-sm text-slate-600">{t('kyc.voterVerification')}</p>
             </div>
 
             {/* Progress Bar */}

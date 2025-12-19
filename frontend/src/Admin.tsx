@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { PHASE_LABELS, ERROR_MESSAGES, COMMIT_PHASE, REVEAL_PHASE, FINISH_PHASE, CANDIDATE_MESSAGES, SUCCESS_MESSAGES } from "./constants";
+import { PHASE_LABELS, ERROR_MESSAGES, COMMIT_PHASE, REVEAL_PHASE, FINISH_PHASE, CANDIDATE_MESSAGES, SUCCESS_MESSAGES, BACKEND_URL } from "./constants";
 import { useI18n } from './i18n';
 import type { BharatVote } from "@typechain/BharatVote.sol/BharatVote";
 import { getCandidateLabel, setCandidateLabels } from './utils/candidateLabels';
@@ -34,6 +34,8 @@ interface AdminState {
   loading: boolean;
   error: string | null;
   success: string | null;
+  merkleRoot: string | null;
+  merkleLoading: boolean;
 }
 
 const initialState: AdminState = {
@@ -42,6 +44,8 @@ const initialState: AdminState = {
   loading: false,
   error: null,
   success: null,
+  merkleRoot: null,
+  merkleLoading: false,
 };
 
 export default function Admin({ contract, phase, onError, onPhaseChange }: AdminProps) {
@@ -456,6 +460,46 @@ export default function Admin({ contract, phase, onError, onPhaseChange }: Admin
 
   const PhaseIcon = getPhaseIcon(phase);
 
+  const fetchMerkleRoot = useCallback(async () => {
+    setState(prev => ({ ...prev, merkleLoading: true, error: null, success: null }));
+    try {
+      const resp = await fetch(`${BACKEND_URL}/api/merkle-root`);
+      if (!resp.ok) {
+        throw new Error(`Backend returned ${resp.status}`);
+      }
+      const data = await resp.json();
+      if (!data?.merkleRoot) {
+        throw new Error('No merkleRoot returned from backend');
+      }
+      setState(prev => ({ ...prev, merkleRoot: data.merkleRoot, merkleLoading: false }));
+    } catch (err: any) {
+      const message = err?.message || 'Failed to fetch Merkle root from backend';
+      setState(prev => ({ ...prev, error: message, merkleLoading: false }));
+      onError?.(message);
+    }
+  }, [onError]);
+
+  const handleSetMerkleRoot = useCallback(async () => {
+    if (!contract) {
+      setState(prev => ({ ...prev, error: "Contract not available" }));
+      return;
+    }
+    if (!state.merkleRoot) {
+      setState(prev => ({ ...prev, error: "Fetch Merkle root from backend first" }));
+      return;
+    }
+    setState(prev => ({ ...prev, loading: true, error: null, success: null }));
+    try {
+      const tx = await contract.setMerkleRoot(state.merkleRoot);
+      await tx.wait();
+      setState(prev => ({ ...prev, success: "Merkle root set on-chain", loading: false }));
+    } catch (err: any) {
+      const message = extractErrorMessage(err);
+      setState(prev => ({ ...prev, error: message, loading: false }));
+      onError?.(message);
+    }
+  }, [contract, state.merkleRoot, onError, extractErrorMessage]);
+
   return (
     <div className="space-y-8 animate-fade-in">
       {/* Header */}
@@ -514,6 +558,41 @@ export default function Admin({ contract, phase, onError, onPhaseChange }: Admin
             </div>
           </div>
         )}
+      </div>
+
+      {/* Merkle Root / Eligibility */}
+      <div className="card-premium p-6">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center">
+            <Users className="w-5 h-5 text-slate-700" />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">Eligibility Root</h2>
+            <p className="text-sm text-slate-600">Fetch from backend and anchor on-chain</p>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <button
+            onClick={fetchMerkleRoot}
+            disabled={state.merkleLoading}
+            className="btn-secondary w-full sm:w-auto"
+          >
+            {state.merkleLoading ? <div className="spinner" /> : 'Fetch Merkle Root'}
+          </button>
+          <button
+            onClick={handleSetMerkleRoot}
+            disabled={state.loading || !state.merkleRoot}
+            className="btn-primary w-full sm:w-auto"
+          >
+            {state.loading ? <div className="spinner" /> : 'Set Root On-Chain'}
+          </button>
+          <div className="flex-1">
+            <p className="text-xs font-mono break-all bg-slate-50 border border-slate-200 rounded-lg p-2">
+              {state.merkleRoot || 'No root fetched yet'}
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Add Candidate */}

@@ -106,12 +106,8 @@ async function main() {
   console.log("📱 Frontend contract address updated");
   console.log("📄 Deployment info saved to deployment-info.json");
   console.log("\n🔗 Contract Explorer Links:");
-  
-  if (network.chainId === 11155111n) { // Sepolia
-    console.log(`🌐 Sepolia Etherscan: https://sepolia.etherscan.io/address/${address}`);
-  } else if (network.chainId === 80001n) { // Mumbai
-    console.log(`🌐 Mumbai Polygonscan: https://mumbai.polygonscan.com/address/${address}`);
-  } else if (network.chainId === 1n) { // Mainnet
+
+  if (network.chainId === 1n) { // Mainnet
     console.log(`🌐 Etherscan: https://etherscan.io/address/${address}`);
   }
   

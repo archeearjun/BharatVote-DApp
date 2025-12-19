@@ -1,0 +1,334 @@
+BharatVote-Week1-Frontend/
+│
+├── 📋 Documentation Files (Read These First)
+│   ├── README.md                           ← START HERE! Complete overview of Week 1
+│   ├── SETUP_COMMANDS.md                   ← Terminal commands with detailed explanations
+│   ├── DEMO_SCRIPT.md                      ← What to say during your presentation
+│   ├── PPT_OUTLINE.md                      ← PowerPoint slide-by-slide guide
+│   ├── ACADEMIC_REPORT_SUMMARY.md          ← Written report templates for submission
+│   ├── WEEK1_COMPLETE_GUIDE.md             ← Everything in one place
+│   └── FOLDER_STRUCTURE.txt                ← This file!
+│
+├── ⚙️ Configuration Files (Don't Edit Unless You Know What You're Doing)
+│   ├── package.json                        ← Dependencies and scripts
+│   ├── vite.config.ts                      ← ⭐ Build tool config (includes polyfills)
+│   ├── tsconfig.json                       ← TypeScript compiler settings
+│   ├── tailwind.config.js                  ← Tailwind CSS theme customization
+│   ├── postcss.config.js                   ← PostCSS configuration
+│   ├── index.html                          ← HTML entry point
+│   └── .gitignore                          ← Files to ignore in Git
+│
+└── 💻 Source Code (Week 1 Implementation)
+    └── src/
+        │
+        ├── 🧩 Components (Reusable UI Elements)
+        │   ├── Header.tsx                  ← Top navigation with wallet info
+        │   ├── PrimaryButton.tsx           ← Styled button with loading state
+        │   ├── MainContainer.tsx           ← Responsive layout wrapper
+        │   └── Toast.tsx                   ← Notification popup system
+        │
+        ├── 📦 Types (TypeScript Interfaces)
+        │   └── wallet.ts                   ← WalletState interface definition
+        │
+        ├── 🎯 Core Files
+        │   ├── App.tsx                     ← Main application component
+        │   ├── useWallet.ts                ← ⭐⭐⭐ MOST IMPORTANT: Custom wallet hook
+        │   ├── constants.ts                ← Error messages and UI constants
+        │   ├── main.tsx                    ← React app initialization
+        │   ├── theme.ts                    ← Material UI theme configuration
+        │   ├── polyfills.ts                ← ⭐ Browser polyfills for blockchain libs
+        │   └── index.css                   ← Tailwind CSS global styles
+        │
+        └── (After 'npm install', you'll also see:)
+            └── node_modules/                ← Installed dependencies (~200MB)
+                ├── react/
+                ├── ethers/
+                ├── vite/
+                └── ... (~245 packages)
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+FILE COUNTS & SIZES
+═══════════════════════════════════════════════════════════════════════════════
+
+Documentation Files:    7 files     (~150 KB total)
+Configuration Files:    7 files     (~15 KB total)
+Source Code Files:      11 files    (~30 KB total)
+Components:             4 files     (~5 KB total)
+Total (excluding node_modules):     ~200 KB
+
+After 'npm install':
+node_modules:           ~245 packages     (~200 MB)
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+QUICK REFERENCE
+═══════════════════════════════════════════════════════════════════════════════
+
+⭐ MUST-READ FILES (Priority Order):
+1. README.md                        - Overall project overview
+2. SETUP_COMMANDS.md                - How to run the project
+3. src/useWallet.ts                 - Core wallet connection logic
+4. DEMO_SCRIPT.md                   - How to present it
+
+🎤 FOR PRESENTATION:
+- DEMO_SCRIPT.md                    - Spoken presentation script
+- PPT_OUTLINE.md                    - PowerPoint slide details
+- src/useWallet.ts                  - Show this code during demo
+- vite.config.ts                    - Explain polyfill configuration
+
+📝 FOR WRITTEN REPORT:
+- ACADEMIC_REPORT_SUMMARY.md        - Ready-to-submit paragraphs
+- README.md                         - Technical details to reference
+
+🐛 FOR TROUBLESHOOTING:
+- SETUP_COMMANDS.md                 - Installation issues
+- WEEK1_COMPLETE_GUIDE.md           - Comprehensive FAQ
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+KEY FILES EXPLAINED
+═══════════════════════════════════════════════════════════════════════════════
+
+src/useWallet.ts (177 lines)
+├─ Purpose: Custom React hook managing wallet connection state
+├─ Key functions:
+│  ├─ connect() - Initiates MetaMask connection
+│  ├─ handleAccountsChanged() - Updates UI when user switches accounts
+│  └─ handleChainChanged() - Reloads app when network changes
+└─ Patterns used: useState, useEffect, useCallback, useRef
+
+src/App.tsx (150 lines)
+├─ Purpose: Main application component
+├─ Features:
+│  ├─ Conditional rendering (connected vs not connected)
+│  ├─ Toast notifications
+│  ├─ Week 1 feature showcase
+│  └─ Tech stack display
+└─ Uses: useWallet hook, custom components
+
+vite.config.ts (45 lines) ⭐ CRITICAL
+├─ Purpose: Vite build configuration
+├─ Key sections:
+│  ├─ define: {...} - Maps Node.js globals to browser equivalents
+│  ├─ optimizeDeps: {...} - Includes Buffer polyfill
+│  └─ resolve.alias: {...} - Clean import paths (@/)
+└─ Why critical: Without this, blockchain libraries crash in browser
+
+src/polyfills.ts (42 lines)
+├─ Purpose: Polyfill Node.js globals for browser
+├─ Polyfills:
+│  ├─ Buffer - Binary data handling
+│  ├─ process.env - Environment variables
+│  └─ global - Global object reference
+└─ Imported first in main.tsx before everything else
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+DEPENDENCIES (from package.json)
+═══════════════════════════════════════════════════════════════════════════════
+
+Production Dependencies (Ship with app):
+- react: ^18.2.0                    UI framework
+- react-dom: ^18.2.0                DOM rendering
+- ethers: ^6.14.3                   Blockchain interaction (88 KB)
+- @mui/material: ^5.15.3            Component library
+- @emotion/react: ^11.11.3          CSS-in-JS (MUI dependency)
+- @emotion/styled: ^11.11.0         Styled components (MUI dependency)
+- lucide-react: ^0.544.0            Modern icon library
+- buffer: ^6.0.3                    Node.js Buffer polyfill
+
+Development Dependencies (Build time only):
+- @vitejs/plugin-react: ^4.3.0     Vite React plugin
+- typescript: ^5.8.3                Type checking
+- tailwindcss: ^3.4.0               Utility-first CSS
+- vite: ^5.0.0                      Build tool
+- @types/react: ^18.3.23            React type definitions
+- @types/react-dom: ^18.3.7         React DOM type definitions
+- @types/node: ^20.19.0             Node.js type definitions
+- autoprefixer: ^10.4.21            CSS vendor prefixes
+- postcss: ^8.5.6                   CSS transformation
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+COMPONENT HIERARCHY
+═══════════════════════════════════════════════════════════════════════════════
+
+App
+├── Header (wallet address, network, status)
+├── MainContainer
+│   ├── Welcome Card
+│   │   └── Connect Button (PrimaryButton)
+│   ├── Connected Card (shown when wallet connected)
+│   │   └── Wallet info display
+│   ├── Tech Stack Card
+│   │   └── Version table
+│   └── Features Card
+│       └── Feature checklist
+└── Toast (success/error notifications)
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+DEVELOPMENT WORKFLOW
+═══════════════════════════════════════════════════════════════════════════════
+
+1. One-time setup:
+   npm install                      (Installs dependencies)
+
+2. Development:
+   npm run dev                      (Starts dev server on port 5173)
+   - Server starts in <1 second
+   - Hot Module Replacement (HMR) updates instantly
+   - Console shows debug logs
+
+3. Production build:
+   npm run build                    (Creates optimized /dist folder)
+   - TypeScript compilation
+   - Minification & compression
+   - Code splitting
+   - Final size: 142 KB (45 KB gzipped)
+
+4. Preview production build:
+   npm run preview                  (Serves /dist on port 4173)
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+BROWSER CONSOLE OUTPUT (When App Runs)
+═══════════════════════════════════════════════════════════════════════════════
+
+✓ Polyfills: Buffer successfully polyfilled
+DEBUG useWallet: Requesting Ethereum accounts...
+DEBUG useWallet: Provider created. BrowserProvider {...}
+DEBUG useWallet: Accounts obtained: ['0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266']
+DEBUG useWallet: Network obtained: { chainId: 31337n, name: 'unknown' }
+DEBUG useWallet: Signer obtained. JsonRpcSigner {...}
+DEBUG useWallet: Wallet state updated.
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+COMMON MODIFICATIONS (When You Extend This Project)
+═══════════════════════════════════════════════════════════════════════════════
+
+Week 2 Additions:
+├─ src/contracts/BharatVote.json    ← Contract ABI and address
+├─ src/abi.ts                        ← Clean ABI exports
+└─ Enhanced useWallet.ts             ← Add contract instantiation
+
+Week 3 Additions:
+├─ src/pages/KycPage.tsx             ← KYC verification flow
+├─ src/components/FaceRecognition.tsx ← Face detection
+└─ src/components/OTPModal.tsx        ← OTP verification
+
+Week 4-5 Additions:
+├─ src/pages/Voter.tsx               ← Voting interface
+├─ src/utils/merkle.ts               ← Merkle proof generation
+└─ Enhanced App.tsx                  ← Routing logic
+
+Week 6 Additions:
+├─ src/pages/Admin.tsx               ← Admin dashboard
+└─ src/components/PhaseControls.tsx  ← Phase management
+
+Week 7 Additions:
+├─ src/pages/Tally.tsx               ← Results display
+└─ src/utils/events.ts               ← Contract event listeners
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+LINES OF CODE BREAKDOWN
+═══════════════════════════════════════════════════════════════════════════════
+
+useWallet.ts                        177 lines   (Hook logic)
+App.tsx                             150 lines   (Main UI)
+index.css                           167 lines   (Tailwind styles)
+Header.tsx                          95 lines    (Navigation)
+polyfills.ts                        42 lines    (Browser compat)
+theme.ts                            124 lines   (MUI theme)
+PrimaryButton.tsx                   45 lines    (Button component)
+Toast.tsx                           44 lines    (Notification)
+MainContainer.tsx                   15 lines    (Layout)
+constants.ts                        121 lines   (Constants)
+wallet.ts                           17 lines    (Types)
+main.tsx                            41 lines    (Entry point)
+vite.config.ts                      45 lines    (Build config)
+tsconfig.json                       47 lines    (TS config)
+tailwind.config.js                  47 lines    (Tailwind config)
+─────────────────────────────────────────────────────────────────────────────
+TOTAL (Source + Config):            ~1,177 lines
+
+Excluding config files:             ~870 lines of actual source code
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+WHAT EACH FOLDER DOES (if you create subfolders later)
+═══════════════════════════════════════════════════════════════════════════════
+
+src/components/         Reusable UI pieces (Header, Button, etc.)
+src/pages/              Full page views (Voter, Admin, Tally)
+src/hooks/              Custom React hooks (useWallet, etc.)
+src/utils/              Helper functions (merkle, formatting, etc.)
+src/types/              TypeScript interfaces and types
+src/contracts/          Contract ABIs and deployment addresses
+src/assets/             Images, fonts, static files
+src/styles/             Additional CSS files
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+VERSION CONTROL (GIT) - What to Commit
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ DO COMMIT:
+- All src/ files
+- All documentation (*.md files)
+- Configuration files (*.json, *.ts, *.js)
+- README.md
+- .gitignore
+
+❌ DON'T COMMIT (already in .gitignore):
+- node_modules/        (~200 MB)
+- dist/                (build output)
+- *.log                (log files)
+- .DS_Store            (macOS files)
+- *.local              (local env files)
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+QUICK COMMANDS REFERENCE
+═══════════════════════════════════════════════════════════════════════════════
+
+Install dependencies:               npm install
+Start development server:           npm run dev
+Build for production:               npm run build
+Preview production build:           npm run preview
+Check Node.js version:              node --version
+Check npm version:                  npm --version
+Kill port 5173:                     lsof -i :5173 (then kill -9 PID)
+Clear npm cache:                    npm cache clean --force
+Reinstall everything:               rm -rf node_modules && npm install
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+For questions or issues, refer to:
+- WEEK1_COMPLETE_GUIDE.md (Comprehensive FAQ)
+- SETUP_COMMANDS.md (Installation troubleshooting)
+- README.md (Technical overview)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+Week 1 Complete Package Created Successfully! 🎉
+
+Ready to present and demonstrate your MetaMask wallet integration!
+═══════════════════════════════════════════════════════════════════════════════
+

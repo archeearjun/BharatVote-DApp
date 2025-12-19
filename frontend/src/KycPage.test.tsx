@@ -9,6 +9,13 @@ const mockFetch = vi.fn() as unknown as typeof fetch
 // @ts-ignore override global for tests
 global.fetch = mockFetch
 
+const mockFetchResponse = (data: any, ok = true, status = 200) =>
+  (mockFetch as any).mockResolvedValueOnce({
+    ok,
+    status,
+    json: async () => data,
+  })
+
 describe('KycPage', () => {
   const mockProps = {
     account: '0x90F79bf6EB2c4f870365E785982E1f101E93b906',
@@ -40,8 +47,9 @@ describe('KycPage', () => {
     renderWithI18n(<KycPage {...mockProps} />)
     
     expect(screen.getByText('EPIC')).toBeInTheDocument()
-    expect(screen.getByText('OTP')).toBeInTheDocument()
-    expect(screen.getByText('Complete')).toBeInTheDocument()
+    // Only the current step label is shown in the progress footer
+    expect(screen.queryByText('OTP')).not.toBeInTheDocument()
+    expect(screen.queryByText('Complete')).not.toBeInTheDocument()
   })
 
   it('shows tabs for different KYC options', () => {
@@ -53,7 +61,7 @@ describe('KycPage', () => {
 
   it('validates voter ID input', async () => {
     renderWithI18n(<KycPage {...mockProps} />)
-    const sendButton = screen.getByText('Send OTP')
+    const sendButton = screen.getByRole('button', { name: /send otp/i })
     
     fireEvent.click(sendButton)
     
@@ -64,11 +72,9 @@ describe('KycPage', () => {
   it('handles successful KYC validation', async () => {
     const user = userEvent.setup()
     
-    ;(mockFetch as any).mockResolvedValueOnce({
-      json: async () => ({
-        eligible: true,
-        address: '0x90F79bf6EB2c4f870365E785982E1f101E93b906'
-      })
+    mockFetchResponse({
+      eligible: true,
+      address: '0x90F79bf6EB2c4f870365E785982E1f101E93b906'
     })
 
     renderWithI18n(<KycPage {...mockProps} />)
@@ -89,10 +95,8 @@ describe('KycPage', () => {
   it('handles KYC validation failure for invalid voter ID', async () => {
     const user = userEvent.setup()
     
-    ;(mockFetch as any).mockResolvedValueOnce({
-      json: async () => ({
-        eligible: false
-      })
+    mockFetchResponse({
+      eligible: false
     })
 
     renderWithI18n(<KycPage {...mockProps} />)
@@ -111,11 +115,9 @@ describe('KycPage', () => {
   it('handles address mismatch error', async () => {
     const user = userEvent.setup()
     
-    ;(mockFetch as any).mockResolvedValueOnce({
-      json: async () => ({
-        eligible: true,
-        address: '0x1234567890123456789012345678901234567890' // Different address
-      })
+    mockFetchResponse({
+      eligible: true,
+      address: '0x1234567890123456789012345678901234567890' // Different address
     })
 
     renderWithI18n(<KycPage {...mockProps} />)
@@ -134,11 +136,9 @@ describe('KycPage', () => {
   it('shows OTP modal after successful KYC', async () => {
     const user = userEvent.setup()
     
-    ;(mockFetch as any).mockResolvedValueOnce({
-      json: async () => ({
-        eligible: true,
-        address: '0x90F79bf6EB2c4f870365E785982E1f101E93b906'
-      })
+    mockFetchResponse({
+      eligible: true,
+      address: '0x90F79bf6EB2c4f870365E785982E1f101E93b906'
     })
 
     renderWithI18n(<KycPage {...mockProps} />)
@@ -158,11 +158,9 @@ describe('KycPage', () => {
     const user = userEvent.setup()
     
     // Mock successful KYC first
-    ;(mockFetch as any).mockResolvedValueOnce({
-      json: async () => ({
-        eligible: true,
-        address: '0x90F79bf6EB2c4f870365E785982E1f101E93b906'
-      })
+    mockFetchResponse({
+      eligible: true,
+      address: '0x90F79bf6EB2c4f870365E785982E1f101E93b906'
     })
 
     renderWithI18n(<KycPage {...mockProps} />)
@@ -189,11 +187,9 @@ describe('KycPage', () => {
     const user = userEvent.setup()
     
     // Mock successful KYC
-    ;(mockFetch as any).mockResolvedValueOnce({
-      json: async () => ({
-        eligible: true,
-        address: '0x90F79bf6EB2c4f870365E785982E1f101E93b906'
-      })
+    mockFetchResponse({
+      eligible: true,
+      address: '0x90F79bf6EB2c4f870365E785982E1f101E93b906'
     })
 
     renderWithI18n(<KycPage {...mockProps} />)
@@ -238,11 +234,9 @@ describe('KycPage', () => {
     const user = userEvent.setup()
     
     // Mock successful KYC
-    ;(mockFetch as any).mockResolvedValueOnce({
-      json: async () => ({
-        eligible: true,
-        address: '0x90F79bf6EB2c4f870365E785982E1f101E93b906'
-      })
+    mockFetchResponse({
+      eligible: true,
+      address: '0x90F79bf6EB2c4f870365E785982E1f101E93b906'
     })
 
     renderWithI18n(<KycPage {...mockProps} />)
@@ -284,6 +278,8 @@ describe('KycPage', () => {
     ;(mockFetch as any).mockImplementationOnce(() => 
       new Promise(resolve => 
         setTimeout(() => resolve({
+          ok: true,
+          status: 200,
           json: async () => ({ eligible: true, address: mockProps.account })
         }), 100)
       )
@@ -294,7 +290,7 @@ describe('KycPage', () => {
     const voterIdInput = screen.getByLabelText(/voter id/i)
     await user.type(voterIdInput, 'VOTER1')
     
-    const sendButton = screen.getByText('Send OTP')
+    const sendButton = screen.getByRole('button', { name: /send otp/i })
     fireEvent.click(sendButton)
 
     // Should show loading state

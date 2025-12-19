@@ -1,4 +1,5 @@
-import { useEffect, Suspense, lazy, useState } from "react";
+import { useEffect, Suspense, lazy, useState, useMemo } from "react";
+import eligibleVoters from "../../eligibleVoters.json";
 import MainContainer from './components/MainContainer';
 import PrimaryButton from './components/PrimaryButton';
 import Header from './components/Header';
@@ -21,6 +22,9 @@ import {
   Clock,
   Users
 } from 'lucide-react';
+import NetworkStrip from './components/NetworkStrip';
+import StepWizard from './components/StepWizard';
+import PublicResults from './components/PublicResults';
 
 const AdminPanel = lazy(() => import('./Admin'));
 const Voter = lazy(() => import('./Voter'));
@@ -36,18 +40,26 @@ export default function App() {
   const { connect, isConnected, isLoading, account, contract, error, chainId, provider } = useWallet();
   // KYC verification state (for non-admin voters)
   const [isKycVerified, setIsKycVerified] = useState(false);
-  const [, setVerifiedVoterId] = useState<string | null>(null);
+  const [verifiedVoterId, setVerifiedVoterId] = useState<string | null>(null);
   // State to determine if the connected account is the administrator.
   const [isAdmin, setIsAdmin] = useState(false);
   // State to track if we've finished checking admin status
   const [isAdminCheckComplete, setIsAdminCheckComplete] = useState(false);
   // State to hold the current phase of the election, initialized to COMMIT_PHASE.
   const [phase, setPhase] = useState<number>(COMMIT_PHASE);
+  // Merkle roots: backend and contract for readiness alignment
+  const [backendMerkleRoot, setBackendMerkleRoot] = useState<string | null>(null);
+  const [contractMerkleRoot, setContractMerkleRoot] = useState<string | null>(null);
   // State to force a refresh of the tally component
   const [tallyRefreshKey, setTallyRefreshKey] = useState<number>(0);
   const [candidates, setCandidates] = useState<any[]>([]);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const { t } = useI18n();
+  const [pendingTx, setPendingTx] = useState<string | null>(null);
+  const [hasUserCommitted, setHasUserCommitted] = useState(false);
+  const [hasUserRevealed, setHasUserRevealed] = useState(false);
+  const [adminTallyOpen, setAdminTallyOpen] = useState(false);
+  const totalEligibleVoters = (eligibleVoters as string[])?.length || 0;
 
   // Persist KYC verification per account so refresh does not force re-verification
   useEffect(() => {
@@ -57,6 +69,7 @@ export default function App() {
     }
     const key = `bv_kyc_${account.toLowerCase()}`;
     const fromStorage = localStorage.getItem(key);
+    const storedVoterId = localStorage.getItem(`${key}_id`);
     console.log('DEBUG KYC Persistence: Checking for account:', account);
     console.log('DEBUG KYC Persistence: Key:', key);
     console.log('DEBUG KYC Persistence: Value from storage:', fromStorage);
@@ -65,7 +78,7 @@ export default function App() {
     if (fromStorage === '1') {
       console.log('DEBUG KYC Persistence: Found existing KYC verification, setting to true');
       setIsKycVerified(true);
-      setVerifiedVoterId(account);
+      setVerifiedVoterId(storedVoterId || account);
     } else {
       console.log('DEBUG KYC Persistence: No existing KYC verification found');
     }
@@ -86,13 +99,14 @@ export default function App() {
     
     const key = `bv_kyc_${account.toLowerCase()}`;
     const fromStorage = localStorage.getItem(key);
+    const storedVoterId = localStorage.getItem(`${key}_id`);
     console.log('DEBUG KYC Phase Check: Storage value:', fromStorage);
     
     // If KYC was verified before but state was reset, restore it
     if (fromStorage === '1' && !isKycVerified) {
       console.log('DEBUG KYC Phase Check: Restoring KYC verification after phase change');
       setIsKycVerified(true);
-      setVerifiedVoterId(account);
+      setVerifiedVoterId(storedVoterId || account);
     } else if (fromStorage === '1' && isKycVerified) {
       console.log('DEBUG KYC Phase Check: KYC already verified in state, no action needed');
     } else if (!fromStorage) {
@@ -165,6 +179,54 @@ export default function App() {
     }
   };
 
+  // Fetch backend merkle root once (or when backend URL changes)
+  useEffect(() => {
+    const fetchBackendRoot = async () => {
+      try {
+        const resp = await fetch(`${import.meta.env.VITE_BACKEND_URL || BACKEND_URL}/api/merkle-root`);
+        if (!resp.ok) return;
+        const data = await resp.json();
+        if (data?.merkleRoot) {
+          setBackendMerkleRoot(data.merkleRoot);
+        }
+      } catch (err) {
+        console.warn('DEBUG: Failed to fetch backend merkle root', err);
+      }
+    };
+    fetchBackendRoot();
+  }, []);
+
+  // Fetch contract merkle root when contract is ready
+  useEffect(() => {
+    const readContractRoot = async () => {
+      if (!contract) return;
+      try {
+        const root = await contract.merkleRoot();
+        setContractMerkleRoot(root);
+      } catch (err) {
+        console.warn('DEBUG: Failed to read contract merkle root', err);
+      }
+    };
+    readContractRoot();
+  }, [contract]);
+
+  const steps = useMemo(() => ([
+    { id: 0, title: 'Verify Identity', description: 'KYC and proof readiness' },
+    { id: 1, title: 'Commit Vote', description: 'Encrypt and submit your choice' },
+    { id: 2, title: 'Reveal Vote', description: 'Prove and count your vote' },
+    { id: 3, title: 'View Results', description: 'See live/final tally' },
+  ]), []);
+
+  const currentStep = useMemo(() => {
+    if (isAdmin) return 0;
+    if (!isKycVerified) return 0;
+    if (phase === 0) return 1;
+    if (phase === 1) return 2;
+    return 3;
+  }, [isAdmin, isKycVerified, phase]);
+
+  const canShowVoterTally = hasUserCommitted || hasUserRevealed;
+
   /**
    * Initiates the wallet connection process.
    * This function simply calls the `connect` function from the `useWallet` hook.
@@ -185,6 +247,9 @@ export default function App() {
           setIsAdminCheckComplete(false);
           setIsAdmin(false);
           setCandidates([]); // Clear candidates when no contract
+          setHasUserCommitted(false);
+          setHasUserRevealed(false);
+          setAdminTallyOpen(false);
           // Don't reset KYC verification when wallet disconnects - it should persist
           // setIsKycVerified(false);
           // setVerifiedVoterId(null);
@@ -615,35 +680,125 @@ export default function App() {
   // Main application render.
   return (
     <div className="min-h-screen bg-gradient-subtle font-sans">
-      <Header account={account} phase={phase} isAdmin={isAdmin} />
+      <Header 
+        account={account} 
+        phase={phase} 
+        isAdmin={isAdmin} 
+        chainId={chainId}
+        expectedChainId={31337}
+        backendMerkleRoot={backendMerkleRoot}
+        contractMerkleRoot={contractMerkleRoot}
+      />
       
       <MainContainer>
-        {isAdmin ? (
-          <Suspense fallback={
-            <div className="flex items-center justify-center py-16">
-              <div className="card p-6 text-center">
-                <RefreshCw className="w-6 h-6 text-slate-400 animate-spin mx-auto mb-3" />
-                <p className="text-sm text-slate-600">Loading admin interface...</p>
-              </div>
+        {/* Network / Wallet strip */}
+        <div className="mb-4">
+          <NetworkStrip
+            account={account}
+            chainId={chainId}
+            contractAddress={contract?.target as string | undefined}
+          />
+        </div>
+
+        {/* Stepper */}
+        <div className="mb-6">
+          <StepWizard
+            steps={steps}
+            currentStep={currentStep}
+            lockedReason={!isKycVerified ? 'Complete KYC to proceed' : undefined}
+          />
+        </div>
+
+        {/* Readiness checklist */}
+        {account && (
+          <div className="mb-4 grid gap-3 sm:grid-cols-2">
+            <div className={`p-4 rounded-xl border ${Number(chainId) === 31337 ? 'border-success-200 bg-success-50' : 'border-warning-200 bg-warning-50'}`}>
+              <p className="text-sm font-semibold text-slate-900">Network</p>
+              <p className="text-xs text-slate-600 mt-1">
+                {Number(chainId) === 31337 ? 'Connected to expected chain (31337)' : `Connected to chain ${chainId ?? 'unknown'}, expected 31337`}
+              </p>
             </div>
-          }>
-            <AdminPanel
-              contract={contract}
-              phase={phase}
-              onError={(error: string) => setToast({ type: 'error', message: error })}
-              onPhaseChange={() => {
-                contract.phase().then((p: any) => setPhase(Number(p)));
-                fetchCandidates();
-                // Force header pill to update immediately by reading phase and setting state
-                setTimeout(async () => {
-                  try {
-                    const p2 = await contract.phase();
-                    setPhase(Number(p2));
-                  } catch {}
-                }, 0);
-              }}
-            />
-          </Suspense>
+            <div className={`p-4 rounded-xl border ${backendMerkleRoot && contractMerkleRoot && backendMerkleRoot.toLowerCase() === contractMerkleRoot.toLowerCase() ? 'border-success-200 bg-success-50' : 'border-warning-200 bg-warning-50'}`}>
+              <p className="text-sm font-semibold text-slate-900">Eligibility Root</p>
+              <p className="text-xs text-slate-600 mt-1">
+                {backendMerkleRoot && contractMerkleRoot
+                  ? backendMerkleRoot.toLowerCase() === contractMerkleRoot.toLowerCase()
+                    ? 'Backend root matches on-chain root'
+                    : 'Backend root differs from on-chain root'
+                  : 'Root not fetched yet'}
+              </p>
+            </div>
+            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50">
+              <p className="text-sm font-semibold text-slate-900">Voting Actions</p>
+              <p className="text-xs text-slate-600 mt-1">
+                Commit and reveal will be disabled if KYC is missing, wrong phase, or root mismatch.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Public results section (read-only, no wallet needed) */}
+        <div className="flex justify-end">
+          <a href="#public-tally" className="text-sm text-blue-600 hover:text-blue-800 underline">
+            View public tally (no wallet)
+          </a>
+        </div>
+        <div id="public-tally" className="mt-4">
+          <PublicResults />
+        </div>
+
+        {isAdmin ? (
+          <>
+            <Suspense fallback={
+              <div className="flex items-center justify-center py-16">
+                <div className="card p-6 text-center">
+                  <RefreshCw className="w-6 h-6 text-slate-400 animate-spin mx-auto mb-3" />
+                  <p className="text-sm text-slate-600">Loading admin interface...</p>
+                </div>
+              </div>
+            }>
+              <AdminPanel
+                contract={contract}
+                phase={phase}
+                onError={(error: string) => setToast({ type: 'error', message: error })}
+                onPhaseChange={() => {
+                  contract.phase().then((p: any) => setPhase(Number(p)));
+                  fetchCandidates();
+                  // Force header pill to update immediately by reading phase and setting state
+                  setTimeout(async () => {
+                    try {
+                      const p2 = await contract.phase();
+                      setPhase(Number(p2));
+                    } catch {}
+                  }, 0);
+                }}
+              />
+            </Suspense>
+            <div className="mt-6 space-y-3">
+              <button
+                onClick={() => setAdminTallyOpen((prev) => !prev)}
+                className="btn-secondary inline-flex items-center gap-2"
+              >
+                <BarChart3 className="w-4 h-4" />
+                {adminTallyOpen ? 'Hide Tally' : 'Show Tally'}
+              </button>
+              {adminTallyOpen && (
+                <Suspense fallback={
+                  <div className="card p-6 text-center">
+                    <BarChart3 className="w-6 h-6 text-slate-400 animate-pulse mx-auto mb-3" />
+                    <p className="text-sm text-slate-600">Loading election results...</p>
+                  </div>
+                }>
+                  <Tally
+                    contract={contract}
+                    phase={phase}
+                    refreshTrigger={tallyRefreshKey}
+                    eligibleCount={totalEligibleVoters}
+                  />
+                </Suspense>
+              )}
+            </div>
+          </>
         ) : (
           <div className="space-y-8">
             <Suspense fallback={
@@ -663,14 +818,23 @@ export default function App() {
                 contract={contract} 
                 phase={phase} 
                 setPhase={setPhase} 
-                voterId={account} 
-                onRevealSuccess={() => setTallyRefreshKey(prev => prev + 1)} 
+                account={account as string}
+                voterId={(verifiedVoterId || account) as string} 
+                onRevealSuccess={() => {
+                  setHasUserRevealed(true);
+                  setTallyRefreshKey(prev => prev + 1);
+                }} 
+                onCommitSuccess={() => setHasUserCommitted(true)}
+                onStatusChange={({ committed, revealed }) => {
+                  setHasUserCommitted(committed);
+                  setHasUserRevealed(revealed);
+                }}
                 candidates={candidates}
               />
             </Suspense>
             
             {/* Make Tally more prominent during reveal and finished phases */}
-            {(phase === 1 || phase === 2) && (
+            {canShowVoterTally && (phase === 1 || phase === 2) && (
               <Suspense fallback={
                 <div className="card p-6 text-center">
                   <BarChart3 className="w-6 h-6 text-slate-400 animate-pulse mx-auto mb-3" />
@@ -699,12 +863,13 @@ export default function App() {
                   contract={contract} 
                   phase={phase} 
                   refreshTrigger={tallyRefreshKey} 
+                  eligibleCount={totalEligibleVoters}
                 />
               </Suspense>
             )}
             
             {/* Show Tally during commit phase but less prominently */}
-            {phase === 0 && (
+            {canShowVoterTally && phase === 0 && (
               <Suspense fallback={
                 <div className="card p-6 text-center">
                   <BarChart3 className="w-6 h-6 text-slate-400 animate-pulse mx-auto mb-3" />
@@ -715,6 +880,7 @@ export default function App() {
                   contract={contract} 
                   phase={phase} 
                   refreshTrigger={tallyRefreshKey} 
+                  eligibleCount={totalEligibleVoters}
                 />
               </Suspense>
             )}

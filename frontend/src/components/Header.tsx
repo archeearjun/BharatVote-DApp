@@ -23,9 +23,21 @@ interface HeaderProps {
   account?: string;
   phase?: number;
   isAdmin?: boolean;
+  chainId?: number | null;
+  expectedChainId?: number;
+  backendMerkleRoot?: string | null;
+  contractMerkleRoot?: string | null;
 }
 
-const Header: React.FC<HeaderProps> = ({ account, phase = 0, isAdmin = false }) => {
+const Header: React.FC<HeaderProps> = ({
+  account,
+  phase = 0,
+  isAdmin = false,
+  chainId = null,
+  expectedChainId = 31337,
+  backendMerkleRoot,
+  contractMerkleRoot
+}) => {
   const [languageAnchor, setLanguageAnchor] = useState<null | HTMLElement>(null);
   const { lang, setLang, t } = useI18n();
 
@@ -63,6 +75,8 @@ const Header: React.FC<HeaderProps> = ({ account, phase = 0, isAdmin = false }) 
   };
 
   const phaseInfo = getPhaseInfo();
+  const chainMatch = expectedChainId !== undefined && chainId !== null && Number(chainId) === Number(expectedChainId);
+  const merkleAligned = backendMerkleRoot && contractMerkleRoot && backendMerkleRoot.toLowerCase() === contractMerkleRoot.toLowerCase();
 
   // Simple identicon generator based on address
   const generateIdenticon = (address: string) => {
@@ -114,6 +128,20 @@ const Header: React.FC<HeaderProps> = ({ account, phase = 0, isAdmin = false }) 
 
           {/* Right: Account info, admin status, and language */}
           <div className="flex items-center space-x-3">
+            {/* Network and root status pills */}
+            {account && (
+              <div className="hidden lg:flex items-center space-x-2">
+                <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border ${chainMatch ? 'bg-success-50 text-success-700 border-success-200' : 'bg-warning-50 text-warning-700 border-warning-200'}`}>
+                  <div className={`w-1.5 h-1.5 rounded-full ${chainMatch ? 'bg-success-500' : 'bg-warning-500'}`} />
+                  <span>{chainMatch ? `Chain ${expectedChainId}` : `Wrong chain (${chainId ?? 'unknown'})`}</span>
+                </div>
+                <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border ${merkleAligned ? 'bg-success-50 text-success-700 border-success-200' : 'bg-warning-50 text-warning-700 border-warning-200'}`}>
+                  <div className={`w-1.5 h-1.5 rounded-full ${merkleAligned ? 'bg-success-500' : 'bg-warning-500'}`} />
+                  <span>{merkleAligned ? 'Root aligned' : 'Root mismatch'}</span>
+                </div>
+              </div>
+            )}
+
             {/* Phase Badge (Mobile) */}
             {account && (
               <div className="md:hidden">

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useI18n } from './i18n';
-import { Buffer } from 'buffer';
 import { 
   CheckCircle,
   Lock,
@@ -12,65 +11,33 @@ import {
   User,
   AlertTriangle,
   X,
-  Shuffle
+  Shuffle,
+  Loader2
 } from 'lucide-react';
-import { MerkleTree } from 'merkletreejs';
 import { ethers } from 'ethers';
-// KYC components removed as they're handled in App.tsx
-
-// Create a safe Buffer utility that ensures Buffer is available
-const getSafeBuffer = () => {
-  if (typeof Buffer !== 'undefined' && typeof Buffer.from === 'function') {
-    return Buffer;
-  }
-  if (typeof (window as any).Buffer !== 'undefined' && typeof (window as any).Buffer.from === 'function') {
-    return (window as any).Buffer;
-  }
-  if (typeof (globalThis as any).Buffer !== 'undefined' && typeof (globalThis as any).Buffer.from === 'function') {
-    return (globalThis as any).Buffer;
-  }
-  throw new Error('Buffer is not available anywhere. Cannot proceed.');
-};
-
-// Ensure Buffer is available globally for merkletreejs AFTER imports
-if (typeof window !== 'undefined') {
-  try {
-    const safeBuffer = getSafeBuffer();
-    if (!(window as any).Buffer) {
-      (window as any).Buffer = safeBuffer;
-      console.log('Voter: Buffer successfully polyfilled to window.Buffer');
-    }
-  } catch (error) {
-    console.error('Voter: Failed to polyfill Buffer:', error);
-  }
-}
-
-// Verify critical dependencies are available
-if (typeof MerkleTree === 'undefined') {
-  console.error('CRITICAL: MerkleTree is not available!');
-}
-if (typeof ethers === 'undefined') {
-  console.error('CRITICAL: ethers is not available!');
-}
-if (typeof Buffer === 'undefined') {
-  console.error('CRITICAL: Buffer is not available!');
-}
+import { BACKEND_URL } from './constants';
 
 interface VoterProps {
   contract: any;
   phase: number;
   setPhase: (phase: number) => void;
+  account: string;
   voterId: string;
   onRevealSuccess: () => void;
   candidates?: any[];
+  onCommitSuccess?: () => void;
+  onStatusChange?: (status: { committed: boolean; revealed: boolean }) => void;
 }
 
 const Voter: React.FC<VoterProps> = ({
   contract,
   phase,
+  account,
   voterId,
   onRevealSuccess,
   candidates = [],
+  onCommitSuccess,
+  onStatusChange,
 }) => {
   const { t } = useI18n();
   console.log('DEBUG Voter: Component rendered with props:');
@@ -90,81 +57,21 @@ const Voter: React.FC<VoterProps> = ({
   const [success, setSuccess] = useState<string | null>(null);
   const [showCommitModal, setShowCommitModal] = useState(false);
 
-  // Merkle tree setup for voter verification
-  const [merkleTree, setMerkleTree] = useState<MerkleTree | null>(null);
   const [isEligible, setIsEligible] = useState(false);
+  const [isFetchingProof, setIsFetchingProof] = useState(false);
 
-  // Immediate check for Buffer availability
-  useEffect(() => {
-    console.log('DEBUG Voter: Immediate Buffer check:');
-    console.log('DEBUG Voter: typeof Buffer:', typeof Buffer);
-    console.log('DEBUG Voter: typeof window.Buffer:', typeof (window as any).Buffer);
-    console.log('DEBUG Voter: typeof globalThis.Buffer:', typeof (globalThis as any).Buffer);
-    console.log('DEBUG Voter: Buffer.from available:', typeof Buffer?.from);
-    console.log('DEBUG Voter: window.Buffer.from available:', typeof (window as any).Buffer?.from);
-    console.log('DEBUG Voter: MerkleTree available:', typeof MerkleTree);
-    console.log('DEBUG Voter: ethers available:', typeof ethers);
-    
-    // Test Buffer functionality
-    try {
-      if (typeof Buffer !== 'undefined' && typeof Buffer.from === 'function') {
-        const testBuffer = Buffer.from('test', 'utf8');
-        console.log('DEBUG Voter: Buffer.from test successful:', testBuffer);
-      } else {
-        console.error('DEBUG Voter: Buffer.from test failed - Buffer.from not available');
-      }
-      
-      if (typeof (window as any).Buffer !== 'undefined' && typeof (window as any).Buffer.from === 'function') {
-        const testWindowBuffer = (window as any).Buffer.from('test', 'utf8');
-        console.log('DEBUG Voter: window.Buffer.from test successful:', testWindowBuffer);
-      } else {
-        console.error('DEBUG Voter: window.Buffer.from test failed - window.Buffer.from not available');
-      }
-    } catch (error) {
-      console.error('DEBUG Voter: Buffer functionality test failed:', error);
-    }
-    
-    // Ensure Buffer is available globally if it wasn't before
-    if (typeof Buffer !== 'undefined' && typeof (window as any).Buffer === 'undefined') {
-      (window as any).Buffer = Buffer;
-      console.log('DEBUG Voter: Buffer polyfilled to window.Buffer');
-    }
-  }, []);
-
-  // Check if critical dependencies are available
-  if (typeof Buffer === 'undefined' && typeof (window as any).Buffer === 'undefined') {
+  // Validate wallet/account presence early
+  if (!account) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
             </svg>
           </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Critical Error: Buffer Not Available</h3>
-          <p className="text-sm text-gray-600 mb-4">The application cannot function without Buffer support. Please refresh the page.</p>
-          <div className="text-xs text-gray-500">
-            Debug: Buffer = {typeof Buffer}, window.Buffer = {typeof (window as any).Buffer}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (typeof MerkleTree === 'undefined') {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-            </svg>
-          </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Critical Error: MerkleTree Not Available</h3>
-          <p className="text-sm text-gray-600 mb-4">The application cannot function without MerkleTree support. Please refresh the page.</p>
-          <div className="text-xs text-gray-500">
-            Debug: MerkleTree = {typeof MerkleTree}
-          </div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Wallet Not Connected</h3>
+          <p className="text-sm text-gray-600 mb-4">Please connect your wallet to continue.</p>
         </div>
       </div>
     );
@@ -177,150 +84,54 @@ const Voter: React.FC<VoterProps> = ({
   ];
 
   useEffect(() => {
-    console.log('DEBUG Voter useEffect: voterId changed to:', voterId);
-    console.log('DEBUG Voter useEffect: contract available:', !!contract);
-    console.log('DEBUG Voter useEffect: Buffer available:', typeof Buffer);
-    console.log('DEBUG Voter useEffect: window.Buffer available:', typeof (window as any).Buffer);
-    
-    const initializeMerkleTree = async () => {
+    const checkEligibility = async () => {
+      if (!voterId) {
+        setIsEligible(false);
+        return;
+      }
       try {
-        console.log('DEBUG: Starting Merkle tree initialization');
-        console.log('DEBUG: voterId:', voterId);
-        console.log('DEBUG: contract:', contract);
-        console.log('DEBUG: Buffer type:', typeof Buffer);
-        console.log('DEBUG: Buffer.from available:', typeof Buffer.from);
-        console.log('DEBUG: window.Buffer type:', typeof (window as any).Buffer);
-        console.log('DEBUG: window.Buffer.from available:', typeof (window as any).Buffer?.from);
-        
-        // Critical Buffer availability check
-        if (typeof Buffer === 'undefined' && typeof (window as any).Buffer === 'undefined') {
-          throw new Error('Buffer is not available anywhere. Cannot proceed with Merkle tree initialization.');
+        const resp = await fetch(`${BACKEND_URL}/api/merkle-proof?voter_id=${encodeURIComponent(voterId)}`);
+        if (resp.ok) {
+          setIsEligible(true);
+        } else {
+          setIsEligible(false);
         }
-        const BufferToUse = getSafeBuffer();
-        console.log('DEBUG: Using Buffer in initializeMerkleTree:', BufferToUse === Buffer ? 'imported Buffer' : 'window.Buffer');
-        
-        if (!voterId || voterId === '') {
-          console.log('DEBUG: No voterId or empty voterId, skipping initialization');
-          console.log('DEBUG: voterId type:', typeof voterId);
-          console.log('DEBUG: voterId value:', JSON.stringify(voterId));
-          return;
-        }
-        
-        if (!contract) {
-          console.log('DEBUG: No contract, skipping initialization');
-          return;
-        }
-
-        // Get eligible voters from the contract's merkle root instead of hardcoded list
-        // For now, we'll use the eligibleVoters.json file, but this should ideally come from the contract
-        const eligibleVoters = [
-          "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
-          "0x0000000000000000000000000000000000000002",
-          "0x0000000000000000000000000000000000000003",
-          "0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199"
-        ];
-
-        console.log('DEBUG: Eligible voters:', eligibleVoters);
-        console.log('DEBUG: Current voter address:', voterId);
-        console.log('DEBUG: Is voterId a valid address?', ethers.isAddress(voterId));
-        console.log('DEBUG: voterId length:', voterId.length);
-        console.log('DEBUG: voterId starts with 0x?', voterId.startsWith('0x'));
-
-        // Log whether the voter appears in the list, but do not early-return.
-        const isInEligibleList = eligibleVoters.some(addr => addr.toLowerCase().trim() === voterId.toLowerCase().trim());
-        console.log('DEBUG: Is voter in eligible list?', isInEligibleList);
-
-        // Create keccak256 hasher function
-        const keccak256Hasher = (data: string | Buffer) => {
-          try {
-            // Get safe Buffer
-            const safeBuffer = getSafeBuffer();
-            console.log('DEBUG: keccak256Hasher called with:', typeof data, data);
-            console.log('DEBUG: Using safe Buffer:', safeBuffer === Buffer ? 'imported Buffer' : 'window.Buffer');
-            
-            if (typeof data === 'string') {
-              // For leaves (addresses), hash them using solidityPackedKeccak256
-              const result = ethers.solidityPackedKeccak256(['address'], [data.toLowerCase()]);
-              console.log('DEBUG: String hash result:', result);
-              const buffer = safeBuffer.from(result.substring(2), 'hex');
-              console.log('DEBUG: Created buffer:', buffer);
-              return buffer;
-            } else if (safeBuffer.isBuffer(data)) {
-              // If data is a Buffer (from MerkleTree internal operations), hash it using keccak256
-              const result = ethers.keccak256(data);
-              console.log('DEBUG: Buffer hash result:', result);
-              const buffer = safeBuffer.from(result.substring(2), 'hex');
-              console.log('DEBUG: Created buffer from buffer:', buffer);
-              return buffer;
-            } else {
-              throw new Error("Invalid data type for keccak256Hasher: Expected string or Buffer");
-            }
-          } catch (error) {
-            console.error('DEBUG: Error in keccak256Hasher:', error);
-            throw error;
-          }
-        };
-
-        console.log('DEBUG: Creating Merkle tree...');
-        const leaves = eligibleVoters.map(addr => keccak256Hasher(addr.toLowerCase()));
-        console.log('DEBUG: Leaves created:', leaves.length);
-        
-        const tree = new MerkleTree(leaves, keccak256Hasher, { sortLeaves: true, sortPairs: true });
-        console.log('DEBUG: Merkle tree created');
-        
-        setMerkleTree(tree);
-        
-        // Check if current voter is eligible
-        console.log('DEBUG: Checking voter eligibility for:', voterId);
-        const hashedAddress = ethers.solidityPackedKeccak256(['address'], [voterId.toLowerCase()]);
-        const hashedBuffer = BufferToUse.from(hashedAddress.substring(2), 'hex');
-        console.log('DEBUG: Hashed address:', hashedAddress);
-        
-        const proof = tree.getProof(hashedBuffer);
-        console.log('DEBUG: Proof generated:', proof.length, 'elements');
-        
-        const isVoterEligible = tree.verify(proof, hashedBuffer, tree.getRoot());
-        console.log('DEBUG: Voter eligibility result:', isVoterEligible);
-        
-        setIsEligible(isVoterEligible);
-        
-        console.log('DEBUG: Merkle tree initialization completed successfully');
-      } catch (error) {
-        console.error('DEBUG: Error initializing Merkle tree:', error);
-        // Set a fallback state to prevent the component from being completely broken
+      } catch (err) {
+        console.error('DEBUG Voter: eligibility check failed', err);
         setIsEligible(false);
       }
     };
 
-    initializeMerkleTree();
+    checkEligibility();
     checkVoteStatus();
-  }, [contract, voterId]);
+  }, [contract, voterId, account]);
 
   const checkVoteStatus = async () => {
-    if (!contract || !voterId) {
-      console.log('DEBUG checkVoteStatus: Early return - contract:', !!contract, 'voterId:', !!voterId);
+    if (!contract || !account) {
+      console.log('DEBUG checkVoteStatus: Early return - contract:', !!contract, 'account:', !!account);
       return;
     }
     try {
-      console.log('DEBUG checkVoteStatus: Checking status for voter:', voterId);
+      console.log('DEBUG checkVoteStatus: Checking status for voter:', account);
       console.log('DEBUG checkVoteStatus: Contract available:', !!contract);
-      console.log('DEBUG checkVoteStatus: VoterId:', voterId);
+      console.log('DEBUG checkVoteStatus: Account:', account);
       console.log('DEBUG checkVoteStatus: Contract methods available:', Object.keys(contract));
       console.log('DEBUG checkVoteStatus: getVoterStatus method available:', typeof contract.getVoterStatus);
       
-      const [committed, revealed] = await contract.getVoterStatus(voterId);
+      const [committed, revealed] = await contract.getVoterStatus(account);
       console.log('DEBUG checkVoteStatus: Contract returned - committed:', committed, 'revealed:', revealed);
       console.log('DEBUG checkVoteStatus: Types - committed:', typeof committed, 'revealed:', typeof revealed);
       
       setHasVoted(committed);
       setHasRevealed(revealed);
       console.log('DEBUG checkVoteStatus: State updated - hasVoted:', committed, 'hasRevealed:', revealed);
+      onStatusChange?.({ committed, revealed });
 
       // Privacy: no local persistence used
 
       // Hydrate locally stored commit hash from chain so reveal comparisons are accurate even after refresh
       try {
-        const onchainCommit: string = await contract.commits(voterId);
+        const onchainCommit: string = await contract.commits(account);
         console.log('DEBUG checkVoteStatus: On-chain commit hash:', onchainCommit);
         if (onchainCommit && onchainCommit !== '0x' && onchainCommit !== '0x0000000000000000000000000000000000000000000000000000000000000000') {
           setVoteHash(onchainCommit);
@@ -358,12 +169,11 @@ const Voter: React.FC<VoterProps> = ({
     console.log('DEBUG handleCommitVote: selectedCandidateId:', selectedCandidateId);
     console.log('DEBUG handleCommitVote: salt:', salt);
     console.log('DEBUG handleCommitVote: contract available:', !!contract);
-    console.log('DEBUG handleCommitVote: merkleTree available:', !!merkleTree);
-    console.log('DEBUG handleCommitVote: Buffer available:', typeof Buffer);
-    console.log('DEBUG handleCommitVote: window.Buffer available:', typeof (window as any).Buffer);
+    console.log('DEBUG handleCommitVote: voterId:', voterId);
+    console.log('DEBUG handleCommitVote: account:', account);
     
     if (selectedCandidateId === null || !salt.trim()) {
-      console.log('DEBUG handleCommitVote: Missing candidate or salt');
+      setError('Select a candidate and enter a salt (secret phrase) before committing.');
       return;
     }
     if (!contract) {
@@ -371,35 +181,32 @@ const Voter: React.FC<VoterProps> = ({
       setError('Wallet not connected or contract unavailable');
       return;
     }
-    if (!merkleTree) {
-      console.log('DEBUG handleCommitVote: No merkleTree available');
-      setError('Preparing voter eligibility… please try again in a moment');
+    if (!voterId) {
+      setError('KYC verification missing. Please complete verification.');
       return;
     }
 
     setIsCommitting(true);
+    setIsFetchingProof(true);
     setError(null);
 
     try {
       console.log('DEBUG handleCommitVote: Calling hashVote...');
       const { commitHash } = await hashVote(selectedCandidateId, salt.trim());
       console.log('DEBUG handleCommitVote: hashVote completed, commitHash:', commitHash);
-      
-      // Generate Merkle proof using the initialized tree
-      console.log('DEBUG handleCommitVote: Generating Merkle proof...');
-      const hashedAddress = ethers.solidityPackedKeccak256(['address'], [voterId.toLowerCase()]);
-      console.log('DEBUG handleCommitVote: Hashed address:', hashedAddress);
-      
-      // Use the most available Buffer
-      const BufferToUse = getSafeBuffer();
-      if (!BufferToUse || typeof BufferToUse.from !== 'function') {
-        throw new Error('Buffer.from is not available. Cannot generate Merkle proof.');
+
+      // Fetch Merkle proof from backend using verified voterId
+      console.log('DEBUG handleCommitVote: Fetching Merkle proof from backend...');
+      const resp = await fetch(`${BACKEND_URL}/api/merkle-proof?voter_id=${encodeURIComponent(voterId)}`);
+      if (!resp.ok) {
+        const errText = await resp.text();
+        throw new Error(`Failed to get Merkle proof: ${errText || resp.statusText}`);
       }
-      
-      const hashedBuffer = BufferToUse.from(hashedAddress.substring(2), 'hex');
-      console.log('DEBUG handleCommitVote: Hashed buffer created:', hashedBuffer);
-      const proof = merkleTree.getProof(hashedBuffer).map(x => '0x' + x.data.toString('hex'));
-      console.log('DEBUG handleCommitVote: Merkle proof generated:', proof);
+      const proofData = await resp.json();
+      const proof = Array.isArray(proofData) ? proofData : proofData.proof;
+      if (!proof || !Array.isArray(proof) || proof.length === 0) {
+        throw new Error('Empty Merkle proof from backend.');
+      }
 
       console.log('DEBUG: Committing vote with hash:', commitHash);
       console.log('DEBUG: Merkle proof:', proof);
@@ -413,6 +220,7 @@ const Voter: React.FC<VoterProps> = ({
 
       setVoteHash(commitHash);
       setHasVoted(true);
+      onCommitSuccess?.();
       setSuccess('Vote committed successfully! Your vote is now encrypted and secure.');
       setShowCommitModal(true);
 
@@ -438,6 +246,7 @@ const Voter: React.FC<VoterProps> = ({
       setError(msg);
     } finally {
       setIsCommitting(false);
+      setIsFetchingProof(false);
     }
   };
 
@@ -455,7 +264,10 @@ const Voter: React.FC<VoterProps> = ({
   }, [phase]);
 
   const handleRevealVote = async () => {
-    if (selectedCandidateId === null || !salt.trim()) return;
+    if (selectedCandidateId === null || !salt.trim()) {
+      setError('Select the same candidate and enter the exact salt you used when committing.');
+      return;
+    }
 
     setIsRevealing(true);
     setError(null);
@@ -479,7 +291,7 @@ const Voter: React.FC<VoterProps> = ({
       // Always fetch latest on-chain committed hash for this voter to avoid stale local state
       let storedHash = voteHash;
       try {
-        const onchainCommit: string = await contract.commits(voterId);
+        const onchainCommit: string = await contract.commits(account);
         console.log('DEBUG handleRevealVote: On-chain stored commit hash:', onchainCommit);
         if (onchainCommit) storedHash = onchainCommit;
       } catch (readErr) {
@@ -532,6 +344,24 @@ const Voter: React.FC<VoterProps> = ({
   const canCommit = selectedCandidateId !== null && !!salt.trim() && !isCommitting && !hasVoted && phase === 0;
   const canReveal = selectedCandidateId !== null && !!salt.trim() && !isRevealing && hasVoted && !hasRevealed && phase === 1;
 
+  const commitDisabledReason = (() => {
+    if (phase !== 0) return 'Commit is only available during the commit phase';
+    if (!voterId) return 'Complete KYC to commit a vote';
+    if (hasVoted) return 'You have already committed a vote';
+    if (!salt.trim()) return 'Enter a password/salt to secure your vote';
+    if (selectedCandidateId === null) return 'Select a candidate to commit';
+    return null;
+  })();
+
+  const revealDisabledReason = (() => {
+    if (phase !== 1) return 'Reveal is only available during the reveal phase';
+    if (!hasVoted) return 'Commit your vote before revealing';
+    if (hasRevealed) return 'You have already revealed your vote';
+    if (!salt.trim()) return 'Enter the exact password/salt you used to commit';
+    if (selectedCandidateId === null) return 'Select the candidate you committed';
+    return null;
+  })();
+
   // Debug logging for canReveal calculation
   console.log('DEBUG canReveal calculation:', {
     selectedCandidateId,
@@ -552,7 +382,6 @@ const Voter: React.FC<VoterProps> = ({
     hasVoted,
     isEligible,
     candidates: candidates.length,
-    merkleTree: !!merkleTree,
     selectedCandidateId,
     salt: salt.trim(),
     saltLength: salt.trim().length,
@@ -579,57 +408,12 @@ const Voter: React.FC<VoterProps> = ({
   // Add click handler debugging
   const handleCommitClick = () => {
     console.log('DEBUG: Commit button clicked!');
-    console.log('DEBUG: selectedCandidateId:', selectedCandidateId);
-    console.log('DEBUG: salt:', salt);
-    console.log('DEBUG: salt.trim():', salt.trim());
-    console.log('DEBUG: salt.trim().length:', salt.trim().length);
-    console.log('DEBUG: canCommit:', canCommit);
-    console.log('DEBUG: contract available:', !!contract);
-    console.log('DEBUG: merkleTree available:', !!merkleTree);
-    
     if (!canCommit) {
       console.log('DEBUG: Button disabled, cannot commit');
       return;
     }
-    
     handleCommitVote();
   };
-
-  // Critical dependency checks
-  if (typeof MerkleTree === 'undefined') {
-    return (
-      <div className="max-w-4xl mx-auto mt-8">
-        <div className="card p-6">
-          <h2 className="text-lg font-semibold text-error-600 mb-3">
-            Critical Error: MerkleTree Not Available
-          </h2>
-          <p className="text-slate-700">
-            The MerkleTree library is not loaded. Please refresh the page or check your internet connection.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  try {
-    getSafeBuffer(); // This will throw if Buffer is not available
-  } catch (error) {
-    return (
-      <div className="max-w-4xl mx-auto mt-8">
-        <div className="card p-6">
-          <h2 className="text-lg font-semibold text-error-600 mb-3">
-            Critical Error: Buffer Not Available
-          </h2>
-          <p className="text-slate-700 mb-4">
-            The Buffer polyfill is not loaded. Please refresh the page or check your internet connection.
-          </p>
-          <p className="text-sm text-slate-500">
-            Error: {error instanceof Error ? error.message : 'Unknown error'}
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   // Error boundary - if there's a critical error, show it
   if (!voterId) {
@@ -933,19 +717,13 @@ const Voter: React.FC<VoterProps> = ({
             <button
               disabled={!canCommit}
               onClick={handleCommitClick}
-              className="btn-primary w-full sm:w-auto"
+              title={canCommit ? undefined : commitDisabledReason || undefined}
+              className={`btn-primary w-full sm:w-auto ${!canCommit ? 'cursor-not-allowed opacity-80' : ''}`}
             >
-              {isCommitting ? (
-                <>
-                  <div className="spinner" />
-                  {t('voter.committing')}
-                </>
-              ) : (
-                <>
-                  <Lock className="w-4 h-4" />
-                  {t('voter.commitVote')}
-                </>
-              )}
+              <span className="inline-flex items-center gap-2">
+                {isFetchingProof && <Loader2 className="w-4 h-4 animate-spin" />}
+                {isCommitting ? 'Submitting...' : t('voter.commitVote')}
+              </span>
             </button>
           </div>
         </div>
@@ -1126,6 +904,7 @@ const Voter: React.FC<VoterProps> = ({
               <p className="text-sm text-slate-600 mb-4">{t('voter.readyToReveal')}</p>
               <button
                 disabled={!canReveal}
+                title={canReveal ? undefined : revealDisabledReason || undefined}
                 onClick={() => {
                   console.log('DEBUG: Reveal button clicked!');
                   console.log('DEBUG: selectedCandidateId:', selectedCandidateId);
@@ -1152,17 +931,10 @@ const Voter: React.FC<VoterProps> = ({
                 }}
                 className="btn-warning w-full sm:w-auto px-8"
               >
-                {isRevealing ? (
-                  <>
-                    <div className="spinner" />
-                    {t('voter.revealing')}
-                  </>
-                ) : (
-                  <>
-                    <Unlock className="w-4 h-4" />
-                    {t('voter.revealVote')}
-                  </>
-                )}
+              <span className="inline-flex items-center gap-2">
+                {isRevealing && <Loader2 className="w-4 h-4 animate-spin" />}
+                {isRevealing ? 'Revealing...' : t('voter.revealVote')}
+              </span>
               </button>
             </div>
           </div>

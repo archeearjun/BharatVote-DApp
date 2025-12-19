@@ -1,0 +1,45 @@
+name: Daily Auto-Push
+
+on:
+  schedule:
+    # Run daily at 11:59 PM UTC (adjust timezone as needed)
+    - cron: '59 23 * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  daily-push:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
+    
+    - name: Configure Git
+      run: |
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+    
+    - name: Check for changes
+      id: check-changes
+      run: |
+        git add -A
+        if git diff --staged --quiet; then
+          echo "has_changes=false" >> $GITHUB_OUTPUT
+        else
+          echo "has_changes=true" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Commit and push changes
+      if: steps.check-changes.outputs.has_changes == 'true'
+      run: |
+        DATE=$(date +"%Y-%m-%d %H:%M:%S")
+        git commit -m "Daily auto-push: $DATE [skip ci]"
+        git push origin main
+    
+    - name: No changes message
+      if: steps.check-changes.outputs.has_changes == 'false'
+      run: |
+        echo "No changes to commit today."

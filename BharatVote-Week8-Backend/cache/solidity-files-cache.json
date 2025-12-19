@@ -1,0 +1,147 @@
+{
+  "_format": "hh-sol-cache-2",
+  "files": {
+    "C:\\Users\\arche\\Desktop\\BharatVote\\contracts\\BharatVote.sol": {
+      "lastModificationDate": 1756300012489,
+      "contentHash": "2020402815c6446fffd718c7d7290988",
+      "sourceName": "contracts/BharatVote.sol",
+      "solcConfig": {
+        "version": "0.8.20",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.20"
+      ],
+      "artifacts": [
+        "BharatVote"
+      ]
+    },
+    "C:\\Users\\arche\\Desktop\\BharatVote\\contracts\\CommitVote.sol": {
+      "lastModificationDate": 1752137239664,
+      "contentHash": "612242ce5c489243fcfd5d42553adb7b",
+      "sourceName": "contracts/CommitVote.sol",
+      "solcConfig": {
+        "version": "0.8.20",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.20"
+      ],
+      "artifacts": []
+    },
+    "C:\\Users\\arche\\Desktop\\BharatVote\\contracts\\Lock.sol": {
+      "lastModificationDate": 1752137239667,
+      "contentHash": "c66e846e61ba12fc7e1e932fd03fc90b",
+      "sourceName": "contracts/Lock.sol",
+      "solcConfig": {
+        "version": "0.8.20",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.20"
+      ],
+      "artifacts": [
+        "Lock"
+      ]
+    },
+    "C:\\Users\\arche\\Desktop\\BharatVote\\contracts\\BharatVoteWithIPFS.sol": {
+      "lastModificationDate": 1761490177894,
+      "contentHash": "7e37e739d9e93de311566950a2726121",
+      "sourceName": "contracts/BharatVoteWithIPFS.sol",
+      "solcConfig": {
+        "version": "0.8.20",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.20"
+      ],
+      "artifacts": [
+        "BharatVoteWithIPFS"
+      ]
+    }
+  }
+}
