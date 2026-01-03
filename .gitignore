@@ -17,7 +17,6 @@ node_modules
 ignition/deployments/chain-31337
 
 # Added by Cursor for temporary/build files
-package-lock.json
 **/tsconfig.tsbuildinfo
 npx
 taskkill
