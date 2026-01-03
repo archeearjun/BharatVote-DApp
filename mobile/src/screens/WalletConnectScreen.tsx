@@ -121,7 +121,7 @@ const WalletConnectScreen: React.FC = () => {
     setLoading(true);
     try {
       const adminAddress = '0xf39Fd6e51aad88F6F4ce6AB8827279cffFb92266';
-      const voterAddress = (global as any).__kycAddress || '0x90F79bf6EB2c4f870365E785982E1f101E93b906';
+      const voterAddress = (global as any).__kycAddress || '0x01bad59740664445Fd489315E14F4300639c253b';
       const address = role === 'admin' ? adminAddress : voterAddress;
       const connection = await metaMaskService.connectWithAddress(address);
       setConnected(true);

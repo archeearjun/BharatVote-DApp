@@ -14,7 +14,7 @@ Object.defineProperty(window, 'ethereum', {
     request: vi.fn(),
     on: vi.fn(),
     removeListener: vi.fn(),
-    selectedAddress: '0x90F79bf6EB2c4f870365E785982E1f101E93b906',
+    selectedAddress: '0x01bad59740664445Fd489315E14F4300639c253b',
   },
 })
 

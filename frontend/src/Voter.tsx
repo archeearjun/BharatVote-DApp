@@ -85,12 +85,12 @@ const Voter: React.FC<VoterProps> = ({
 
   useEffect(() => {
     const checkEligibility = async () => {
-      if (!voterId) {
+      if (!account) {
         setIsEligible(false);
         return;
       }
       try {
-        const resp = await fetch(`${BACKEND_URL}/api/merkle-proof?voter_id=${encodeURIComponent(voterId)}`);
+        const resp = await fetch(`${BACKEND_URL}/api/merkle-proof/${encodeURIComponent(account)}`);
         if (resp.ok) {
           setIsEligible(true);
         } else {
@@ -104,7 +104,7 @@ const Voter: React.FC<VoterProps> = ({
 
     checkEligibility();
     checkVoteStatus();
-  }, [contract, voterId, account]);
+  }, [contract, account]);
 
   const checkVoteStatus = async () => {
     if (!contract || !account) {
@@ -181,10 +181,10 @@ const Voter: React.FC<VoterProps> = ({
       setError('Wallet not connected or contract unavailable');
       return;
     }
-    if (!voterId) {
-      setError('KYC verification missing. Please complete verification.');
-      return;
-    }
+      if (!account) {
+        setError('Wallet not connected. Please connect your wallet.');
+        return;
+      }
 
     setIsCommitting(true);
     setIsFetchingProof(true);
@@ -197,7 +197,7 @@ const Voter: React.FC<VoterProps> = ({
 
       // Fetch Merkle proof from backend using verified voterId
       console.log('DEBUG handleCommitVote: Fetching Merkle proof from backend...');
-      const resp = await fetch(`${BACKEND_URL}/api/merkle-proof?voter_id=${encodeURIComponent(voterId)}`);
+      const resp = await fetch(`${BACKEND_URL}/api/merkle-proof/${encodeURIComponent(account)}`);
       if (!resp.ok) {
         const errText = await resp.text();
         throw new Error(`Failed to get Merkle proof: ${errText || resp.statusText}`);
@@ -210,7 +210,7 @@ const Voter: React.FC<VoterProps> = ({
 
       console.log('DEBUG: Committing vote with hash:', commitHash);
       console.log('DEBUG: Merkle proof:', proof);
-      console.log('DEBUG: Voter ID:', voterId);
+      console.log('DEBUG: Voter Address:', account);
 
       console.log('DEBUG handleCommitVote: Calling contract.commitVote...');
       const tx = await contract.commitVote(commitHash, proof);

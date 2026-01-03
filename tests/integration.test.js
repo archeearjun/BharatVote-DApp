@@ -60,9 +60,9 @@ describe('BharatVote Integration Tests', () => {
         const response = await fetch('http://localhost:3001/api/merkle-proof?voter_id=VOTER1');
         
         if (response.status === 200) {
-          const proof = await response.json();
-          expect(Array.isArray(proof)).toBe(true);
-          expect(proof.length).toBeGreaterThan(0);
+          const data = await response.json();
+          expect(Array.isArray(data.proof)).toBe(true);
+          expect(data.proof.length).toBeGreaterThan(0);
         }
       } catch (error) {
         console.log('Backend not available, skipping Merkle proof test');
@@ -140,8 +140,8 @@ describe('BharatVote Integration Tests', () => {
       };
 
       // Test with known voter IDs
-      await testVoterFlow('VOTER1', '0x90F79bf6EB2c4f870365E785982E1f101E93b906');
-      await testVoterFlow('VOTER2', '0x0000000000000000000000000000000000000002');
+      await testVoterFlow('VOTER1', '0x01bad59740664445Fd489315E14F4300639c253b');
+      await testVoterFlow('VOTER2', '0xe0A8EE8D3f0F92a47C93af28F0685127c08Fd892');
       
       // This should always pass as a health check
       expect(true).toBe(true);

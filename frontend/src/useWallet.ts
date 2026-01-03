@@ -1,9 +1,27 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { ethers } from "ethers";
-import { BharatVote__factory } from "@typechain/factories/BharatVote.sol/BharatVote__factory";
 import type { WalletState } from "./types/wallet";
 import { WALLET_ERRORS, CONTRACT_ERRORS } from "./constants";
-import contractJson from "./contracts/BharatVote.json";
+import { getElectionContract } from "@/utils/contract";
+import { getExpectedChainId } from "@/utils/chain";
+
+function normalizeChainId(chainId: unknown): number | null {
+  if (typeof chainId === "bigint") return Number(chainId);
+  if (typeof chainId === "number") return Number.isFinite(chainId) ? chainId : null;
+  if (typeof chainId === "string") {
+    const trimmed = chainId.trim();
+    if (!trimmed) return null;
+    const cleaned =
+      (trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))
+        ? trimmed.slice(1, -1)
+        : trimmed;
+    const parsed = cleaned.startsWith("0x") || cleaned.startsWith("0X")
+      ? Number.parseInt(cleaned, 16)
+      : Number.parseInt(cleaned, 10);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
 
 declare global {
   interface Window {
@@ -26,9 +44,36 @@ const initialState: WalletState = {
   chainId: null,
 };
 
-export default function useWallet() {
+export default function useWallet(electionAddress?: string) {
   const [state, setState] = useState<WalletState>(initialState);
   const isConnecting = useRef(false);
+  const requiredChainId = getExpectedChainId();
+
+  const checkNetwork = useCallback((currentChainId: unknown) => {
+    const current = normalizeChainId(currentChainId);
+    const expected = normalizeChainId(requiredChainId);
+    if (current === null || expected === null) return false;
+
+    if (current === expected) {
+      setState((prev) => ({ ...prev, error: null, chainId: current }));
+      return true;
+    }
+
+    setState((prev) => ({ ...prev, error: WALLET_ERRORS.WRONG_NETWORK, chainId: current }));
+    return false;
+  }, [requiredChainId]);
+
+  const attachElectionContract = useCallback(async (provider: ethers.BrowserProvider, electionAddress: string) => {
+    // Verify bytecode exists at the address to avoid BAD_DATA from calls
+    const code = await provider.getCode(electionAddress);
+    console.log('DEBUG useWallet: Code length at address:', code?.length);
+    if (!code || code === '0x') {
+      throw new Error(CONTRACT_ERRORS.NO_CONTRACT_FOUND);
+    }
+
+    const signer = await provider.getSigner();
+    return getElectionContract(electionAddress, signer);
+  }, []);
 
   const handleError = useCallback((error: unknown, defaultMessage: string) => {
     const errorMessage = error instanceof Error ? error.message : defaultMessage;
@@ -45,15 +90,15 @@ export default function useWallet() {
     setState(initialState);
   }, []);
 
-  const connect = useCallback(async () => {
+  const connect = useCallback(async (targetElectionAddress?: string) => {
     if (isConnecting.current) {
       console.log('DEBUG useWallet: Connection already in progress');
-      return;
+      return null;
     }
 
     if (!window.ethereum) {
       handleError(new Error(WALLET_ERRORS.NO_WALLET), WALLET_ERRORS.NO_WALLET);
-      return;
+      return null;
     }
 
     try {
@@ -67,26 +112,26 @@ export default function useWallet() {
       const accounts = await provider.send("eth_requestAccounts", []);
       if (!accounts.length) {
         handleError(new Error(WALLET_ERRORS.NO_ACCOUNTS), WALLET_ERRORS.NO_ACCOUNTS);
-        return;
+        return null;
       }
       console.log('DEBUG useWallet: Accounts obtained:', accounts);
 
       const network = await provider.getNetwork();
       console.log('DEBUG useWallet: Network obtained:', network);
-      const requiredChainId = parseInt(import.meta.env.VITE_CHAIN_ID || "31337", 10);
 
-      if (Number(network.chainId) !== requiredChainId) {
+      if (!checkNetwork(network.chainId)) {
         console.log('DEBUG useWallet: Switching network...');
         try {
           await window.ethereum.request({
             method: "wallet_switchEthereumChain",
             params: [{ chainId: `0x${requiredChainId.toString(16)}` }],
           });
-          return;
+          setState((prev: WalletState) => ({ ...prev, isLoading: false }));
+          return null;
         } catch (switchError: any) {
           if (switchError.code === 4902) {
             handleError(switchError, WALLET_ERRORS.WRONG_NETWORK);
-            return;
+            return null;
           }
           throw switchError;
         }
@@ -95,31 +140,19 @@ export default function useWallet() {
 
       const signer = await provider.getSigner();
       console.log('DEBUG useWallet: Signer obtained.', signer);
-      const contractAddress = contractJson.address;
-      
-      if (!contractAddress) {
-        handleError(new Error(CONTRACT_ERRORS.NO_CONTRACT_FOUND), CONTRACT_ERRORS.NO_CONTRACT_FOUND);
-        return;
-      }
-      console.log('DEBUG useWallet: Contract address:', contractAddress);
 
-      // Verify bytecode exists at the address to avoid BAD_DATA from calls
-      try {
-        const code = await provider.getCode(contractAddress);
-        console.log('DEBUG useWallet: Code length at address:', code?.length);
-        if (!code || code === '0x') {
-          handleError(new Error('No contract code at address. Ensure Hardhat node is running and contract is deployed.'), CONTRACT_ERRORS.NO_CONTRACT_FOUND);
-          return;
+      const addressToAttach = targetElectionAddress || electionAddress;
+      let contract: WalletState["contract"] = null;
+      if (addressToAttach) {
+        console.log('DEBUG useWallet: Election address:', addressToAttach);
+        try {
+          contract = await attachElectionContract(provider, addressToAttach);
+          console.log('DEBUG useWallet: Election contract instance created.', contract);
+        } catch (contractErr) {
+          handleError(contractErr, CONTRACT_ERRORS.NO_CONTRACT_FOUND);
+          return null;
         }
-      } catch (codeErr) {
-        console.error('DEBUG useWallet: Error fetching contract code:', codeErr);
       }
-
-      const contract = BharatVote__factory.connect(
-        contractAddress,
-        signer
-      );
-      console.log('DEBUG useWallet: Contract instance created.', contract);
 
       setState({
         provider,
@@ -132,12 +165,71 @@ export default function useWallet() {
       });
       console.log('DEBUG useWallet: Wallet state updated.');
 
+      return { provider, account: accounts[0], chainId: Number(network.chainId) };
+
     } catch (err) {
       handleError(err, WALLET_ERRORS.CONNECT_FAILED);
+      return null;
     } finally {
       isConnecting.current = false;
     }
-  }, [handleError]);
+  }, [attachElectionContract, electionAddress, handleError, requiredChainId]);
+
+  useEffect(() => {
+    if (!window.ethereum) return;
+
+    (async () => {
+      try {
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const accounts = await provider.send("eth_accounts", []);
+        if (!accounts.length) return;
+
+      const network = await provider.getNetwork();
+        const chainId = normalizeChainId(network.chainId);
+        const wrongNetwork = chainId === null ? true : !checkNetwork(chainId);
+
+        let contract: WalletState["contract"] = null;
+        if (!wrongNetwork && chainId !== null && electionAddress) {
+          try {
+            contract = await attachElectionContract(provider, electionAddress);
+          } catch (contractErr) {
+            console.error("DEBUG useWallet: Auto-attach failed:", contractErr);
+          }
+        }
+
+        setState((prev) => ({
+          ...prev,
+          provider,
+          account: accounts[0],
+          chainId: chainId ?? prev.chainId,
+          contract,
+          isConnected: true,
+          isLoading: false,
+          error: wrongNetwork ? WALLET_ERRORS.WRONG_NETWORK : null,
+        }));
+      } catch (err) {
+        console.error("DEBUG useWallet: Auto-connect failed:", err);
+      }
+    })();
+  }, [attachElectionContract, checkNetwork, electionAddress, requiredChainId]);
+
+  useEffect(() => {
+    const desired = (electionAddress || "").toLowerCase();
+    const current = (state.contract?.target as string | undefined)?.toLowerCase();
+    if (!state.provider || !state.isConnected) return;
+    if (!desired) return;
+    if (current === desired) return;
+    if (state.chainId !== requiredChainId) return;
+
+    (async () => {
+      try {
+        const contract = await attachElectionContract(state.provider as ethers.BrowserProvider, electionAddress as string);
+        setState((prev) => ({ ...prev, contract, error: null }));
+      } catch (err) {
+        handleError(err, CONTRACT_ERRORS.NO_CONTRACT_FOUND);
+      }
+    })();
+  }, [attachElectionContract, electionAddress, handleError, requiredChainId, state.chainId, state.contract?.target, state.isConnected, state.provider]);
 
   useEffect(() => {
     const handleAccountsChanged = (accounts: string[]) => {
@@ -147,12 +239,14 @@ export default function useWallet() {
           ...prev,
           account: accounts[0],
           error: null,
+          isConnected: true,
         }));
       } else {
         setState((prev: WalletState) => ({
           ...prev,
           account: null,
           isConnected: false,
+          contract: null,
           error: WALLET_ERRORS.NO_ACCOUNTS,
         }));
       }

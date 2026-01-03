@@ -1,58 +1,71 @@
 import React from 'react';
+import { Box, Step, StepLabel, Stepper } from '@mui/material';
+import type { StepIconProps } from '@mui/material/StepIcon';
+import { Check } from 'lucide-react';
 
-interface Step {
+interface WizardStep {
   id: number;
   title: string;
-  description: string;
+  description?: string;
 }
 
 interface StepWizardProps {
-  steps: Step[];
+  steps: WizardStep[];
   currentStep: number;
   lockedReason?: string;
 }
 
+const StepIcon = ({ active, completed, icon }: StepIconProps) => {
+  const base = 'w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold';
+  if (completed) {
+    return (
+      <div className={`${base} bg-green-600 text-white`}>
+        <Check className="w-4 h-4" />
+      </div>
+    );
+  }
+  if (active) {
+    return <div className={`${base} bg-slate-900 text-white`}>{icon}</div>;
+  }
+  return <div className={`${base} bg-slate-200 text-slate-700`}>{icon}</div>;
+};
+
 const StepWizard: React.FC<StepWizardProps> = ({ steps, currentStep, lockedReason }) => {
   return (
-    <div className="w-full bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-        <div className="flex-1 w-full">
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-            {steps.map((step, idx) => {
-              const status = idx === currentStep ? 'active' : idx < currentStep ? 'done' : 'pending';
-              const isLocked = lockedReason && idx > currentStep;
-              return (
-                <div
-                  key={step.id}
-                  className={`p-3 rounded-lg border transition ${
-                    status === 'active'
-                      ? 'border-blue-300 bg-blue-50'
-                      : status === 'done'
-                        ? 'border-green-200 bg-green-50'
-                        : 'border-slate-200 bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs uppercase tracking-wide text-slate-500">
-                      Step {idx + 1}
+    <div className="w-full bg-white rounded-xl border border-slate-200 px-4 py-3">
+      <Box sx={{ width: '100%' }}>
+        <Stepper
+          activeStep={Math.min(Math.max(currentStep, 0), Math.max(steps.length - 1, 0))}
+          alternativeLabel
+          sx={{
+            '& .MuiStepConnector-line': { borderColor: 'rgb(203 213 225)' },
+            '& .MuiStepLabel-label': { fontSize: '0.75rem', marginTop: '6px', color: 'rgb(51 65 85)' },
+            '& .MuiStepLabel-label.Mui-active': { color: 'rgb(15 23 42)', fontWeight: 600 },
+            '& .MuiStepLabel-label.Mui-completed': { color: 'rgb(21 128 61)', fontWeight: 600 },
+          }}
+        >
+          {steps.map((step, idx) => {
+            const isLocked = Boolean(lockedReason) && idx > currentStep;
+            return (
+              <Step key={step.id} completed={idx < currentStep} disabled={isLocked}>
+                <StepLabel StepIconComponent={StepIcon}>
+                  <span className="block leading-tight">{step.title}</span>
+                  {step.description && (
+                    <span className="block text-[11px] font-normal text-slate-500 mt-0.5">
+                      {step.description}
                     </span>
-                    {status === 'done' && <span className="text-green-600 text-xs font-semibold">Done</span>}
-                    {status === 'active' && <span className="text-blue-600 text-xs font-semibold">Now</span>}
-                    {status === 'pending' && <span className="text-slate-400 text-xs">Next</span>}
-                  </div>
-                  <p className="text-sm font-semibold text-slate-900">{step.title}</p>
-                  <p className="text-xs text-slate-500">{step.description}</p>
-                  {isLocked && (
-                    <p className="text-[11px] text-amber-600 mt-2">
-                      {lockedReason}
-                    </p>
                   )}
-                </div>
-              );
-            })}
-          </div>
+                </StepLabel>
+              </Step>
+            );
+          })}
+        </Stepper>
+      </Box>
+      {lockedReason && (
+        <div className="mt-2 text-xs text-amber-700">
+          {lockedReason}
         </div>
-      </div>
+      )}
     </div>
   );
 };

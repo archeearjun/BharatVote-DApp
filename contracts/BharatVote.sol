@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+
 /**
  * @title BharatVote
  * @dev Commit-reveal based voting system with Merkle proof voter eligibility
  */
-contract BharatVote {
+contract BharatVote is Initializable {
     // Custom errors
     error NotAdmin();
+    error ZeroAdmin();
     error WrongPhase();
     error InvalidCandidateId();
     error InactiveCandidate();
@@ -20,7 +23,8 @@ contract BharatVote {
     error InvalidNameLength();
     error CanOnlyResetAfterFinish();
 
-    address public immutable admin;
+    address public admin;
+    string public name;
 
     // Removed enum Phase, using uint8 for phase management
     uint8 public phase = 0; // 0: Commit, 1: Reveal, 2: Finished
@@ -70,7 +74,14 @@ contract BharatVote {
     }
 
     constructor() {
-        admin = msg.sender;
+        _disableInitializers();
+    }
+
+    function initialize(string calldata _name, address _admin) external initializer {
+        if (bytes(_name).length == 0 || bytes(_name).length > 100) revert InvalidNameLength();
+        if (_admin == address(0)) revert ZeroAdmin();
+        name = _name;
+        admin = _admin;
     }
 
     /* ───── Admin Controls ───── */

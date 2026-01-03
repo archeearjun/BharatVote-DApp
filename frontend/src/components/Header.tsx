@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useI18n } from '../i18n';
+import { getExpectedChainId } from '@/utils/chain';
 import { 
   Typography, 
   Chip, 
@@ -27,6 +28,7 @@ interface HeaderProps {
   expectedChainId?: number;
   backendMerkleRoot?: string | null;
   contractMerkleRoot?: string | null;
+  electionName?: string | null;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -34,9 +36,10 @@ const Header: React.FC<HeaderProps> = ({
   phase = 0,
   isAdmin = false,
   chainId = null,
-  expectedChainId = 31337,
+  expectedChainId = getExpectedChainId(),
   backendMerkleRoot,
-  contractMerkleRoot
+  contractMerkleRoot,
+  electionName
 }) => {
   const [languageAnchor, setLanguageAnchor] = useState<null | HTMLElement>(null);
   const { lang, setLang, t } = useI18n();
@@ -78,6 +81,18 @@ const Header: React.FC<HeaderProps> = ({
   const chainMatch = expectedChainId !== undefined && chainId !== null && Number(chainId) === Number(expectedChainId);
   const merkleAligned = backendMerkleRoot && contractMerkleRoot && backendMerkleRoot.toLowerCase() === contractMerkleRoot.toLowerCase();
 
+  const getNetworkLabel = (id?: number | null) => {
+    if (id === null || id === undefined) return 'Network';
+    switch (Number(id)) {
+      case 11155111:
+        return 'Sepolia Testnet';
+      case 31337:
+        return 'Localhost';
+      default:
+        return `Chain ${id}`;
+    }
+  };
+
   // Simple identicon generator based on address
   const generateIdenticon = (address: string) => {
     const colors = ['bg-red-400', 'bg-blue-400', 'bg-green-400', 'bg-yellow-400', 'bg-purple-400', 'bg-pink-400'];
@@ -102,7 +117,15 @@ const Header: React.FC<HeaderProps> = ({
             </div>
             <div className="hidden sm:block">
               <h1 className="text-lg font-semibold text-slate-900 tracking-tight">
-                {t('app.title')}
+                <span>{t('app.title')}</span>
+                {electionName && (
+                  <span
+                    className="ml-2 text-slate-500 font-medium truncate max-w-[28ch] inline-block align-bottom"
+                    title={electionName}
+                  >
+                    · {electionName}
+                  </span>
+                )}
               </h1>
               <p className="text-xs text-slate-500">
                 {t('app.subtitle')}
@@ -133,11 +156,11 @@ const Header: React.FC<HeaderProps> = ({
               <div className="hidden lg:flex items-center space-x-2">
                 <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border ${chainMatch ? 'bg-success-50 text-success-700 border-success-200' : 'bg-warning-50 text-warning-700 border-warning-200'}`}>
                   <div className={`w-1.5 h-1.5 rounded-full ${chainMatch ? 'bg-success-500' : 'bg-warning-500'}`} />
-                  <span>{chainMatch ? `Chain ${expectedChainId}` : `Wrong chain (${chainId ?? 'unknown'})`}</span>
+                  <span>{chainMatch ? `🟢 ${getNetworkLabel(expectedChainId)}` : `Wrong network (${getNetworkLabel(chainId)})`}</span>
                 </div>
                 <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border ${merkleAligned ? 'bg-success-50 text-success-700 border-success-200' : 'bg-warning-50 text-warning-700 border-warning-200'}`}>
                   <div className={`w-1.5 h-1.5 rounded-full ${merkleAligned ? 'bg-success-500' : 'bg-warning-500'}`} />
-                  <span>{merkleAligned ? 'Root aligned' : 'Root mismatch'}</span>
+                  <span>{merkleAligned ? '✅ System Synced' : '⚠️ Needs Sync'}</span>
                 </div>
               </div>
             )}

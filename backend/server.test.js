@@ -6,20 +6,14 @@ const { keccak256, solidityPackedKeccak256 } = require('ethers');
 
 // Mock the KYC data
 jest.mock('./kyc-data.json', () => [
-  { "voterId": "VOTER1", "address": "0x90F79bf6EB2c4f870365E785982E1f101E93b906" },
-  { "voterId": "VOTER2", "address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8" },
-  { "voterId": "VOTER3", "address": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC" },
-  { "voterId": "VOTER4", "address": "0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199" },
-  { "voterId": "VOTER5", "address": "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65" }
+  { "voterId": "VOTER1", "address": "0x01bad59740664445Fd489315E14F4300639c253b" },
+  { "voterId": "VOTER2", "address": "0xe0A8EE8D3f0F92a47C93af28F0685127c08Fd892" }
 ], { virtual: true });
 
 // Mock the eligible voters JSON
 jest.mock('../eligibleVoters.json', () => [
-  "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
-  "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
-  "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
-  "0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199",
-  "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65"
+  "0x01bad59740664445Fd489315E14F4300639c253b",
+  "0xe0A8EE8D3f0F92a47C93af28F0685127c08Fd892"
 ], { virtual: true });
 
 describe('BharatVote Backend API', () => {
@@ -103,7 +97,7 @@ describe('BharatVote Backend API', () => {
 
         expect(response.body).toEqual({
           eligible: true,
-          address: '0x90F79bf6EB2c4f870365E785982E1f101E93b906'
+          address: '0x01bad59740664445Fd489315E14F4300639c253b'
         });
       });
 
@@ -131,11 +125,8 @@ describe('BharatVote Backend API', () => {
 
       it('should handle all test voter IDs correctly', async () => {
         const testCases = [
-          { voterId: 'VOTER1', address: '0x90F79bf6EB2c4f870365E785982E1f101E93b906' },
-          { voterId: 'VOTER2', address: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8' },
-          { voterId: 'VOTER3', address: '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC' },
-          { voterId: 'VOTER4', address: '0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199' },
-          { voterId: 'VOTER5', address: '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65' }
+          { voterId: 'VOTER1', address: '0x01bad59740664445Fd489315E14F4300639c253b' },
+          { voterId: 'VOTER2', address: '0xe0A8EE8D3f0F92a47C93af28F0685127c08Fd892' }
         ];
 
         for (const testCase of testCases) {
@@ -206,7 +197,7 @@ describe('BharatVote Backend API', () => {
       });
 
       it('should handle all eligible voters', async () => {
-        const voterIds = ['VOTER1', 'VOTER2', 'VOTER3', 'VOTER4', 'VOTER5'];
+        const voterIds = ['VOTER1', 'VOTER2'];
         
         for (const voterId of voterIds) {
           const response = await request(app)

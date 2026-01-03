@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { ethers } from "ethers";
 import { PHASE_LABELS, ERROR_MESSAGES, COMMIT_PHASE, REVEAL_PHASE, FINISH_PHASE, CANDIDATE_MESSAGES, SUCCESS_MESSAGES, BACKEND_URL } from "./constants";
 import { useI18n } from './i18n';
 import type { BharatVote } from "@typechain/BharatVote.sol/BharatVote";
@@ -24,6 +25,8 @@ import {
 interface AdminProps {
   contract: BharatVote | null;
   phase: number;
+  backendMerkleRoot?: string | null;
+  contractMerkleRoot?: string | null;
   onError?: (error: string) => void;
   onPhaseChange?: () => void;
 }
@@ -48,9 +51,20 @@ const initialState: AdminState = {
   merkleLoading: false,
 };
 
-export default function Admin({ contract, phase, onError, onPhaseChange }: AdminProps) {
+export default function Admin({ contract, phase, backendMerkleRoot, contractMerkleRoot, onError, onPhaseChange }: AdminProps) {
   const [state, setState] = useState<AdminState>(initialState);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const { t } = useI18n();
+  const rootsAligned =
+    Boolean(contract) &&
+    Boolean(contractMerkleRoot) &&
+    Boolean(backendMerkleRoot) &&
+    backendMerkleRoot!.toLowerCase() === contractMerkleRoot!.toLowerCase();
+  const rootsMismatch =
+    Boolean(contract) &&
+    Boolean(contractMerkleRoot) &&
+    Boolean(backendMerkleRoot) &&
+    backendMerkleRoot!.toLowerCase() !== contractMerkleRoot!.toLowerCase();
 
   const fetchCandidates = useCallback(async () => {
     if (!contract) return;
@@ -162,15 +176,15 @@ export default function Admin({ contract, phase, onError, onPhaseChange }: Admin
   const getNextPhaseButtonLabel = useCallback((currentPhase: number): string => {
     switch (currentPhase) {
       case COMMIT_PHASE:
-        return t('admin.advanceReveal');
+        return 'End Voting (Reveal Phase)';
       case REVEAL_PHASE:
-        return t('admin.advanceFinish');
+        return 'End Election (Tally Phase)';
       case FINISH_PHASE:
-        return `Election Finished`; // Button should be disabled, but provide a label
+        return `Election Complete`; // Button should be disabled, but provide a label
       default:
-        return "Advance Phase";
+        return "Start Election (Commit Phase)";
     }
-  }, [t]);
+  }, []);
 
   // Helper to extract meaningful revert messages (custom errors, revert reasons)
   const extractErrorMessage = (err: any): string => {
@@ -298,10 +312,19 @@ export default function Admin({ contract, phase, onError, onPhaseChange }: Admin
       }
       if (tx) {
         await tx.wait();
-        setState(prev => ({
-          ...prev,
-          success: `Advanced to ${getNextPhaseButtonLabel(phase).replace("Advance to ", "")}`,
-        }));
+        try {
+          const updated = await contract.phase();
+          const updatedPhase = Number(updated);
+          setState(prev => ({
+            ...prev,
+            success: `Now in ${PHASE_LABELS[updatedPhase as keyof typeof PHASE_LABELS]}`,
+          }));
+        } catch {
+          setState(prev => ({
+            ...prev,
+            success: `Phase updated`,
+          }));
+        }
         // Force a re-fetch of phase immediately after tx confirmation so UI reflects changes without extra refresh
         try {
           await contract.phase();
@@ -472,33 +495,43 @@ export default function Admin({ contract, phase, onError, onPhaseChange }: Admin
         throw new Error('No merkleRoot returned from backend');
       }
       setState(prev => ({ ...prev, merkleRoot: data.merkleRoot, merkleLoading: false }));
+      return data.merkleRoot as string;
     } catch (err: any) {
       const message = err?.message || 'Failed to fetch Merkle root from backend';
       setState(prev => ({ ...prev, error: message, merkleLoading: false }));
       onError?.(message);
+      return null;
     }
   }, [onError]);
 
-  const handleSetMerkleRoot = useCallback(async () => {
+  const handleUpdateMerkleRoot = useCallback(async () => {
     if (!contract) {
       setState(prev => ({ ...prev, error: "Contract not available" }));
       return;
     }
-    if (!state.merkleRoot) {
-      setState(prev => ({ ...prev, error: "Fetch Merkle root from backend first" }));
-      return;
-    }
+
     setState(prev => ({ ...prev, loading: true, error: null, success: null }));
     try {
-      const tx = await contract.setMerkleRoot(state.merkleRoot);
+      const root = await fetchMerkleRoot();
+      if (!root) {
+        setState(prev => ({ ...prev, loading: false }));
+        return;
+      }
+      if (!ethers.isHexString(root, 32)) {
+        throw new Error("Invalid merkle root format (expected 32-byte hex string)");
+      }
+
+      const tx = await contract.setMerkleRoot(root);
       await tx.wait();
-      setState(prev => ({ ...prev, success: "Merkle root set on-chain", loading: false }));
+
+      setState(prev => ({ ...prev, success: "Merkle root updated on-chain", loading: false }));
+      setTimeout(() => window.location.reload(), 600);
     } catch (err: any) {
       const message = extractErrorMessage(err);
       setState(prev => ({ ...prev, error: message, loading: false }));
       onError?.(message);
     }
-  }, [contract, state.merkleRoot, onError, extractErrorMessage]);
+  }, [contract, fetchMerkleRoot, onError, extractErrorMessage]);
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -560,160 +593,228 @@ export default function Admin({ contract, phase, onError, onPhaseChange }: Admin
         )}
       </div>
 
-      {/* Merkle Root / Eligibility */}
+      {/* Eligibility sync */}
+      {rootsMismatch && (
+        <div className="p-4 rounded-xl border border-warning-200 bg-warning-50">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-warning-700 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-warning-900">Voter list updated</p>
+                <p className="text-sm text-warning-800 mt-1">Sync now to update eligibility on-chain.</p>
+              </div>
+            </div>
+            <button
+              onClick={handleUpdateMerkleRoot}
+              disabled={state.loading || state.merkleLoading}
+              className="btn-warning w-full sm:w-auto"
+              title="Sync backend voter list to chain"
+            >
+              {state.loading || state.merkleLoading ? <div className="spinner" /> : 'Sync Now'}
+            </button>
+          </div>
+        </div>
+      )}
+      {rootsAligned && (
+        <div className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-success-50 border border-success-200 text-success-800 w-fit">
+          <CheckCircle className="w-4 h-4 text-success-600" />
+          <span className="text-sm font-medium">Voter list synced</span>
+        </div>
+      )}
+
+      {/* Action Center */}
       <div className="card-premium p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center">
-            <Users className="w-5 h-5 text-slate-700" />
-          </div>
-          <div>
-            <h2 className="text-lg font-semibold text-slate-900">Eligibility Root</h2>
-            <p className="text-sm text-slate-600">Fetch from backend and anchor on-chain</p>
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <button
-            onClick={fetchMerkleRoot}
-            disabled={state.merkleLoading}
-            className="btn-secondary w-full sm:w-auto"
-          >
-            {state.merkleLoading ? <div className="spinner" /> : 'Fetch Merkle Root'}
-          </button>
-          <button
-            onClick={handleSetMerkleRoot}
-            disabled={state.loading || !state.merkleRoot}
-            className="btn-primary w-full sm:w-auto"
-          >
-            {state.loading ? <div className="spinner" /> : 'Set Root On-Chain'}
-          </button>
-          <div className="flex-1">
-            <p className="text-xs font-mono break-all bg-slate-50 border border-slate-200 rounded-lg p-2">
-              {state.merkleRoot || 'No root fetched yet'}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Add Candidate */}
-      <div className="card-premium p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center">
-            <Plus className="w-5 h-5 text-slate-700" />
-          </div>
-          <div>
-            <h2 className="text-lg font-semibold text-slate-900">{t('admin.addCandidate')}</h2>
-            <p className="text-sm text-slate-600">Add new candidates to the election</p>
-          </div>
-        </div>
-
-        <div className="flex gap-3">
-          <div className="flex-1">
-            <input
-              type="text"
-              value={state.candidateName}
-              onChange={e => setState(prev => ({ ...prev, candidateName: e.target.value }))}
-              placeholder={t('admin.input.placeholder')}
-              disabled={state.loading || phase !== COMMIT_PHASE}
-              className="input-base"
-            />
-            {phase !== COMMIT_PHASE && (
-              <p className="text-xs text-slate-500 mt-2">{t('admin.commitOnlyAdd')}</p>
-            )}
+        <div className="flex items-center justify-between gap-4 mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center">
+              <Play className="w-5 h-5 text-slate-700" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">Action Center</h2>
+              <p className="text-sm text-slate-600">Move the election forward</p>
+            </div>
           </div>
           <button
-            onClick={handleAddCandidate}
-            disabled={state.loading || !state.candidateName.trim() || phase !== COMMIT_PHASE}
-            className="btn-primary px-6"
+            onClick={() => setSettingsOpen(v => !v)}
+            className="btn-ghost text-xs"
+            type="button"
           >
-            {state.loading ? (
-              <div className="spinner" />
-            ) : (
-              <>
-                <Plus className="w-4 h-4" />
-                {t('common.add')}
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-
-      {/* Phase Control */}
-      <div className="card-premium p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center">
-            <Play className="w-5 h-5 text-slate-700" />
-          </div>
-          <div>
-            <h2 className="text-lg font-semibold text-slate-900">{t('admin.phaseControl')}</h2>
-            <p className="text-sm text-slate-600">Control election phase transitions</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-          <button
-            onClick={handlePhaseAdvance}
-            disabled={state.loading || phase === FINISH_PHASE}
-            className="btn-primary"
-          >
-            {state.loading && phase !== FINISH_PHASE ? (
-              <div className="spinner" />
-            ) : (
-              <>
-                <SkipForward className="w-4 h-4" />
-                {getNextPhaseButtonLabel(phase)}
-              </>
-            )}
-          </button>
-
-          <button
-            onClick={handleResetElection}
-            disabled={state.loading || phase !== FINISH_PHASE}
-            className="btn-secondary"
-            title={phase !== FINISH_PHASE ? `Reset only available in Finish Phase. Current: ${PHASE_LABELS[phase as keyof typeof PHASE_LABELS]}` : ""}
-          >
-            {state.loading && phase === FINISH_PHASE ? (
-              <div className="spinner" />
-            ) : (
-              <>
-                <RotateCcw className="w-4 h-4" />
-                {t('admin.reset')}
-              </>
-            )}
-          </button>
-
-          <button
-            onClick={handleClearAllCandidates}
-            disabled={state.loading || phase !== FINISH_PHASE}
-            className="btn-error"
-          >
-            {state.loading && phase === FINISH_PHASE ? (
-              <div className="spinner" />
-            ) : (
-              <>
-                <Trash2 className="w-4 h-4" />
-                {t('admin.clear')}
-              </>
-            )}
-          </button>
-
-          <button
-            onClick={handleEmergencyReset}
-            disabled={state.loading}
-            className="btn-warning"
-          >
-            <AlertTriangle className="w-4 h-4" />
-            Emergency Reset
+            <Settings className="w-4 h-4" />
+            Settings
           </button>
         </div>
 
         <button
-          onClick={runDiagnostics}
-          className="btn-ghost text-xs"
+          onClick={handlePhaseAdvance}
+          disabled={state.loading || phase === FINISH_PHASE}
+          className={`w-full ${phase === FINISH_PHASE ? 'btn-secondary' : 'btn-success'} py-3.5 text-base`}
         >
-          <Settings className="w-3 h-3" />
-          Run Diagnostics (Check Console)
+          {state.loading && phase !== FINISH_PHASE ? (
+            <div className="spinner" />
+          ) : (
+            <>
+              <SkipForward className="w-5 h-5" />
+              {getNextPhaseButtonLabel(phase)}
+            </>
+          )}
         </button>
+
+        <div className="mt-3 text-sm text-slate-600">
+          Current status: <span className="font-medium text-slate-900">{PHASE_LABELS[phase as keyof typeof PHASE_LABELS]}</span>
+        </div>
+
+        {settingsOpen && (
+          <div className="mt-4 p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-3">
+            <div className="text-xs font-semibold text-slate-700">Danger zone</div>
+
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={handleResetElection}
+                disabled={state.loading || phase !== FINISH_PHASE}
+                className="btn-secondary w-full sm:w-auto"
+                title={phase !== FINISH_PHASE ? `Reset only available in Finish Phase. Current: ${PHASE_LABELS[phase as keyof typeof PHASE_LABELS]}` : ""}
+              >
+                {state.loading && phase === FINISH_PHASE ? (
+                  <div className="spinner" />
+                ) : (
+                  <>
+                    <RotateCcw className="w-4 h-4" />
+                    {t('admin.reset')}
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={handleClearAllCandidates}
+                disabled={state.loading || phase !== FINISH_PHASE}
+                className="btn-error w-full sm:w-auto"
+              >
+                {state.loading && phase === FINISH_PHASE ? (
+                  <div className="spinner" />
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    {t('admin.clear')}
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={handleEmergencyReset}
+                disabled={state.loading}
+                className="btn-warning w-full sm:w-auto"
+              >
+                <AlertTriangle className="w-4 h-4" />
+                Emergency Reset
+              </button>
+            </div>
+
+            <button
+              onClick={runDiagnostics}
+              className="btn-ghost text-xs"
+              type="button"
+            >
+              <Settings className="w-3 h-3" />
+              Run Diagnostics (Check Console)
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="grid gap-8 lg:grid-cols-2">
+        {/* Registered Candidates */}
+        <div className="card-premium p-6">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center">
+              <Users className="w-5 h-5 text-slate-700" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">{t('admin.registered')}</h2>
+              <p className="text-sm text-slate-600">
+                {state.candidates.length} candidate{state.candidates.length !== 1 ? 's' : ''} registered
+              </p>
+            </div>
+          </div>
+
+          {state.loading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="spinner w-6 h-6" />
+            </div>
+          ) : state.candidates.length === 0 ? (
+            <div className="text-center py-8">
+              <User className="w-12 h-12 text-slate-400 mx-auto mb-3" />
+              <p className="text-slate-600 mb-2">{CANDIDATE_MESSAGES.UI.NO_CANDIDATES}</p>
+              <p className="text-sm text-slate-500">Use the form to add your first candidate</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {state.candidates.map((candidate) => (
+                <div
+                  key={candidate.id}
+                  className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-200"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-slate-200 rounded-lg flex items-center justify-center">
+                      <User className="w-4 h-4 text-slate-600" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-slate-900">
+                        {getCandidateLabel((contract as any)?.target || (contract as any)?.address || '', candidate.id, (localStorage.getItem('lang') as any) || 'en') || candidate.name}
+                      </p>
+                      <p className="text-sm text-slate-600">ID: {candidate.id}</p>
+                    </div>
+                  </div>
+                  <div className={`badge ${candidate.isActive ? 'badge-success' : 'badge-error'}`}>
+                    {candidate.isActive ? 'Active' : 'Inactive'}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Add Candidate */}
+        <div className="card-premium p-6">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center">
+              <Plus className="w-5 h-5 text-slate-700" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">{t('admin.addCandidate')}</h2>
+              <p className="text-sm text-slate-600">Add new candidates to the election</p>
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <div className="flex-1">
+              <input
+                type="text"
+                value={state.candidateName}
+                onChange={e => setState(prev => ({ ...prev, candidateName: e.target.value }))}
+                placeholder={t('admin.input.placeholder')}
+                disabled={state.loading || phase !== COMMIT_PHASE}
+                className="input-base"
+              />
+              {phase !== COMMIT_PHASE && (
+                <p className="text-xs text-slate-500 mt-2">{t('admin.commitOnlyAdd')}</p>
+              )}
+            </div>
+            <button
+              onClick={handleAddCandidate}
+              disabled={state.loading || !state.candidateName.trim() || phase !== COMMIT_PHASE}
+              className="btn-primary px-6"
+            >
+              {state.loading ? (
+                <div className="spinner" />
+              ) : (
+                <>
+                  <Plus className="w-4 h-4" />
+                  {t('common.add')}
+                </>
+              )}
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Troubleshooting */}
@@ -723,62 +824,10 @@ export default function Admin({ contract, phase, onError, onPhaseChange }: Admin
           <div>
             <h3 className="text-sm font-medium text-slate-900 mb-1">Troubleshooting</h3>
             <p className="text-sm text-slate-600">
-              If reset fails, check the console for diagnostic info. 
-              Make sure you're in the Finish Phase and your Hardhat node is running.
+              If something fails, check the console and verify your wallet network.
             </p>
           </div>
         </div>
-      </div>
-
-      {/* Registered Candidates */}
-      <div className="card-premium p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center">
-            <Users className="w-5 h-5 text-slate-700" />
-          </div>
-          <div>
-            <h2 className="text-lg font-semibold text-slate-900">{t('admin.registered')}</h2>
-            <p className="text-sm text-slate-600">
-              {state.candidates.length} candidate{state.candidates.length !== 1 ? 's' : ''} registered
-            </p>
-          </div>
-        </div>
-
-        {state.loading ? (
-          <div className="flex items-center justify-center py-8">
-            <div className="spinner w-6 h-6" />
-          </div>
-        ) : state.candidates.length === 0 ? (
-          <div className="text-center py-8">
-            <User className="w-12 h-12 text-slate-400 mx-auto mb-3" />
-            <p className="text-slate-600 mb-2">{CANDIDATE_MESSAGES.UI.NO_CANDIDATES}</p>
-            <p className="text-sm text-slate-500">Use the form above to add your first candidate</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {state.candidates.map((candidate) => (
-              <div
-                key={candidate.id}
-                className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-200"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-slate-200 rounded-lg flex items-center justify-center">
-                    <User className="w-4 h-4 text-slate-600" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-slate-900">
-                      {getCandidateLabel((contract as any)?.target || (contract as any)?.address || '', candidate.id, (localStorage.getItem('lang') as any) || 'en') || candidate.name}
-                    </p>
-                    <p className="text-sm text-slate-600">ID: {candidate.id}</p>
-                  </div>
-                </div>
-                <div className={`badge ${candidate.isActive ? 'badge-success' : 'badge-error'}`}>
-                  {candidate.isActive ? 'Active' : 'Inactive'}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );

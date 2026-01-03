@@ -9,9 +9,13 @@ interface Candidate {
   voteCount: number;
 }
 
+interface PublicResultsProps {
+  contractAddress?: string;
+}
+
 const POLL_INTERVAL_MS = 15000;
 
-const PublicResults: React.FC = () => {
+const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress }) => {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [totalVotes, setTotalVotes] = useState(0);
   const [phase, setPhase] = useState<number | null>(null);
@@ -33,10 +37,10 @@ const PublicResults: React.FC = () => {
 
   const contract = useMemo(() => {
     if (!provider) return null;
-    const address = publicContractAddress || (contractJson as any).address;
+    const address = contractAddress || publicContractAddress || (contractJson as any).address;
     if (!address) return null;
     return new ethers.Contract(address, (contractJson as any).abi, provider);
-  }, [provider, publicContractAddress]);
+  }, [provider, publicContractAddress, contractAddress]);
 
   const fetchResults = async () => {
     if (!contract) {

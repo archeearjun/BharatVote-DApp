@@ -18,7 +18,7 @@ const mockFetchResponse = (data: any, ok = true, status = 200) =>
 
 describe('KycPage', () => {
   const mockProps = {
-    account: '0x90F79bf6EB2c4f870365E785982E1f101E93b906',
+    account: '0x01bad59740664445Fd489315E14F4300639c253b',
     onVerified: vi.fn(),
     setKycError: vi.fn(),
   }
@@ -74,7 +74,7 @@ describe('KycPage', () => {
     
     mockFetchResponse({
       eligible: true,
-      address: '0x90F79bf6EB2c4f870365E785982E1f101E93b906'
+      address: '0x01bad59740664445Fd489315E14F4300639c253b'
     })
 
     renderWithI18n(<KycPage {...mockProps} />)
@@ -138,7 +138,7 @@ describe('KycPage', () => {
     
     mockFetchResponse({
       eligible: true,
-      address: '0x90F79bf6EB2c4f870365E785982E1f101E93b906'
+      address: '0x01bad59740664445Fd489315E14F4300639c253b'
     })
 
     renderWithI18n(<KycPage {...mockProps} />)
@@ -160,7 +160,7 @@ describe('KycPage', () => {
     // Mock successful KYC first
     mockFetchResponse({
       eligible: true,
-      address: '0x90F79bf6EB2c4f870365E785982E1f101E93b906'
+      address: '0x01bad59740664445Fd489315E14F4300639c253b'
     })
 
     renderWithI18n(<KycPage {...mockProps} />)
@@ -189,7 +189,7 @@ describe('KycPage', () => {
     // Mock successful KYC
     mockFetchResponse({
       eligible: true,
-      address: '0x90F79bf6EB2c4f870365E785982E1f101E93b906'
+      address: '0x01bad59740664445Fd489315E14F4300639c253b'
     })
 
     renderWithI18n(<KycPage {...mockProps} />)
@@ -236,7 +236,7 @@ describe('KycPage', () => {
     // Mock successful KYC
     mockFetchResponse({
       eligible: true,
-      address: '0x90F79bf6EB2c4f870365E785982E1f101E93b906'
+      address: '0x01bad59740664445Fd489315E14F4300639c253b'
     })
 
     renderWithI18n(<KycPage {...mockProps} />)

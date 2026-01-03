@@ -1,4 +1,5 @@
 import { useEffect, Suspense, lazy, useState, useMemo } from "react";
+import { Routes, Route, Navigate, useParams } from "react-router-dom";
 import eligibleVoters from "../../eligibleVoters.json";
 import MainContainer from './components/MainContainer';
 import PrimaryButton from './components/PrimaryButton';
@@ -22,9 +23,10 @@ import {
   Clock,
   Users
 } from 'lucide-react';
-import NetworkStrip from './components/NetworkStrip';
 import StepWizard from './components/StepWizard';
 import PublicResults from './components/PublicResults';
+import LandingPage from "./components/LandingPage";
+import { getExpectedChainId } from "@/utils/chain";
 
 const AdminPanel = lazy(() => import('./Admin'));
 const Voter = lazy(() => import('./Voter'));
@@ -35,9 +37,9 @@ const Tally = lazy(() => import('./Tally'));
  * Manages global state such as wallet connection, admin status, and election phase.
  * Conditionally renders Admin, Voter, or Tally components based on the current state.
  */
-export default function App() {
+function ElectionUI({ electionAddress }: { electionAddress: string }) {
   // Destructure state and functions from the custom useWallet hook.
-  const { connect, isConnected, isLoading, account, contract, error, chainId, provider } = useWallet();
+  const { connect, isConnected, isLoading, account, contract, error, chainId, provider } = useWallet(electionAddress);
   // KYC verification state (for non-admin voters)
   const [isKycVerified, setIsKycVerified] = useState(false);
   const [verifiedVoterId, setVerifiedVoterId] = useState<string | null>(null);
@@ -47,6 +49,7 @@ export default function App() {
   const [isAdminCheckComplete, setIsAdminCheckComplete] = useState(false);
   // State to hold the current phase of the election, initialized to COMMIT_PHASE.
   const [phase, setPhase] = useState<number>(COMMIT_PHASE);
+  const [electionName, setElectionName] = useState<string | null>(null);
   // Merkle roots: backend and contract for readiness alignment
   const [backendMerkleRoot, setBackendMerkleRoot] = useState<string | null>(null);
   const [contractMerkleRoot, setContractMerkleRoot] = useState<string | null>(null);
@@ -60,6 +63,7 @@ export default function App() {
   const [hasUserRevealed, setHasUserRevealed] = useState(false);
   const [adminTallyOpen, setAdminTallyOpen] = useState(false);
   const totalEligibleVoters = (eligibleVoters as string[])?.length || 0;
+  const expectedChainId = getExpectedChainId();
 
   // Persist KYC verification per account so refresh does not force re-verification
   useEffect(() => {
@@ -210,20 +214,57 @@ export default function App() {
     readContractRoot();
   }, [contract]);
 
-  const steps = useMemo(() => ([
-    { id: 0, title: 'Verify Identity', description: 'KYC and proof readiness' },
-    { id: 1, title: 'Commit Vote', description: 'Encrypt and submit your choice' },
-    { id: 2, title: 'Reveal Vote', description: 'Prove and count your vote' },
-    { id: 3, title: 'View Results', description: 'See live/final tally' },
-  ]), []);
+  // Fetch election name when contract is ready
+  useEffect(() => {
+    let cancelled = false;
+    const readElectionName = async () => {
+      if (!contract) {
+        if (!cancelled) setElectionName(null);
+        return;
+      }
+      try {
+        const n = await contract.name();
+        if (!cancelled) setElectionName(n);
+      } catch (err) {
+        console.warn('DEBUG: Failed to read election name', err);
+        if (!cancelled) setElectionName(null);
+      }
+    };
+    readElectionName();
+    return () => {
+      cancelled = true;
+    };
+  }, [contract]);
+
+  const steps = useMemo(() => {
+    if (isAdmin) {
+      return [
+        { id: 0, title: 'Setup', description: 'Connect & configure' },
+        { id: 1, title: 'Voting', description: 'Commit votes' },
+        { id: 2, title: 'Reveal', description: 'Reveal votes' },
+        { id: 3, title: 'Tally', description: 'Results' },
+      ];
+    }
+    return [
+      { id: 0, title: 'Setup', description: 'Verify identity' },
+      { id: 1, title: 'Commit', description: 'Submit your choice' },
+      { id: 2, title: 'Reveal', description: 'Prove your vote' },
+      { id: 3, title: 'Results', description: 'View tally' },
+    ];
+  }, [isAdmin]);
 
   const currentStep = useMemo(() => {
-    if (isAdmin) return 0;
+    if (isAdmin) {
+      if (!account) return 0;
+      if (phase === 0) return 1;
+      if (phase === 1) return 2;
+      return 3;
+    }
     if (!isKycVerified) return 0;
     if (phase === 0) return 1;
     if (phase === 1) return 2;
     return 3;
-  }, [isAdmin, isKycVerified, phase]);
+  }, [isAdmin, isKycVerified, phase, account]);
 
   const canShowVoterTally = hasUserCommitted || hasUserRevealed;
 
@@ -258,6 +299,8 @@ export default function App() {
 
         // Proceed only if wallet is connected, contract and account are available.
         if (isConnected && contract && account && provider) {
+          // Force admin status refresh immediately after contract loads.
+          setIsAdminCheckComplete(false);
           console.log('DEBUG: Attempting to fetch admin address...');
           console.log('DEBUG: Contract address:', contract.target);
           console.log('DEBUG: Provider:', provider);
@@ -277,11 +320,11 @@ export default function App() {
           try {
             const network = await provider.getNetwork();
             console.log('DEBUG: Current Network Chain ID:', network.chainId);
-            console.log('DEBUG: Expected Chain ID: 31337 (Hardhat)');
-            console.log('DEBUG: Network Match:', Number(network.chainId) === 31337);
+            console.log('DEBUG: Expected Chain ID:', expectedChainId);
+            console.log('DEBUG: Network Match:', Number(network.chainId) === Number(expectedChainId));
             
-            if (Number(network.chainId) !== 31337) {
-              console.warn('DEBUG: WARNING - Connected to wrong network! Expected Hardhat (31337) but got:', network.chainId);
+            if (Number(network.chainId) !== Number(expectedChainId)) {
+              console.warn('DEBUG: WARNING - Connected to wrong network! Expected:', expectedChainId, 'but got:', network.chainId);
             }
           } catch (networkErr) {
             console.error('DEBUG: Error getting network:', networkErr);
@@ -302,62 +345,33 @@ export default function App() {
           }
 
           try {
-            // Fetch the admin address directly from the contract via provider.call.
-            const callData = contract.interface.encodeFunctionData("admin");
-            console.log('DEBUG: Call data for admin function:', callData);
-            const adminResult = await provider.call({ to: contract.target as string, data: callData });
-            console.log('DEBUG: Admin result from contract:', adminResult);
-            const [adminAddress] = contract.interface.decodeFunctionData("admin", adminResult);
-            console.log('DEBUG: Decoded admin address:', adminAddress);
+            // Admin check must compare case-insensitively.
+            const contractAdmin = await contract.admin();
+            const currentAccount = account;
 
-            const currentAccount = account; // Use a local variable for consistency.
-            
-            // Determine if the connected account is the admin.
-            const isCurrentAccountAdmin = (adminAddress as string).toLowerCase() === currentAccount.toLowerCase();
-            
-            // Fallback: Also check if the current account matches the known Hardhat admin address
+            const isCurrentAccountAdmin =
+              String(contractAdmin).toLowerCase() === String(currentAccount).toLowerCase();
+
+            // Dev-only fallback for localhost hardhat account.
             const knownAdminAddress = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
-            const isKnownAdmin = currentAccount.toLowerCase() === knownAdminAddress.toLowerCase();
-            
-            // Use either contract admin check or known admin address check
+            const isKnownAdmin =
+              Number(chainId) === 31337 &&
+              String(currentAccount).toLowerCase() === knownAdminAddress.toLowerCase();
+
             const finalAdminStatus = isCurrentAccountAdmin || isKnownAdmin;
-            
+
             setIsAdmin(finalAdminStatus);
             setIsAdminCheckComplete(true);
 
             console.log('DEBUG: Connected Account:', currentAccount);
-            console.log('DEBUG: Contract Admin Address:', adminAddress);
-            console.log('DEBUG: Known Admin Address:', knownAdminAddress);
+            console.log('DEBUG: Contract Admin Address:', contractAdmin);
             console.log('DEBUG: Is Admin (Contract Check):', isCurrentAccountAdmin);
             console.log('DEBUG: Is Admin (Known Address Check):', isKnownAdmin);
             console.log('DEBUG: Final Admin Status:', finalAdminStatus);
           } catch (adminCheckError) {
             console.error('DEBUG: Error checking admin status:', adminCheckError);
-            
-            // Try alternative method: call admin function directly on contract
-            try {
-              console.log('DEBUG: Trying alternative admin check method...');
-              const adminAddress = await contract.admin();
-              console.log('DEBUG: Alternative admin check result:', adminAddress);
-              
-              const isCurrentAccountAdmin = adminAddress.toLowerCase() === account.toLowerCase();
-              console.log('DEBUG: Alternative admin check - Is Admin:', isCurrentAccountAdmin);
-              
-              setIsAdmin(isCurrentAccountAdmin);
-              setIsAdminCheckComplete(true);
-            } catch (alternativeError) {
-              console.error('DEBUG: Alternative admin check also failed:', alternativeError);
-              
-              // Final fallback to known admin address check if all contract calls fail
-              const knownAdminAddress = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
-              const isKnownAdmin = account.toLowerCase() === knownAdminAddress.toLowerCase();
-              
-              console.log('DEBUG: Final fallback admin check - Known Admin Address:', knownAdminAddress);
-              console.log('DEBUG: Final fallback admin check - Is Admin:', isKnownAdmin);
-              
-              setIsAdmin(isKnownAdmin);
-              setIsAdminCheckComplete(true);
-            }
+            setIsAdmin(false);
+            setIsAdminCheckComplete(true);
           }
 
           // Fetch the current election phase from the contract.
@@ -685,57 +699,21 @@ export default function App() {
         phase={phase} 
         isAdmin={isAdmin} 
         chainId={chainId}
-        expectedChainId={31337}
+        expectedChainId={getExpectedChainId()}
         backendMerkleRoot={backendMerkleRoot}
         contractMerkleRoot={contractMerkleRoot}
+        electionName={electionName}
       />
       
       <MainContainer>
-        {/* Network / Wallet strip */}
-        <div className="mb-4">
-          <NetworkStrip
-            account={account}
-            chainId={chainId}
-            contractAddress={contract?.target as string | undefined}
-          />
-        </div>
-
         {/* Stepper */}
-        <div className="mb-6">
+        <div className="mb-4">
           <StepWizard
             steps={steps}
             currentStep={currentStep}
-            lockedReason={!isKycVerified ? 'Complete KYC to proceed' : undefined}
+            lockedReason={!isAdmin && !isKycVerified ? 'Complete verification to proceed' : undefined}
           />
         </div>
-
-        {/* Readiness checklist */}
-        {account && (
-          <div className="mb-4 grid gap-3 sm:grid-cols-2">
-            <div className={`p-4 rounded-xl border ${Number(chainId) === 31337 ? 'border-success-200 bg-success-50' : 'border-warning-200 bg-warning-50'}`}>
-              <p className="text-sm font-semibold text-slate-900">Network</p>
-              <p className="text-xs text-slate-600 mt-1">
-                {Number(chainId) === 31337 ? 'Connected to expected chain (31337)' : `Connected to chain ${chainId ?? 'unknown'}, expected 31337`}
-              </p>
-            </div>
-            <div className={`p-4 rounded-xl border ${backendMerkleRoot && contractMerkleRoot && backendMerkleRoot.toLowerCase() === contractMerkleRoot.toLowerCase() ? 'border-success-200 bg-success-50' : 'border-warning-200 bg-warning-50'}`}>
-              <p className="text-sm font-semibold text-slate-900">Eligibility Root</p>
-              <p className="text-xs text-slate-600 mt-1">
-                {backendMerkleRoot && contractMerkleRoot
-                  ? backendMerkleRoot.toLowerCase() === contractMerkleRoot.toLowerCase()
-                    ? 'Backend root matches on-chain root'
-                    : 'Backend root differs from on-chain root'
-                  : 'Root not fetched yet'}
-              </p>
-            </div>
-            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50">
-              <p className="text-sm font-semibold text-slate-900">Voting Actions</p>
-              <p className="text-xs text-slate-600 mt-1">
-                Commit and reveal will be disabled if KYC is missing, wrong phase, or root mismatch.
-              </p>
-            </div>
-          </div>
-        )}
 
         {/* Public results section (read-only, no wallet needed) */}
         <div className="flex justify-end">
@@ -744,7 +722,7 @@ export default function App() {
           </a>
         </div>
         <div id="public-tally" className="mt-4">
-          <PublicResults />
+          <PublicResults contractAddress={electionAddress} />
         </div>
 
         {isAdmin ? (
@@ -757,14 +735,16 @@ export default function App() {
                 </div>
               </div>
             }>
-              <AdminPanel
-                contract={contract}
-                phase={phase}
-                onError={(error: string) => setToast({ type: 'error', message: error })}
-                onPhaseChange={() => {
-                  contract.phase().then((p: any) => setPhase(Number(p)));
-                  fetchCandidates();
-                  // Force header pill to update immediately by reading phase and setting state
+               <AdminPanel
+                 contract={contract}
+                 phase={phase}
+                 backendMerkleRoot={backendMerkleRoot}
+                 contractMerkleRoot={contractMerkleRoot}
+                  onError={(error: string) => setToast({ type: 'error', message: error })}
+                  onPhaseChange={() => {
+                    contract.phase().then((p: any) => setPhase(Number(p)));
+                    fetchCandidates();
+                    // Force header pill to update immediately by reading phase and setting state
                   setTimeout(async () => {
                     try {
                       const p2 = await contract.phase();
@@ -897,5 +877,22 @@ export default function App() {
         />
       )}
     </div>
+  );
+}
+
+function ElectionRoute() {
+  const params = useParams();
+  const address = params.address;
+  if (!address) return <Navigate to="/" replace />;
+  return <ElectionUI electionAddress={address} />;
+}
+
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/election/:address" element={<ElectionRoute />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }

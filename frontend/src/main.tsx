@@ -1,6 +1,7 @@
 import './polyfills';
 import React from "react";
 import { createRoot } from "react-dom/client";
+import { BrowserRouter } from "react-router-dom";
 import { ThemeProvider } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
 import App from "./App";
@@ -20,7 +21,9 @@ const initializeApp = () => {
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <I18nProvider>
-          <App />
+          <BrowserRouter>
+            <App />
+          </BrowserRouter>
         </I18nProvider>
       </ThemeProvider>
     </React.StrictMode>
