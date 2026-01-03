@@ -8,7 +8,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
-      '@typechain': path.resolve(__dirname, '../typechain-types'),
+      '@typechain': path.resolve(__dirname, 'src/typechain-types'),
       buffer: 'buffer',
     },
   },
