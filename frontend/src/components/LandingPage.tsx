@@ -53,7 +53,8 @@ export default function LandingPage() {
         return;
       }
 
-      const resp = await fetch('http://localhost:3000/api/join', {
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
+      const resp = await fetch(`${backendUrl}/api/join`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ address: userAddress }),
