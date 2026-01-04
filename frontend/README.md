@@ -36,8 +36,14 @@ export default tseslint.config({
 Create a `.env.local` in `frontend/`:
 
 ```
-VITE_BACKEND_URL=http://localhost:3001
+VITE_BACKEND_URL=http://localhost:3000
 VITE_CHAIN_ID=31337
+```
+
+Hosted backend (Render):
+
+```
+VITE_BACKEND_URL=https://bharatvote-backend.onrender.com
 ```
 
 Run sequence for local dev:
