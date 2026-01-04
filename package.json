@@ -2,7 +2,6 @@
   "name": "bharatvote",
   "private": true,
   "version": "1.0.0",
-  "packageManager": "npm@10.2.4",
   "scripts": {
     "compile": "npx hardhat compile",
     "node": "npx hardhat node",
