@@ -48,11 +48,25 @@ VITE_CHAIN_ID=11155111
 VITE_CONTRACT_ADDRESS=YOUR_DEPLOYED_CONTRACT_ADDRESS
 VITE_RPC_URL=https://sepolia.infura.io/v3/YOUR_PROJECT_ID
 
+# Backend (Render) for Public Demo "Stranger Mode"
+# Required for `/api/join` auto-funding + Merkle proof service.
+# Configure these on your backend host (Render) and point the frontend at it.
+VITE_BACKEND_URL=https://bharatvote-backend.onrender.com
+
 # For Mumbai Demo
 VITE_ENV=demo
 VITE_CHAIN_ID=80001
 VITE_CONTRACT_ADDRESS=YOUR_DEPLOYED_CONTRACT_ADDRESS
 VITE_RPC_URL=https://polygon-mumbai.infura.io/v3/YOUR_PROJECT_ID
+```
+
+Backend host env vars (Render):
+
+```bash
+# Used to fund strangers + sync demo eligibility on-chain
+PRIVATE_KEY=0x...
+VITE_SEPOLIA_RPC_URL=https://...
+VITE_DEMO_ELECTION_ADDRESS=0x...
 ```
 
 ### Step 3: Deploy to Testnet

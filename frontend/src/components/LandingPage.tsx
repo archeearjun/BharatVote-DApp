@@ -9,6 +9,7 @@ export default function LandingPage() {
   const navigate = useNavigate();
   const [addressInput, setAddressInput] = useState("");
   const [joinError, setJoinError] = useState<string | null>(null);
+  const [demoError, setDemoError] = useState<string | null>(null);
   const [isJoiningDemo, setIsJoiningDemo] = useState(false);
 
   const demoElectionAddress = import.meta.env.VITE_DEMO_ELECTION_ADDRESS as string | undefined;
@@ -45,6 +46,7 @@ export default function LandingPage() {
     }
 
     setIsJoiningDemo(true);
+    setDemoError(null);
     try {
       const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
       const userAddress = accounts?.[0];
@@ -60,7 +62,20 @@ export default function LandingPage() {
         body: JSON.stringify({ address: userAddress }),
       });
       if (!resp.ok) {
-        throw new Error(await resp.text());
+        let message = `Failed to join demo (${resp.status})`;
+        try {
+          const contentType = resp.headers.get('content-type') || '';
+          if (contentType.includes('application/json')) {
+            const data = await resp.json();
+            message = data?.error || JSON.stringify(data);
+          } else {
+            const text = await resp.text();
+            if (text) message = text;
+          }
+        } catch {
+          // ignore
+        }
+        throw new Error(message);
       }
 
       // Skip KYC gate for demo users (persisted per-account in App.tsx)
@@ -70,7 +85,8 @@ export default function LandingPage() {
       navigate(`/election/${demoElectionAddress}`);
     } catch (err) {
       console.error(err);
-      alert("Failed to join demo. Is the backend server running?");
+      const message = err instanceof Error ? err.message : "Failed to join demo.";
+      setDemoError(message);
     } finally {
       setIsJoiningDemo(false);
     }
@@ -150,6 +166,12 @@ export default function LandingPage() {
               {!demoEnabled && (
                 <div className="mt-2 text-xs text-purple-800/80">
                   Demo is not configured. Set <span className="font-mono">VITE_DEMO_ELECTION_ADDRESS</span>.
+                </div>
+              )}
+
+              {demoError && (
+                <div className="mt-3 text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+                  {demoError}
                 </div>
               )}
             </div>
