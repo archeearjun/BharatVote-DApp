@@ -26,6 +26,7 @@ import {
 import StepWizard from './components/StepWizard';
 import PublicResults from './components/PublicResults';
 import LandingPage from "./components/LandingPage";
+import DemoTimerBanner from "./components/DemoTimerBanner";
 import { getExpectedChainId } from "@/utils/chain";
 
 const AdminPanel = lazy(() => import('./Admin'));
@@ -64,6 +65,11 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
   const [adminTallyOpen, setAdminTallyOpen] = useState(false);
   const totalEligibleVoters = (eligibleVoters as string[])?.length || 0;
   const expectedChainId = getExpectedChainId();
+  const demoElectionAddress = import.meta.env.VITE_DEMO_ELECTION_ADDRESS as string | undefined;
+  const isDemoElection = useMemo(() => {
+    if (!demoElectionAddress || !electionAddress) return false;
+    return String(demoElectionAddress).toLowerCase() === String(electionAddress).toLowerCase();
+  }, [demoElectionAddress, electionAddress]);
 
   // Persist KYC verification per account so refresh does not force re-verification
   useEffect(() => {
@@ -714,6 +720,8 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
             lockedReason={!isAdmin && !isKycVerified ? 'Complete verification to proceed' : undefined}
           />
         </div>
+
+        <DemoTimerBanner enabled={isDemoElection} />
 
         {/* Public results section (read-only, no wallet needed) */}
         <div className="flex justify-end">

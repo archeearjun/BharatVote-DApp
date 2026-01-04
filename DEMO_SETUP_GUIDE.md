@@ -67,6 +67,14 @@ Backend host env vars (Render):
 PRIVATE_KEY=0x...
 VITE_SEPOLIA_RPC_URL=https://...
 VITE_DEMO_ELECTION_ADDRESS=0x...
+
+# Optional: demo autophasing (commit -> reveal -> finished -> reset)
+DEMO_AUTOPHASE_ENABLED=true
+DEMO_START_MODE=on_first_join     # or: immediate
+DEMO_COMMIT_SECONDS=120
+DEMO_REVEAL_SECONDS=120
+DEMO_AUTORESET_ENABLED=true
+DEMO_RESET_GRACE_SECONDS=15
 ```
 
 ### Step 3: Deploy to Testnet
