@@ -1,15 +1,22 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import path from 'path';
 
 export default defineConfig({
   base: '/',
-  plugins: [react()],
+  plugins: [
+    react(),
+    // This plugin automatically handles Buffer, process, and other Node.js globals
+    nodePolyfills({
+      // Whether to polyfill `node:` protocol imports.
+      protocolImports: true,
+    }),
+  ],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
       '@typechain': path.resolve(__dirname, 'src/typechain-types'),
-      buffer: 'buffer',
     },
   },
   server: {
@@ -19,13 +26,10 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
     rollupOptions: {
-      output: {
-        manualChunks: {
-          polyfills: ['buffer']
-        }
-      }
+      // Manual chunks for buffer are no longer needed, the plugin handles injection
     }
   },
+  // Vitest configuration
   test: {
     globals: true,
     environment: 'jsdom',
@@ -42,16 +46,4 @@ export default defineConfig({
       ],
     },
   },
-  define: {
-    global: 'globalThis',
-    'process.env': {},
-  },
-  optimizeDeps: {
-    include: ['buffer'],
-    esbuildOptions: {
-      define: {
-        global: 'globalThis'
-      }
-    }
-  }
 });
