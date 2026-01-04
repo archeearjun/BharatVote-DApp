@@ -15,6 +15,11 @@ app.use(express.json());
 const PORT = process.env.PORT || 3000;
 const PRIVATE_KEY = process.env.PRIVATE_KEY; // Admin Private Key
 const RPC_URL = process.env.VITE_SEPOLIA_RPC_URL || process.env.RPC_URL; // Alchemy/Infura URL
+const DEMO_ELECTION_ADDRESS =
+  process.env.VITE_DEMO_ELECTION_ADDRESS ||
+  process.env.DEMO_ELECTION_ADDRESS ||
+  process.env.DEMO_ELECTION_CONTRACT ||
+  '';
 
 const keccak256Hasher = (data) => {
   if (typeof data === 'string') {
@@ -31,9 +36,19 @@ const keccak256Hasher = (data) => {
   throw new Error('Invalid data type for keccak256Hasher');
 };
 
+const NORMALIZED_PRIVATE_KEY =
+  PRIVATE_KEY && typeof PRIVATE_KEY === 'string'
+    ? (PRIVATE_KEY.trim().startsWith('0x') ? PRIVATE_KEY.trim() : `0x${PRIVATE_KEY.trim()}`)
+    : null;
+
 // --- 1. THE HYBRID LIST (Pros + Strangers) ---
 // Start with known addresses. Strangers will be added here automatically.
-const ADMIN_ADDRESS = process.env.ADMIN_ADDRESS || '0xad9f935ba3c0b1ed22ef90e9cb6230b034383b5b';
+const ADMIN_ADDRESS =
+  process.env.ADMIN_ADDRESS ||
+  (PRIVATE_KEY
+    ? new ethers.Wallet(NORMALIZED_PRIVATE_KEY).address
+    : null) ||
+  '0xad9f935ba3c0b1ed22ef90e9cb6230b034383b5b';
 const initialEligible = (() => {
   try {
     const fromFile = require('../eligibleVoters.json');
@@ -55,7 +70,7 @@ const eligibleVoters = Array.from(
 
 // --- 2. SETUP BLOCKCHAIN CONNECTION ---
 const provider = RPC_URL ? new ethers.JsonRpcProvider(RPC_URL) : null;
-const adminWallet = provider && PRIVATE_KEY ? new ethers.Wallet(PRIVATE_KEY, provider) : null;
+const adminWallet = provider && NORMALIZED_PRIVATE_KEY ? new ethers.Wallet(NORMALIZED_PRIVATE_KEY, provider) : null;
 
 // Merkle tree state
 let tree = null;
@@ -68,6 +83,51 @@ const rebuildTree = () => {
 };
 
 rebuildTree();
+
+const DEMO_ELECTION_ABI = [
+  'function merkleRoot() view returns (bytes32)',
+  'function setMerkleRoot(bytes32 _root)',
+  'function admin() view returns (address)',
+];
+
+async function syncDemoElectionMerkleRootIfConfigured({ onlyIfChanged }) {
+  if (!provider || !adminWallet) {
+    console.log('?? Demo sync skipped (missing RPC_URL or PRIVATE_KEY).');
+    return { synced: false, reason: 'missing_rpc_or_key' };
+  }
+
+  if (!DEMO_ELECTION_ADDRESS || !ethers.isAddress(DEMO_ELECTION_ADDRESS)) {
+    console.log('?? Demo sync skipped (missing/invalid demo election address).');
+    return { synced: false, reason: 'missing_demo_address' };
+  }
+
+  if (!merkleRoot || !ethers.isHexString(merkleRoot, 32)) {
+    console.log('?? Demo sync skipped (invalid backend merkleRoot).');
+    return { synced: false, reason: 'invalid_backend_root' };
+  }
+
+  const election = new ethers.Contract(DEMO_ELECTION_ADDRESS, DEMO_ELECTION_ABI, adminWallet);
+
+  try {
+    const onChainRoot = await election.merkleRoot();
+    const shouldUpdate = String(onChainRoot).toLowerCase() !== String(merkleRoot).toLowerCase();
+
+    if (onlyIfChanged && !shouldUpdate) {
+      return { synced: false, reason: 'already_synced' };
+    }
+
+    if (!shouldUpdate) return { synced: false, reason: 'already_synced' };
+
+    console.log(`?? Syncing demo election merkleRoot on-chain: ${DEMO_ELECTION_ADDRESS}`);
+    const tx = await election.setMerkleRoot(merkleRoot);
+    await tx.wait();
+    console.log(`? Demo election merkleRoot synced. tx=${tx.hash}`);
+    return { synced: true, txHash: tx.hash };
+  } catch (error) {
+    console.error('? Demo merkleRoot sync failed:', error);
+    return { synced: false, reason: 'sync_failed', error: error?.message || String(error) };
+  }
+}
 
 console.log('------------------------------------------------');
 console.log(`🌳 Server Started.`);
@@ -102,6 +162,12 @@ app.get('/api/merkle-proof/:address', (req, res) => {
 
 // 3. THE MAGIC "JOIN DEMO" ENDPOINT
 app.post('/api/join', async (req, res) => {
+  if (!DEMO_ELECTION_ADDRESS || !ethers.isAddress(DEMO_ELECTION_ADDRESS)) {
+    return res.status(503).json({
+      error: 'Demo is not configured on the backend (missing VITE_DEMO_ELECTION_ADDRESS)',
+    });
+  }
+
   const address = String(req.body?.address || '').trim();
   if (!ethers.isAddress(address)) return res.status(400).json({ error: 'No valid address provided' });
 
@@ -109,10 +175,13 @@ app.post('/api/join', async (req, res) => {
   console.log(`✨ New Demo Request: ${normalized}`);
 
   try {
+    let listChanged = false;
+
     // A. Add to List (if they aren't already there)
     if (!eligibleVoters.some((v) => v.toLowerCase() === normalized.toLowerCase())) {
       eligibleVoters.push(normalized);
       rebuildTree();
+      listChanged = true;
       console.log(`✅ User added! New Root: ${merkleRoot}`);
     } else {
       console.log('ℹ️ User already in list.');
@@ -134,7 +203,22 @@ app.post('/api/join', async (req, res) => {
       console.log('ℹ️ Funding skipped (missing RPC_URL or PRIVATE_KEY).');
     }
 
-    return res.json({ success: true, message: 'Welcome to the demo!', merkleRoot });
+    // C. Keep the demo election usable: update on-chain merkleRoot when the backend list changes.
+    const sync = listChanged
+      ? await syncDemoElectionMerkleRootIfConfigured({ onlyIfChanged: true })
+      : { synced: false, reason: 'list_unchanged' };
+
+    // If we changed the allowlist, the on-chain merkleRoot must be updated too or the voter will revert as NotEligible.
+    if (listChanged && !sync?.synced) {
+      return res.status(500).json({
+        error:
+          'Demo eligibility sync failed (cannot update on-chain merkleRoot). Check RPC_URL/PRIVATE_KEY and demo admin permissions.',
+        merkleRoot,
+        sync,
+      });
+    }
+
+    return res.json({ success: true, message: 'Welcome to the demo!', merkleRoot, sync });
   } catch (error) {
     console.error('❌ Onboarding failed:', error);
     return res.status(500).json({ error: error?.message || 'Onboarding failed' });
@@ -146,4 +230,3 @@ app.listen(PORT, () => {
 });
 
 module.exports = app;
-
