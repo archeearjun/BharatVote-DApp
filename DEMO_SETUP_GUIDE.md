@@ -183,7 +183,12 @@ Share these instructions with your demo audience:
    - Verify the contract address is correct
    - Check if the contract was deployed successfully
 
-4. **Transaction Stuck**
+4. **Vercel build fails with `ENOENT ... /.pnpm-store/...`**
+   - This is a pnpm cache/store corruption from Vercel’s restored build cache.
+   - This repo sets pnpm’s store to `/tmp/pnpm-store` via `.npmrc` to avoid reusing a bad cached store.
+   - If it still happens, clear the Vercel build cache once and redeploy.
+
+5. **Transaction Stuck**
    - Check network congestion
    - Suggest increasing gas limit
    - Wait for confirmation
