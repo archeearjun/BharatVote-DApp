@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ethers } from 'ethers';
 import contractJson from '../contracts/BharatVote.json';
 import { RefreshCcw, Clock, AlertTriangle, Users, BarChart3 } from 'lucide-react';
@@ -11,20 +11,32 @@ interface Candidate {
 
 interface PublicResultsProps {
   contractAddress?: string;
+  isDemoElection?: boolean;
 }
 
 const POLL_INTERVAL_MS = 15000;
+type ResultsMode = 'current' | 'allTime';
 
-const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress }) => {
+const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoElection }) => {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [totalVotes, setTotalVotes] = useState(0);
+  const [votesCommittedAllTime, setVotesCommittedAllTime] = useState<number | null>(null);
+  const [votesRevealedAllTime, setVotesRevealedAllTime] = useState<number | null>(null);
+  const [allTimeCandidateVotes, setAllTimeCandidateVotes] = useState<Map<number, number>>(new Map());
   const [phase, setPhase] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [mode, setMode] = useState<ResultsMode>(() => (isDemoElection ? 'allTime' : 'current'));
+
+  const committedVotersRef = useRef<Set<string>>(new Set());
+  const revealedVotersRef = useRef<Set<string>>(new Set());
+  const allTimeVotesByCandidateRef = useRef<Map<number, number>>(new Map());
+  const lastScannedBlockRef = useRef<number | null>(null);
 
   const rpcUrl = import.meta.env.VITE_PUBLIC_RPC_URL;
   const publicContractAddress = import.meta.env.VITE_PUBLIC_CONTRACT_ADDRESS;
+  const eventsFromBlock = Number(import.meta.env.VITE_PUBLIC_EVENTS_FROM_BLOCK ?? 0);
 
   const provider = useMemo(() => {
     try {
@@ -42,6 +54,20 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress }) => {
     return new ethers.Contract(address, (contractJson as any).abi, provider);
   }, [provider, publicContractAddress, contractAddress]);
 
+  useEffect(() => {
+    setMode(isDemoElection ? 'allTime' : 'current');
+  }, [isDemoElection]);
+
+  useEffect(() => {
+    committedVotersRef.current = new Set();
+    revealedVotersRef.current = new Set();
+    allTimeVotesByCandidateRef.current = new Map();
+    lastScannedBlockRef.current = null;
+    setVotesCommittedAllTime(null);
+    setVotesRevealedAllTime(null);
+    setAllTimeCandidateVotes(new Map());
+  }, [contractAddress]);
+
   const fetchResults = async () => {
     if (!contract) {
       setError('Public provider or contract address missing. Set VITE_PUBLIC_RPC_URL and VITE_PUBLIC_CONTRACT_ADDRESS.');
@@ -56,8 +82,13 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress }) => {
       for (const c of fetched) {
         const idNum = Number(c.id ?? c[0] ?? 0);
         const name = c.name ?? c[1] ?? `Candidate ${idNum}`;
-        const votesRaw = await contract.getVotes(idNum);
-        const votes = Number(votesRaw);
+        let votes = 0;
+        try {
+          const votesRaw = await contract.getVotes(idNum);
+          votes = Number(votesRaw);
+        } catch {
+          votes = 0;
+        }
         withVotes.push({ id: idNum, name, voteCount: votes });
       }
       setCandidates(withVotes);
@@ -72,17 +103,63 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress }) => {
     }
   };
 
+  const fetchAllTimeFromEvents = async () => {
+    if (!contract || !provider) return;
+
+    const latestBlock = await provider.getBlockNumber();
+    const fromBlock = lastScannedBlockRef.current === null
+      ? Math.max(0, eventsFromBlock)
+      : lastScannedBlockRef.current + 1;
+
+    if (fromBlock > latestBlock) {
+      setVotesCommittedAllTime(committedVotersRef.current.size);
+      setVotesRevealedAllTime(revealedVotersRef.current.size);
+      setAllTimeCandidateVotes(new Map(allTimeVotesByCandidateRef.current));
+      return;
+    }
+
+    const commitFilter = (contract as any).filters?.VoteCommitted?.();
+    const revealFilter = (contract as any).filters?.VoteRevealed?.();
+
+    if (commitFilter) {
+      const commitLogs = await contract.queryFilter(commitFilter, fromBlock, latestBlock);
+      for (const log of commitLogs as any[]) {
+        const voter = String((log?.args?.voter ?? log?.args?.[0] ?? '')).toLowerCase();
+        if (voter) committedVotersRef.current.add(voter);
+      }
+    }
+
+    if (revealFilter) {
+      const revealLogs = await contract.queryFilter(revealFilter, fromBlock, latestBlock);
+      for (const log of revealLogs as any[]) {
+        const voter = String((log?.args?.voter ?? log?.args?.[0] ?? '')).toLowerCase();
+        const choiceRaw = log?.args?.choice ?? log?.args?.[1];
+        const choice = Number(choiceRaw ?? 0);
+        if (voter) revealedVotersRef.current.add(voter);
+        allTimeVotesByCandidateRef.current.set(choice, (allTimeVotesByCandidateRef.current.get(choice) ?? 0) + 1);
+      }
+    }
+
+    lastScannedBlockRef.current = latestBlock;
+    setVotesCommittedAllTime(committedVotersRef.current.size);
+    setVotesRevealedAllTime(revealedVotersRef.current.size);
+    setAllTimeCandidateVotes(new Map(allTimeVotesByCandidateRef.current));
+  };
+
   useEffect(() => {
     fetchResults();
-    const id = setInterval(fetchResults, POLL_INTERVAL_MS);
+    fetchAllTimeFromEvents().catch((err) => console.warn('PublicResults: event scan failed', err));
+    const id = setInterval(() => {
+      fetchResults();
+      fetchAllTimeFromEvents().catch((err) => console.warn('PublicResults: event scan failed', err));
+    }, POLL_INTERVAL_MS);
     return () => clearInterval(id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contract]);
 
-  const formatPct = (votes: number) => {
-    if (totalVotes === 0) return '0%';
-    return `${((votes / totalVotes) * 100).toFixed(1)}%`;
-  };
+  const allTimeTotalRevealedVotes = useMemo(() => {
+    return Array.from(allTimeCandidateVotes.values()).reduce((sum, value) => sum + value, 0);
+  }, [allTimeCandidateVotes]);
 
   return (
     <div className="card-premium p-6 space-y-4">
@@ -93,14 +170,37 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress }) => {
             Read-only view, no wallet required. Auto-refresh every 15s.
           </p>
         </div>
-        <button
-          onClick={fetchResults}
-          disabled={isLoading}
-          className="btn-secondary inline-flex items-center gap-2"
-        >
-          <RefreshCcw className="w-4 h-4" />
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          {isDemoElection && (
+            <div className="inline-flex rounded-lg border border-slate-200 bg-white overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setMode('allTime')}
+                className={`px-3 py-2 text-sm ${mode === 'allTime' ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-50'}`}
+              >
+                Live Tally (All-Time)
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode('current')}
+                className={`px-3 py-2 text-sm ${mode === 'current' ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-50'}`}
+              >
+                Tally (Current Run)
+              </button>
+            </div>
+          )}
+          <button
+            onClick={() => {
+              fetchResults();
+              fetchAllTimeFromEvents().catch((err) => console.warn('PublicResults: event scan failed', err));
+            }}
+            disabled={isLoading}
+            className="btn-secondary inline-flex items-center gap-2"
+          >
+            <RefreshCcw className="w-4 h-4" />
+            Refresh
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -116,21 +216,38 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress }) => {
           <p className="text-3xl font-bold text-blue-700 mt-1">{candidates.length}</p>
         </div>
         <div className="p-4 rounded-lg bg-green-50 border border-green-100">
-          <p className="text-xs uppercase tracking-wide text-green-600">Total Votes</p>
-          <p className="text-3xl font-bold text-green-700 mt-1">{totalVotes}</p>
+          <p className="text-xs uppercase tracking-wide text-green-600">{mode === 'allTime' ? 'Votes Cast (All-Time)' : 'Votes Revealed (Current)'}</p>
+          <p className="text-3xl font-bold text-green-700 mt-1">
+            {mode === 'allTime' ? (votesCommittedAllTime ?? '-') : totalVotes}
+          </p>
         </div>
         <div className="p-4 rounded-lg bg-purple-50 border border-purple-100">
           <p className="text-xs uppercase tracking-wide text-purple-600">Phase</p>
           <p className="text-3xl font-bold text-purple-700 mt-1">
-            {phase === null ? '—' : phase === 0 ? 'Commit' : phase === 1 ? 'Reveal' : 'Finished'}
+            {phase === null ? '-' : phase === 0 ? 'Commit' : phase === 1 ? 'Reveal' : 'Finished'}
           </p>
         </div>
       </div>
 
+      {isDemoElection && mode === 'allTime' && (
+        <div className="p-4 rounded-lg border border-slate-100 bg-white text-sm text-slate-700 flex items-center justify-between">
+          <div>
+            <div className="font-semibold text-slate-900">All-time demo participation</div>
+            <div className="text-slate-600">Counts are computed from on-chain events (persists across resets).</div>
+          </div>
+          <div className="text-right">
+            <div><span className="font-semibold">{votesCommittedAllTime ?? '-'}</span> committed</div>
+            <div><span className="font-semibold">{votesRevealedAllTime ?? '-'}</span> revealed</div>
+          </div>
+        </div>
+      )}
+
       <div className="p-4 rounded-lg border border-slate-100 bg-white">
         <div className="flex items-center gap-2 mb-3">
           <Users className="w-4 h-4 text-slate-500" />
-          <span className="text-sm font-semibold text-slate-800">Live Vote Counts</span>
+          <span className="text-sm font-semibold text-slate-800">
+            {mode === 'allTime' ? 'Live Tally (All-Time Reveals)' : 'Live Vote Counts'}
+          </span>
           {lastUpdated && (
             <span className="text-xs text-slate-500 inline-flex items-center gap-1 ml-auto">
               <Clock className="w-3 h-3" />
@@ -152,7 +269,14 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress }) => {
 
         {!isLoading && candidates.length > 0 && (
           <div className="space-y-4">
-            {candidates.map((c) => (
+            {candidates.map((c) => {
+              const voteCount = mode === 'allTime'
+                ? (allTimeCandidateVotes.get(c.id) ?? 0)
+                : c.voteCount;
+              const pctBase = mode === 'allTime' ? allTimeTotalRevealedVotes : totalVotes;
+              const pct = pctBase === 0 ? '0%' : `${((voteCount / pctBase) * 100).toFixed(1)}%`;
+
+              return (
               <div key={c.id} className="space-y-1">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -160,18 +284,19 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress }) => {
                     <span className="text-sm font-medium text-slate-900">{c.name}</span>
                   </div>
                   <div className="text-right">
-                    <div className="text-sm font-semibold text-slate-900">{c.voteCount}</div>
-                    <div className="text-xs text-slate-500">{formatPct(c.voteCount)}</div>
+                    <div className="text-sm font-semibold text-slate-900">{voteCount}</div>
+                    <div className="text-xs text-slate-500">{pct}</div>
                   </div>
                 </div>
                 <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
                   <div
                     className="h-2 bg-blue-500 transition-all"
-                    style={{ width: totalVotes > 0 ? `${(c.voteCount / totalVotes) * 100}%` : '0%' }}
+                    style={{ width: pctBase > 0 ? `${(voteCount / pctBase) * 100}%` : '0%' }}
                   />
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

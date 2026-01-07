@@ -730,7 +730,7 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
           </a>
         </div>
         <div id="public-tally" className="mt-4">
-          <PublicResults contractAddress={electionAddress} />
+          <PublicResults contractAddress={electionAddress} isDemoElection={isDemoElection} />
         </div>
 
         {isAdmin ? (
