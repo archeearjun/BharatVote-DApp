@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BACKEND_URL } from "@/constants";
 
 type DemoStatus = {
@@ -31,9 +31,18 @@ function phaseLabel(phase: number | null | undefined) {
 export default function DemoTimerBanner({ enabled }: { enabled: boolean }) {
   const [status, setStatus] = useState<DemoStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const lastKickAtMsRef = useRef<number>(0);
 
   const show = enabled;
   const pollMs = 5000;
+
+  const callTick = async () => {
+    try {
+      await fetch(`${BACKEND_URL}/api/demo/tick`, { method: "POST" });
+    } catch {
+      // ignore
+    }
+  };
 
   const callStatus = async () => {
     setError(null);
@@ -45,6 +54,23 @@ export default function DemoTimerBanner({ enabled }: { enabled: boolean }) {
       }
       const data = (await resp.json()) as DemoStatus;
       setStatus(data);
+
+      // If the backend host sleeps or the scheduler loop isn't running continuously,
+      // proactively trigger a tick when the timer reaches 0 to advance the on-chain phase.
+      const canKick =
+        data?.enabled &&
+        !data?.transitioning &&
+        typeof data?.timeRemainingMs === "number" &&
+        data.timeRemainingMs <= 0;
+
+      if (canKick) {
+        const now = Date.now();
+        // Avoid a thundering herd: only kick once every 20s per client.
+        if (now - lastKickAtMsRef.current > 20000) {
+          lastKickAtMsRef.current = now;
+          await callTick();
+        }
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load demo status");
     }
@@ -99,4 +125,3 @@ export default function DemoTimerBanner({ enabled }: { enabled: boolean }) {
     </div>
   );
 }
-

@@ -40,7 +40,7 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
   const rpcUrl = import.meta.env.VITE_PUBLIC_RPC_URL;
   const publicContractAddress = import.meta.env.VITE_PUBLIC_CONTRACT_ADDRESS;
   const eventsFromBlock = Number(import.meta.env.VITE_PUBLIC_EVENTS_FROM_BLOCK ?? 0);
-  const maxRequestsPerPoll = Number(import.meta.env.VITE_PUBLIC_EVENTS_MAX_REQUESTS_PER_POLL ?? 20);
+  const maxRequestsPerPoll = Number(import.meta.env.VITE_PUBLIC_EVENTS_MAX_REQUESTS_PER_POLL ?? 6);
 
   const provider = useMemo(() => {
     try {
@@ -234,14 +234,18 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
 
   useEffect(() => {
     fetchResults();
-    fetchAllTimeFromEvents().catch((err) => console.warn('PublicResults: event scan failed', err));
+    if (isDemoElection && mode === 'allTime') {
+      fetchAllTimeFromEvents().catch((err) => console.warn('PublicResults: event scan failed', err));
+    }
     const id = setInterval(() => {
       fetchResults();
-      fetchAllTimeFromEvents().catch((err) => console.warn('PublicResults: event scan failed', err));
+      if (isDemoElection && mode === 'allTime') {
+        fetchAllTimeFromEvents().catch((err) => console.warn('PublicResults: event scan failed', err));
+      }
     }, POLL_INTERVAL_MS);
     return () => clearInterval(id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contract]);
+  }, [contract, isDemoElection, mode]);
 
   const allTimeTotalRevealedVotes = useMemo(() => {
     return Array.from(allTimeCandidateVotes.values()).reduce((sum, value) => sum + value, 0);
@@ -278,7 +282,9 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
           <button
             onClick={() => {
               fetchResults();
-              fetchAllTimeFromEvents().catch((err) => console.warn('PublicResults: event scan failed', err));
+              if (isDemoElection && mode === 'allTime') {
+                fetchAllTimeFromEvents().catch((err) => console.warn('PublicResults: event scan failed', err));
+              }
             }}
             disabled={isLoading}
             className="btn-secondary inline-flex items-center gap-2"
