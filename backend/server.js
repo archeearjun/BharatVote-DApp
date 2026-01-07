@@ -369,6 +369,11 @@ app.get('/api/merkle-proof/:address', (req, res) => {
   }
 
   const normalized = ethers.getAddress(address);
+
+  // Keep the public demo usable: if the backend allowlist changed, ensure the demo contract merkleRoot is synced.
+  // This is a no-op when demo is not configured or when the root is already up to date.
+  syncDemoElectionMerkleRootIfConfigured({ onlyIfChanged: true }).catch(() => {});
+
   const leaf = keccak256Hasher(normalized);
   const proofElements = tree.getProof(leaf);
   const ok = tree.verify(proofElements, leaf, tree.getRoot());

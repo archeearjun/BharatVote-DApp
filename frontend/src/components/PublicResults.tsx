@@ -33,10 +33,14 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
   const revealedVotersRef = useRef<Set<string>>(new Set());
   const allTimeVotesByCandidateRef = useRef<Map<number, number>>(new Map());
   const lastScannedBlockRef = useRef<number | null>(null);
+  const deploymentBlockRef = useRef<number | null>(null);
+  const scanInProgressRef = useRef(false);
+  const batchSpanRef = useRef<number | null>(null); // inclusive span: toBlock = fromBlock + span
 
   const rpcUrl = import.meta.env.VITE_PUBLIC_RPC_URL;
   const publicContractAddress = import.meta.env.VITE_PUBLIC_CONTRACT_ADDRESS;
   const eventsFromBlock = Number(import.meta.env.VITE_PUBLIC_EVENTS_FROM_BLOCK ?? 0);
+  const maxRequestsPerPoll = Number(import.meta.env.VITE_PUBLIC_EVENTS_MAX_REQUESTS_PER_POLL ?? 20);
 
   const provider = useMemo(() => {
     try {
@@ -63,10 +67,58 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
     revealedVotersRef.current = new Set();
     allTimeVotesByCandidateRef.current = new Map();
     lastScannedBlockRef.current = null;
+    deploymentBlockRef.current = null;
+    batchSpanRef.current = null;
     setVotesCommittedAllTime(null);
     setVotesRevealedAllTime(null);
     setAllTimeCandidateVotes(new Map());
   }, [contractAddress]);
+
+  const parseLogRangeLimitFromError = (err: any): number | null => {
+    const message = String(err?.info?.error?.message || err?.error?.message || err?.message || '');
+    const m = message.match(/up to a\s+(\d+)\s+block range/i);
+    if (m) {
+      const blocks = Number(m[1]);
+      return Number.isFinite(blocks) && blocks > 0 ? blocks : null;
+    }
+    const m2 = message.match(/block range should work:\s*\[\s*0x([0-9a-fA-F]+)\s*,\s*0x([0-9a-fA-F]+)\s*\]/i);
+    if (m2) {
+      const from = Number.parseInt(m2[1], 16);
+      const to = Number.parseInt(m2[2], 16);
+      const blocks = Number.isFinite(from) && Number.isFinite(to) ? (to - from + 1) : NaN;
+      return Number.isFinite(blocks) && blocks > 0 ? blocks : null;
+    }
+    return null;
+  };
+
+  const getDeploymentBlock = async (): Promise<number> => {
+    if (deploymentBlockRef.current !== null) return deploymentBlockRef.current;
+    if (!provider || !contract) return 0;
+
+    try {
+      const latest = await provider.getBlockNumber();
+      let low = 0;
+      let high = latest;
+      const address = await contract.getAddress();
+
+      while (low < high) {
+        const mid = Math.floor((low + high) / 2);
+        const code = await provider.getCode(address, mid);
+        if (code && code !== '0x') {
+          high = mid;
+        } else {
+          low = mid + 1;
+        }
+      }
+
+      deploymentBlockRef.current = low;
+      return low;
+    } catch (e) {
+      console.warn('PublicResults: failed to detect deployment block', e);
+      deploymentBlockRef.current = Math.max(0, Number.isFinite(eventsFromBlock) ? eventsFromBlock : 0);
+      return deploymentBlockRef.current;
+    }
+  };
 
   const fetchResults = async () => {
     if (!contract) {
@@ -105,45 +157,79 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
 
   const fetchAllTimeFromEvents = async () => {
     if (!contract || !provider) return;
+    if (scanInProgressRef.current) return;
+    scanInProgressRef.current = true;
 
-    const latestBlock = await provider.getBlockNumber();
-    const fromBlock = lastScannedBlockRef.current === null
-      ? Math.max(0, eventsFromBlock)
-      : lastScannedBlockRef.current + 1;
+    try {
+      const latestBlock = await provider.getBlockNumber();
+      const deploymentBlock = await getDeploymentBlock();
+      const startBlock = Math.max(0, Number.isFinite(eventsFromBlock) ? eventsFromBlock : 0, deploymentBlock);
 
-    if (fromBlock > latestBlock) {
+      let fromBlock = lastScannedBlockRef.current === null ? startBlock : lastScannedBlockRef.current + 1;
+
+      if (fromBlock > latestBlock) {
+        setVotesCommittedAllTime(committedVotersRef.current.size);
+        setVotesRevealedAllTime(revealedVotersRef.current.size);
+        setAllTimeCandidateVotes(new Map(allTimeVotesByCandidateRef.current));
+        return;
+      }
+
+      const commitFilter = (contract as any).filters?.VoteCommitted?.();
+      const revealFilter = (contract as any).filters?.VoteRevealed?.();
+
+      let batchSpan =
+        batchSpanRef.current ?? Math.max(0, Number(import.meta.env.VITE_PUBLIC_EVENTS_MAX_BLOCK_RANGE ?? 2000) - 1);
+      if (!Number.isFinite(batchSpan) || batchSpan < 0) batchSpan = 1999;
+
+      let requests = 0;
+      while (fromBlock <= latestBlock && requests < Math.max(1, maxRequestsPerPoll)) {
+        const toBlock = Math.min(latestBlock, fromBlock + batchSpan);
+
+        try {
+          if (commitFilter) {
+            const commitLogs = await contract.queryFilter(commitFilter, fromBlock, toBlock);
+            requests += 1;
+            for (const log of commitLogs as any[]) {
+              const voter = String((log?.args?.voter ?? log?.args?.[0] ?? '')).toLowerCase();
+              if (voter) committedVotersRef.current.add(voter);
+            }
+          }
+
+          if (revealFilter) {
+            const revealLogs = await contract.queryFilter(revealFilter, fromBlock, toBlock);
+            requests += 1;
+            for (const log of revealLogs as any[]) {
+              const voter = String((log?.args?.voter ?? log?.args?.[0] ?? '')).toLowerCase();
+              const choiceRaw = log?.args?.choice ?? log?.args?.[1];
+              const choice = Number(choiceRaw ?? 0);
+              if (voter) revealedVotersRef.current.add(voter);
+              allTimeVotesByCandidateRef.current.set(choice, (allTimeVotesByCandidateRef.current.get(choice) ?? 0) + 1);
+            }
+          }
+
+          lastScannedBlockRef.current = toBlock;
+          batchSpanRef.current = batchSpan;
+          fromBlock = toBlock + 1;
+        } catch (e: any) {
+          const maxBlocks = parseLogRangeLimitFromError(e);
+          if (maxBlocks && maxBlocks > 0) {
+            const newSpan = Math.max(0, maxBlocks - 1);
+            if (newSpan < batchSpan) {
+              batchSpan = newSpan;
+              batchSpanRef.current = newSpan;
+              continue;
+            }
+          }
+          throw e;
+        }
+      }
+
       setVotesCommittedAllTime(committedVotersRef.current.size);
       setVotesRevealedAllTime(revealedVotersRef.current.size);
       setAllTimeCandidateVotes(new Map(allTimeVotesByCandidateRef.current));
-      return;
+    } finally {
+      scanInProgressRef.current = false;
     }
-
-    const commitFilter = (contract as any).filters?.VoteCommitted?.();
-    const revealFilter = (contract as any).filters?.VoteRevealed?.();
-
-    if (commitFilter) {
-      const commitLogs = await contract.queryFilter(commitFilter, fromBlock, latestBlock);
-      for (const log of commitLogs as any[]) {
-        const voter = String((log?.args?.voter ?? log?.args?.[0] ?? '')).toLowerCase();
-        if (voter) committedVotersRef.current.add(voter);
-      }
-    }
-
-    if (revealFilter) {
-      const revealLogs = await contract.queryFilter(revealFilter, fromBlock, latestBlock);
-      for (const log of revealLogs as any[]) {
-        const voter = String((log?.args?.voter ?? log?.args?.[0] ?? '')).toLowerCase();
-        const choiceRaw = log?.args?.choice ?? log?.args?.[1];
-        const choice = Number(choiceRaw ?? 0);
-        if (voter) revealedVotersRef.current.add(voter);
-        allTimeVotesByCandidateRef.current.set(choice, (allTimeVotesByCandidateRef.current.get(choice) ?? 0) + 1);
-      }
-    }
-
-    lastScannedBlockRef.current = latestBlock;
-    setVotesCommittedAllTime(committedVotersRef.current.size);
-    setVotesRevealedAllTime(revealedVotersRef.current.size);
-    setAllTimeCandidateVotes(new Map(allTimeVotesByCandidateRef.current));
   };
 
   useEffect(() => {

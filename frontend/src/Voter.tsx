@@ -164,6 +164,17 @@ const Voter: React.FC<VoterProps> = ({
     return { commitHash, saltBytes32 };
   };
 
+  const computeMerkleRootFromProof = (addr: string, proof: string[]) => {
+    const normalized = ethers.getAddress(addr);
+    let hash = ethers.solidityPackedKeccak256(['address'], [normalized]);
+    for (const siblingRaw of proof) {
+      const sibling = String(siblingRaw).startsWith('0x') ? String(siblingRaw) : `0x${siblingRaw}`;
+      const [a, b] = BigInt(hash) < BigInt(sibling) ? [hash, sibling] : [sibling, hash];
+      hash = ethers.keccak256(ethers.concat([a, b]));
+    }
+    return hash;
+  };
+
   const handleCommitVote = async () => {
     console.log('DEBUG handleCommitVote: Starting vote commitment');
     console.log('DEBUG handleCommitVote: selectedCandidateId:', selectedCandidateId);
@@ -208,6 +219,19 @@ const Voter: React.FC<VoterProps> = ({
         throw new Error('Empty Merkle proof from backend.');
       }
 
+      // Preflight eligibility check: verify the backend proof matches the contract's merkleRoot.
+      try {
+        const onChainRoot = await contract.merkleRoot();
+        const computedRoot = computeMerkleRootFromProof(account, proof);
+        if (String(computedRoot).toLowerCase() !== String(onChainRoot).toLowerCase()) {
+          throw new Error(
+            'Eligibility sync is out of date (your Merkle proof does not match the contract). Please re-join the demo or ask the admin to sync the Merkle root.'
+          );
+        }
+      } catch (e) {
+        if (e instanceof Error) throw e;
+      }
+
       console.log('DEBUG: Committing vote with hash:', commitHash);
       console.log('DEBUG: Merkle proof:', proof);
       console.log('DEBUG: Voter Address:', account);
@@ -235,8 +259,8 @@ const Voter: React.FC<VoterProps> = ({
       let msg = err?.reason || err?.message || 'Failed to commit vote';
       
       // Better error messages for common issues
-      if (msg.includes('missing revert data') || msg.includes('gas')) {
-        msg = 'Network error: Please ensure you are connected to the correct blockchain network and have sufficient ETH for gas fees.';
+      if (msg.includes('missing revert data') || msg.includes('estimateGas')) {
+        msg = 'Transaction failed during gas estimation. This usually means you are not eligible (Merkle root not synced) or you already committed in this round.';
       } else if (msg.includes('execution reverted')) {
         msg = 'Transaction failed: Please check if you are eligible to vote and haven\'t already voted in this phase.';
       } else if (msg.includes('user rejected')) {

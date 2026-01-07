@@ -390,12 +390,15 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
 
           // Listen for contract events that affect candidate list and phase
           if (contract.on) {
-            contract.on(contract.filters.PhaseChanged(), async (newPhase: bigint) => {
+            contract.on('PhaseChanged', async (newPhase: bigint) => {
               console.log('DEBUG APP EVENT: PhaseChanged event - newPhase:', newPhase);
               setPhase(Number(newPhase)); // Update phase when a change event is received.
 
-              const contractMerkleRoot = await contract.merkleRoot();
-              console.log("DEBUG: Contract Merkle Root:", contractMerkleRoot);
+              try {
+                const root = await contract.merkleRoot();
+                setContractMerkleRoot(root);
+                console.log('DEBUG: Contract Merkle Root:', root);
+              } catch {}
             });
 
             // Candidate list changes
@@ -406,20 +409,18 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
                 console.warn('DEBUG APP EVENT: refreshCandidates failed', e);
               }
             };
-            contract.on(contract.filters.CandidateAdded(), refreshCandidates);
-            contract.on(contract.filters.CandidateRemoved(), refreshCandidates);
-            contract.on(contract.filters.AllCandidatesCleared(), async () => {
+            contract.on('CandidateAdded', refreshCandidates);
+            contract.on('CandidateRemoved', refreshCandidates);
+            contract.on('AllCandidatesCleared', async () => {
               setCandidates([]);
               await fetchCandidates();
             });
             // After reset, everything changes
-            if ((contract as any).filters?.ElectionReset) {
-              contract.on((contract as any).filters.ElectionReset(), async () => {
-                setCandidates([]);
-                setPhase(0);
-                await fetchCandidates();
-              });
-            }
+            contract.on('ElectionReset', async () => {
+              setCandidates([]);
+              setPhase(0);
+              await fetchCandidates();
+            });
           }
 
           // Also listen to a custom window event emitted by admin after phase change confirmations
@@ -452,12 +453,12 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
       // Remove listeners when dependencies change
       if (contract && contract.removeAllListeners) {
         try {
-          contract.removeAllListeners(contract.getEvent('PhaseChanged'));
+          contract.removeAllListeners('PhaseChanged');
         } catch {}
-        try { contract.removeAllListeners(contract.getEvent('CandidateAdded')); } catch {}
-        try { contract.removeAllListeners(contract.getEvent('CandidateRemoved')); } catch {}
-        try { contract.removeAllListeners(contract.getEvent('AllCandidatesCleared')); } catch {}
-        try { if ((contract as any).getEvent) contract.removeAllListeners((contract as any).getEvent('ElectionReset')); } catch {}
+        try { contract.removeAllListeners('CandidateAdded'); } catch {}
+        try { contract.removeAllListeners('CandidateRemoved'); } catch {}
+        try { contract.removeAllListeners('AllCandidatesCleared'); } catch {}
+        try { contract.removeAllListeners('ElectionReset'); } catch {}
       }
       try { (window as any).__bv_cleanup_phase?.(); } catch {}
       // Wallet event listeners are managed by the useWallet hook.
