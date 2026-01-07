@@ -71,6 +71,20 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
     return String(demoElectionAddress).toLowerCase() === String(electionAddress).toLowerCase();
   }, [demoElectionAddress, electionAddress]);
 
+  // Demo convenience: bypass KYC gate for demo election even if user deep-links to /election/:address.
+  useEffect(() => {
+    if (!isDemoElection) return;
+    if (!account) return;
+    if (isAdmin) return;
+    const key = `bv_kyc_${String(account).toLowerCase()}`;
+    try {
+      localStorage.setItem(key, '1');
+      localStorage.setItem(`${key}_id`, account);
+    } catch {}
+    setIsKycVerified(true);
+    setVerifiedVoterId(account);
+  }, [isDemoElection, account, isAdmin]);
+
   // Persist KYC verification per account so refresh does not force re-verification
   useEffect(() => {
     if (!account) {
@@ -809,6 +823,7 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
                 setPhase={setPhase} 
                 account={account as string}
                 voterId={(verifiedVoterId || account) as string} 
+                isDemoElection={isDemoElection}
                 onRevealSuccess={() => {
                   setHasUserRevealed(true);
                   setTallyRefreshKey(prev => prev + 1);

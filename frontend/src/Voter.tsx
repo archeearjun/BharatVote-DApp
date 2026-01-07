@@ -23,6 +23,7 @@ interface VoterProps {
   setPhase: (phase: number) => void;
   account: string;
   voterId: string;
+  isDemoElection?: boolean;
   onRevealSuccess: () => void;
   candidates?: any[];
   onCommitSuccess?: () => void;
@@ -34,6 +35,7 @@ const Voter: React.FC<VoterProps> = ({
   phase,
   account,
   voterId,
+  isDemoElection,
   onRevealSuccess,
   candidates = [],
   onCommitSuccess,
@@ -90,6 +92,14 @@ const Voter: React.FC<VoterProps> = ({
         return;
       }
       try {
+        // Demo mode: auto-register strangers via backend so they are included in the Merkle root.
+        if (isDemoElection) {
+          await fetch(`${BACKEND_URL}/api/join`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ address: account }),
+          });
+        }
         const resp = await fetch(`${BACKEND_URL}/api/merkle-proof/${encodeURIComponent(account)}`);
         if (resp.ok) {
           setIsEligible(true);
@@ -206,9 +216,31 @@ const Voter: React.FC<VoterProps> = ({
       const { commitHash } = await hashVote(selectedCandidateId, salt.trim());
       console.log('DEBUG handleCommitVote: hashVote completed, commitHash:', commitHash);
 
+      // Demo mode: ensure the backend has registered this voter (so they become eligible on-chain).
+      if (isDemoElection) {
+        try {
+          await fetch(`${BACKEND_URL}/api/join`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ address: account }),
+          });
+        } catch {}
+      }
+
       // Fetch Merkle proof from backend using verified voterId
       console.log('DEBUG handleCommitVote: Fetching Merkle proof from backend...');
-      const resp = await fetch(`${BACKEND_URL}/api/merkle-proof/${encodeURIComponent(account)}`);
+      let resp = await fetch(`${BACKEND_URL}/api/merkle-proof/${encodeURIComponent(account)}`);
+      // If this is demo mode and the voter wasn't eligible yet, retry once after a join call.
+      if (isDemoElection && !resp.ok) {
+        try {
+          await fetch(`${BACKEND_URL}/api/join`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ address: account }),
+          });
+          resp = await fetch(`${BACKEND_URL}/api/merkle-proof/${encodeURIComponent(account)}`);
+        } catch {}
+      }
       if (!resp.ok) {
         const errText = await resp.text();
         throw new Error(`Failed to get Merkle proof: ${errText || resp.statusText}`);
@@ -266,7 +298,12 @@ const Voter: React.FC<VoterProps> = ({
       } else if (msg.includes('user rejected')) {
         msg = 'Transaction cancelled by user.';
       }
-      
+
+      if (isDemoElection && msg.includes('Failed to get Merkle proof') && msg.includes('Not eligible')) {
+        msg =
+          'Demo setup is incomplete on the backend (you were not auto-registered). Ensure the backend has DEMO_ELECTION_ADDRESS, RPC_URL, and PRIVATE_KEY (demo admin) configured, then try again.';
+      }
+       
       setError(msg);
     } finally {
       setIsCommitting(false);
