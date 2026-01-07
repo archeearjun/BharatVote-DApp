@@ -12,6 +12,11 @@ type DemoStatus = {
   nextPhaseAtMs?: number | null;
   timeRemainingMs?: number | null;
   transitioning?: boolean;
+  lastTransitionTx?: string | null;
+  lastTransitionAtMs?: number | null;
+  lastAttemptAtMs?: number | null;
+  lastError?: string | null;
+  lastErrorAtMs?: number | null;
 };
 
 function formatMs(ms: number) {
@@ -116,6 +121,12 @@ export default function DemoTimerBanner({ enabled }: { enabled: boolean }) {
       </div>
 
       {error && <div className="mt-2 text-xs text-red-700">{error}</div>}
+
+      {status?.lastError && (
+        <div className="mt-2 text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-lg p-2">
+          Demo autophasing warning: <span className="font-mono">{status.lastError}</span>
+        </div>
+      )}
 
       {status?.enabled === false && status?.reasonDisabled && (
         <div className="mt-2 text-xs text-amber-800">

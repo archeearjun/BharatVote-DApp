@@ -31,6 +31,23 @@ const DEMO_SYNC_WAIT_CONFIRMATIONS = (() => {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : 1;
 })();
 
+const DEMO_PHASE_WAIT_CONFIRMATIONS = (() => {
+  // Phase transitions can be run in a background loop; avoid hard waiting in environments that may suspend.
+  const raw = process.env.DEMO_PHASE_WAIT_CONFIRMATIONS;
+  if (raw === undefined || raw === null || String(raw).trim() === '') {
+    return process.env.VERCEL ? 0 : 1;
+  }
+  const parsed = Number.parseInt(String(raw), 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 1;
+})();
+
+const DEMO_TX_WAIT_TIMEOUT_MS = (() => {
+  const raw = process.env.DEMO_TX_WAIT_TIMEOUT_MS;
+  if (raw === undefined || raw === null || String(raw).trim() === '') return 30000;
+  const parsed = Number.parseInt(String(raw), 10);
+  return Number.isFinite(parsed) && parsed >= 1000 ? parsed : 30000;
+})();
+
 const DEMO_AUTOPHASE_ENABLED = String(process.env.DEMO_AUTOPHASE_ENABLED || '').toLowerCase() === 'true';
 const DEMO_AUTORESET_ENABLED = String(process.env.DEMO_AUTORESET_ENABLED || 'true').toLowerCase() !== 'false';
 const DEMO_START_MODE = String(process.env.DEMO_START_MODE || 'on_first_join'); // 'on_first_join' | 'immediate'
@@ -168,6 +185,10 @@ const demoState = {
   finishedAtMs: null,
   resetAtMs: null,
   lastTransitionTx: null,
+  lastTransitionAtMs: null,
+  lastAttemptAtMs: null,
+  lastError: null,
+  lastErrorAtMs: null,
   transitioning: false,
 };
 
@@ -230,8 +251,23 @@ function demoStatusPayload(extra) {
     nextPhaseAtMs,
     timeRemainingMs,
     lastTransitionTx: demoState.lastTransitionTx,
+    lastTransitionAtMs: demoState.lastTransitionAtMs,
+    lastAttemptAtMs: demoState.lastAttemptAtMs,
+    lastError: demoState.lastError,
+    lastErrorAtMs: demoState.lastErrorAtMs,
     transitioning: Boolean(demoState.transitioning),
   };
+}
+
+async function waitForTx(tx) {
+  if (!tx) return;
+  if (DEMO_PHASE_WAIT_CONFIRMATIONS <= 0) return;
+  await Promise.race([
+    tx.wait(DEMO_PHASE_WAIT_CONFIRMATIONS),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`tx_wait_timeout_${DEMO_TX_WAIT_TIMEOUT_MS}ms`)), DEMO_TX_WAIT_TIMEOUT_MS)
+    ),
+  ]);
 }
 
 async function getDemoContract() {
@@ -318,20 +354,26 @@ async function runDemoSchedulerOnce() {
     if (!shouldStartReveal && !shouldFinish && !shouldReset) return;
 
     demoState.transitioning = true;
+    demoState.lastAttemptAtMs = nowMs();
+    demoState.lastError = null;
+    demoState.lastErrorAtMs = null;
     if (shouldStartReveal) {
       const tx = await contract.startReveal();
-      await tx.wait();
+      await waitForTx(tx);
       demoState.lastTransitionTx = tx.hash;
+      demoState.lastTransitionAtMs = nowMs();
       demoState.finishedAtMs = null;
     } else if (shouldFinish) {
       const tx = await contract.finishElection();
-      await tx.wait();
+      await waitForTx(tx);
       demoState.lastTransitionTx = tx.hash;
+      demoState.lastTransitionAtMs = nowMs();
       demoState.finishedAtMs = nowMs();
     } else if (shouldReset) {
       const tx = await contract.resetElection();
-      await tx.wait();
+      await waitForTx(tx);
       demoState.lastTransitionTx = tx.hash;
+      demoState.lastTransitionAtMs = nowMs();
       demoState.roundId += 1;
       demoState.roundStartedAtMs = nowMs();
       demoState.commitEndsAtMs = null;
@@ -342,6 +384,8 @@ async function runDemoSchedulerOnce() {
     }
   } catch (e) {
     console.error('? Demo scheduler tick failed:', e);
+    demoState.lastError = e?.message || String(e);
+    demoState.lastErrorAtMs = nowMs();
   } finally {
     demoState.transitioning = false;
   }
