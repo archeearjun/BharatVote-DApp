@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ethers } from 'ethers';
 import contractJson from '../contracts/BharatVote.json';
 import { RefreshCcw, Clock, AlertTriangle, Users, BarChart3 } from 'lucide-react';
+import { decodeVoteRevealedChoiceFromLogData } from '../utils/publicResultsEvents';
 
 interface Candidate {
   id: number;
@@ -38,6 +39,9 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
   const deploymentBlockRef = useRef<number | null>(null);
   const scanInProgressRef = useRef(false);
   const batchSpanRef = useRef<number | null>(null); // inclusive span: toBlock = fromBlock + span
+  const effectiveStartBlockRef = useRef<number | null>(null);
+  const rescanBackoffCountRef = useRef(0);
+  const pendingRestartRef = useRef(false);
 
   const rpcUrl = import.meta.env.VITE_PUBLIC_RPC_URL;
   const publicContractAddress = import.meta.env.VITE_PUBLIC_CONTRACT_ADDRESS;
@@ -71,6 +75,9 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
     lastScannedBlockRef.current = null;
     deploymentBlockRef.current = null;
     batchSpanRef.current = null;
+    effectiveStartBlockRef.current = null;
+    rescanBackoffCountRef.current = 0;
+    pendingRestartRef.current = false;
     setVotesCommittedAllTime(null);
     setVotesRevealedAllTime(null);
     setAllTimeCandidateVotes(new Map());
@@ -94,9 +101,16 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
   // Support both contract variants:
   // - VoteRevealed(address,uint256)
   // - VoteRevealed(address,uint256,uint256) (with timestamp)
-  const TOPIC_VOTE_COMMITTED = useMemo(() => ethers.id('VoteCommitted(address,bytes32)'), []);
+  // Support both contract variants:
+  // - VoteCommitted(address,bytes32)
+  // - VoteCommitted(address,bytes32,uint256) (with timestamp)
+  const TOPIC_VOTE_COMMITTED_V1 = useMemo(() => ethers.id('VoteCommitted(address,bytes32)'), []);
+  const TOPIC_VOTE_COMMITTED_V2 = useMemo(() => ethers.id('VoteCommitted(address,bytes32,uint256)'), []);
   const TOPIC_VOTE_REVEALED_V1 = useMemo(() => ethers.id('VoteRevealed(address,uint256)'), []);
   const TOPIC_VOTE_REVEALED_V2 = useMemo(() => ethers.id('VoteRevealed(address,uint256,uint256)'), []);
+  // Back-compat: some deployments use uint8 for choice in the event signature.
+  const TOPIC_VOTE_REVEALED_V1_UINT8 = useMemo(() => ethers.id('VoteRevealed(address,uint8)'), []);
+  const TOPIC_VOTE_REVEALED_V2_UINT8 = useMemo(() => ethers.id('VoteRevealed(address,uint8,uint256)'), []);
 
   const parseLogRangeLimitFromError = (err: any): number | null => {
     const message = String(err?.info?.error?.message || err?.error?.message || err?.message || '');
@@ -183,12 +197,18 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
     if (!contract || !provider) return;
     if (scanInProgressRef.current) return;
     scanInProgressRef.current = true;
+    pendingRestartRef.current = false;
 
     try {
       setAllTimeScanError(null);
       const latestBlock = await provider.getBlockNumber();
       const deploymentBlock = await getDeploymentBlock();
-      const startBlock = Math.max(0, Number.isFinite(eventsFromBlock) ? eventsFromBlock : 0, deploymentBlock);
+      const configuredStart = Math.max(0, Number.isFinite(eventsFromBlock) ? eventsFromBlock : 0);
+      const computedStart = Math.max(configuredStart, deploymentBlock);
+      if (effectiveStartBlockRef.current === null) {
+        effectiveStartBlockRef.current = computedStart;
+      }
+      const startBlock = effectiveStartBlockRef.current;
 
       let fromBlock = lastScannedBlockRef.current === null ? startBlock : lastScannedBlockRef.current + 1;
 
@@ -196,6 +216,28 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
         setVotesCommittedAllTime(committedVotersRef.current.size);
         setVotesRevealedAllTime(revealedVotersRef.current.size);
         setAllTimeCandidateVotes(new Map(allTimeVotesByCandidateRef.current));
+
+        if (
+          committedVotersRef.current.size === 0 &&
+          revealedVotersRef.current.size === 0 &&
+          startBlock > configuredStart &&
+          rescanBackoffCountRef.current < 5
+        ) {
+          rescanBackoffCountRef.current += 1;
+          const step = Math.max(250_000, 250_000 * rescanBackoffCountRef.current);
+          const newStart = Math.max(configuredStart, startBlock - step);
+
+          committedVotersRef.current = new Set();
+          revealedVotersRef.current = new Set();
+          allTimeVotesByCandidateRef.current = new Map();
+          lastScannedBlockRef.current = null;
+          effectiveStartBlockRef.current = newStart;
+          setAllTimeScannedToBlock(null);
+          setAllTimeScanError(
+            `No vote events found yet in scanned history; expanding scan window earlier (from block ${newStart}).`
+          );
+          pendingRestartRef.current = true;
+        }
         return;
       }
 
@@ -216,7 +258,7 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
               address,
               fromBlock,
               toBlock,
-              topics: [TOPIC_VOTE_COMMITTED],
+              topics: [[TOPIC_VOTE_COMMITTED_V1, TOPIC_VOTE_COMMITTED_V2]],
             });
             requests += 1;
             for (const log of commitLogs) {
@@ -231,7 +273,7 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
               address,
               fromBlock,
               toBlock,
-              topics: [[TOPIC_VOTE_REVEALED_V1, TOPIC_VOTE_REVEALED_V2]],
+              topics: [[TOPIC_VOTE_REVEALED_V1, TOPIC_VOTE_REVEALED_V2, TOPIC_VOTE_REVEALED_V1_UINT8, TOPIC_VOTE_REVEALED_V2_UINT8]],
             });
             requests += 1;
 
@@ -239,15 +281,12 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
               const voter = parseIndexedAddress(log.topics?.[1]);
               if (voter) revealedVotersRef.current.add(voter);
 
-              try {
-                const decoded = abiCoder.decode(['uint256'], log.data);
-                const choice = Number(decoded?.[0] ?? 0);
+              const choice = decodeVoteRevealedChoiceFromLogData(log.data, abiCoder);
+              if (choice !== null) {
                 allTimeVotesByCandidateRef.current.set(
                   choice,
                   (allTimeVotesByCandidateRef.current.get(choice) ?? 0) + 1
                 );
-              } catch {
-                // ignore malformed logs
               }
             }
           }
@@ -273,11 +312,43 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
       setVotesCommittedAllTime(committedVotersRef.current.size);
       setVotesRevealedAllTime(revealedVotersRef.current.size);
       setAllTimeCandidateVotes(new Map(allTimeVotesByCandidateRef.current));
+
+      // If we reached the latest block but found no vote events, the most common cause is
+      // a start block that's too recent (often due to non-archive RPCs returning `0x` for historical `getCode`),
+      // so expand the scan window earlier and retry a few times.
+      if (
+        lastScannedBlockRef.current === latestBlock &&
+        committedVotersRef.current.size === 0 &&
+        revealedVotersRef.current.size === 0 &&
+        startBlock > configuredStart &&
+        rescanBackoffCountRef.current < 5
+      ) {
+        rescanBackoffCountRef.current += 1;
+        const step = Math.max(250_000, 250_000 * rescanBackoffCountRef.current);
+        const newStart = Math.max(configuredStart, startBlock - step);
+
+        committedVotersRef.current = new Set();
+        revealedVotersRef.current = new Set();
+        allTimeVotesByCandidateRef.current = new Map();
+        lastScannedBlockRef.current = null;
+        effectiveStartBlockRef.current = newStart;
+        setAllTimeScannedToBlock(null);
+        setAllTimeScanError(
+          `No vote events found yet in scanned history; expanding scan window earlier (from block ${newStart}).`
+        );
+        pendingRestartRef.current = true;
+      }
     } catch (e: any) {
       const message = String(e?.info?.error?.message || e?.error?.message || e?.message || 'Failed to scan on-chain events');
       setAllTimeScanError(message);
     } finally {
       scanInProgressRef.current = false;
+      if (pendingRestartRef.current) {
+        pendingRestartRef.current = false;
+        setTimeout(() => {
+          fetchAllTimeFromEvents().catch((err) => console.warn('PublicResults: event scan failed', err));
+        }, 0);
+      }
     }
   };
 
