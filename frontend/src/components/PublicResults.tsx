@@ -26,6 +26,7 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
   const [allTimeCandidateVotes, setAllTimeCandidateVotes] = useState<Map<number, number>>(new Map());
   const [allTimeScanError, setAllTimeScanError] = useState<string | null>(null);
   const [allTimeScannedToBlock, setAllTimeScannedToBlock] = useState<number | null>(null);
+  const [allTimeStartedFromBlock, setAllTimeStartedFromBlock] = useState<number | null>(null);
   const [phase, setPhase] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -83,6 +84,7 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
     setAllTimeCandidateVotes(new Map());
     setAllTimeScanError(null);
     setAllTimeScannedToBlock(null);
+    setAllTimeStartedFromBlock(null);
   }, [contractAddress]);
 
   const parseIndexedAddress = (topic: string | undefined) => {
@@ -163,11 +165,37 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
     if (deploymentBlockRef.current !== null) return deploymentBlockRef.current;
     if (!provider || !contract) return 0;
 
+    const configuredStart = Math.max(0, Number.isFinite(eventsFromBlock) ? eventsFromBlock : 0);
+
+    let latest = 0;
     try {
-      const latest = await provider.getBlockNumber();
+      latest = await provider.getBlockNumber();
+    } catch (e) {
+      console.warn('PublicResults: failed to read latest block number', e);
+      deploymentBlockRef.current = configuredStart;
+      return deploymentBlockRef.current;
+    }
+
+    const address = await contract.getAddress();
+
+    try {
+      // Detect providers that don't reliably support historical `eth_getCode`:
+      // if code exists at both block 0 and latest, we cannot infer deployment block.
+      const [codeAtZero, codeAtLatest] = await Promise.all([
+        provider.getCode(address, 0),
+        provider.getCode(address, latest),
+      ]);
+
+      const hasCodeAtLatest = !!codeAtLatest && codeAtLatest !== '0x';
+      const hasCodeAtZero = !!codeAtZero && codeAtZero !== '0x';
+
+      if (hasCodeAtLatest && hasCodeAtZero) {
+        deploymentBlockRef.current = Math.max(configuredStart, Math.max(0, latest - 500_000));
+        return deploymentBlockRef.current;
+      }
+
       let low = 0;
       let high = latest;
-      const address = await contract.getAddress();
 
       while (low < high) {
         const mid = Math.floor((low + high) / 2);
@@ -182,8 +210,10 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
       deploymentBlockRef.current = low;
       return low;
     } catch (e) {
+      // If historical `getCode` is unsupported/rate-limited, falling back to the configured start makes
+      // the scan painfully slow; instead, start reasonably close to tip and expand earlier if needed.
       console.warn('PublicResults: failed to detect deployment block', e);
-      deploymentBlockRef.current = Math.max(0, Number.isFinite(eventsFromBlock) ? eventsFromBlock : 0);
+      deploymentBlockRef.current = Math.max(configuredStart, Math.max(0, latest - 500_000));
       return deploymentBlockRef.current;
     }
   };
@@ -242,6 +272,7 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
         effectiveStartBlockRef.current = computedStart;
       }
       const startBlock = effectiveStartBlockRef.current;
+      setAllTimeStartedFromBlock(startBlock);
 
       let fromBlock = lastScannedBlockRef.current === null ? startBlock : lastScannedBlockRef.current + 1;
 
@@ -461,6 +492,9 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
             <div><span className="font-semibold">{votesRevealedAllTime ?? '-'}</span> revealed</div>
             <div className="text-xs text-slate-500 mt-1">
               Scanned to block {allTimeScannedToBlock ?? '-'}
+              {allTimeStartedFromBlock !== null && (
+                <span className="ml-2">· start {allTimeStartedFromBlock}</span>
+              )}
             </div>
           </div>
         </div>
