@@ -36,7 +36,8 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
   const committedVotersRef = useRef<Set<string>>(new Set());
   const revealedVotersRef = useRef<Set<string>>(new Set());
   const allTimeVotesByCandidateRef = useRef<Map<number, number>>(new Map());
-  const lastScannedBlockRef = useRef<number | null>(null);
+  const allTimeLatestProcessedBlockRef = useRef<number | null>(null); // highest block included in totals
+  const allTimeBackfillToBlockRef = useRef<number | null>(null); // next block to backfill down from
   const deploymentBlockRef = useRef<number | null>(null);
   const scanInProgressRef = useRef(false);
   const batchSpanRef = useRef<number | null>(null); // inclusive span: toBlock = fromBlock + span
@@ -73,7 +74,8 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
     committedVotersRef.current = new Set();
     revealedVotersRef.current = new Set();
     allTimeVotesByCandidateRef.current = new Map();
-    lastScannedBlockRef.current = null;
+    allTimeLatestProcessedBlockRef.current = null;
+    allTimeBackfillToBlockRef.current = null;
     deploymentBlockRef.current = null;
     batchSpanRef.current = null;
     effectiveStartBlockRef.current = null;
@@ -118,7 +120,8 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
     committedVotersRef.current = new Set();
     revealedVotersRef.current = new Set();
     allTimeVotesByCandidateRef.current = new Map();
-    lastScannedBlockRef.current = null;
+    allTimeLatestProcessedBlockRef.current = null;
+    allTimeBackfillToBlockRef.current = null;
     setAllTimeScannedToBlock(null);
   };
 
@@ -264,32 +267,15 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
       const latestBlock = await provider.getBlockNumber();
       const deploymentBlock = await getDeploymentBlock();
       const configuredStart = Math.max(0, Number.isFinite(eventsFromBlock) ? eventsFromBlock : 0);
-      // Events cannot exist before the contract is deployed, so prefer the deployment block when it's later.
-      // If deployment detection is wrong (common on some RPCs), we fall back by expanding earlier automatically
-      // when we reach latest block but still see zero events.
+      // Prefer whichever is later: user-configured start or detected deployment.
+      // NOTE: Some RPCs have limited historical state; this start is used only as a backfill limit
+      // because we scan backwards from tip to show results quickly.
       const computedStart = Math.max(configuredStart, deploymentBlock);
       if (effectiveStartBlockRef.current === null) {
         effectiveStartBlockRef.current = computedStart;
       }
       const startBlock = effectiveStartBlockRef.current;
       setAllTimeStartedFromBlock(startBlock);
-
-      let fromBlock = lastScannedBlockRef.current === null ? startBlock : lastScannedBlockRef.current + 1;
-
-      if (fromBlock > latestBlock) {
-        setVotesCommittedAllTime(committedVotersRef.current.size);
-        setVotesRevealedAllTime(revealedVotersRef.current.size);
-        setAllTimeCandidateVotes(new Map(allTimeVotesByCandidateRef.current));
-
-        if (
-          committedVotersRef.current.size === 0 &&
-          revealedVotersRef.current.size === 0 &&
-          rescanBackoffCountRef.current < 5
-        ) {
-          scheduleExpandAllTimeScanWindowEarlier({ startBlock, configuredStart });
-        }
-        return;
-      }
 
       let batchSpan =
         batchSpanRef.current ?? Math.max(0, Number(import.meta.env.VITE_PUBLIC_EVENTS_MAX_BLOCK_RANGE ?? 2000) - 1);
@@ -310,40 +296,71 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
         requests += 1;
         return logs;
       };
-      while (fromBlock <= latestBlock && requests < requestBudget) {
-        const toBlock = Math.min(latestBlock, fromBlock + batchSpan);
+
+      const scanRange = async (range: { fromBlock: number; toBlock: number }) => {
+        // Commit logs
+        for (const log of [
+          ...(await fetchLogsForTopic0(TOPIC_VOTE_COMMITTED_V1, range)),
+          ...(await fetchLogsForTopic0(TOPIC_VOTE_COMMITTED_V2, range)),
+        ]) {
+          const voter = parseIndexedAddress(log.topics?.[1]);
+          if (voter) committedVotersRef.current.add(voter);
+        }
+
+        // Reveal logs (support multiple signatures)
+        for (const log of [
+          ...(await fetchLogsForTopic0(TOPIC_VOTE_REVEALED_V1, range)),
+          ...(await fetchLogsForTopic0(TOPIC_VOTE_REVEALED_V2, range)),
+          ...(await fetchLogsForTopic0(TOPIC_VOTE_REVEALED_V1_UINT8, range)),
+          ...(await fetchLogsForTopic0(TOPIC_VOTE_REVEALED_V2_UINT8, range)),
+        ]) {
+          const voter = parseIndexedAddress(log.topics?.[1]);
+          if (voter) revealedVotersRef.current.add(voter);
+
+          const choice = decodeVoteRevealedChoiceFromLogData(log.data, abiCoder);
+          if (choice !== null) {
+            allTimeVotesByCandidateRef.current.set(choice, (allTimeVotesByCandidateRef.current.get(choice) ?? 0) + 1);
+          }
+        }
+      };
+
+      // 1) Always incorporate new head blocks (so all-time updates during the demo).
+      if (allTimeLatestProcessedBlockRef.current === null) {
+        allTimeLatestProcessedBlockRef.current = latestBlock;
+        allTimeBackfillToBlockRef.current = latestBlock;
+      } else if (latestBlock > allTimeLatestProcessedBlockRef.current) {
+        const fromNew = allTimeLatestProcessedBlockRef.current + 1;
+        const range = { fromBlock: fromNew, toBlock: latestBlock };
+        try {
+          await scanRange(range);
+          allTimeLatestProcessedBlockRef.current = latestBlock;
+        } catch (e: any) {
+          const maxBlocks = parseLogRangeLimitFromError(e);
+          if (maxBlocks && maxBlocks > 0) {
+            const newSpan = Math.max(0, maxBlocks - 1);
+            if (newSpan < batchSpan) {
+              batchSpan = newSpan;
+              batchSpanRef.current = newSpan;
+            }
+          }
+          throw e;
+        }
+      }
+
+      // 2) Backfill downwards from the most recent blocks towards the start block.
+      let toBlock = allTimeBackfillToBlockRef.current ?? allTimeLatestProcessedBlockRef.current ?? latestBlock;
+      while (toBlock >= startBlock && requests < requestBudget) {
+        const fromBlock = Math.max(startBlock, toBlock - batchSpan);
         const range = { fromBlock, toBlock };
 
         try {
-          // Commit logs
-          for (const log of [
-            ...(await fetchLogsForTopic0(TOPIC_VOTE_COMMITTED_V1, range)),
-            ...(await fetchLogsForTopic0(TOPIC_VOTE_COMMITTED_V2, range)),
-          ]) {
-            const voter = parseIndexedAddress(log.topics?.[1]);
-            if (voter) committedVotersRef.current.add(voter);
-          }
+          await scanRange(range);
 
-          // Reveal logs (support both signatures with OR topic)
-          for (const log of [
-            ...(await fetchLogsForTopic0(TOPIC_VOTE_REVEALED_V1, range)),
-            ...(await fetchLogsForTopic0(TOPIC_VOTE_REVEALED_V2, range)),
-            ...(await fetchLogsForTopic0(TOPIC_VOTE_REVEALED_V1_UINT8, range)),
-            ...(await fetchLogsForTopic0(TOPIC_VOTE_REVEALED_V2_UINT8, range)),
-          ]) {
-            const voter = parseIndexedAddress(log.topics?.[1]);
-            if (voter) revealedVotersRef.current.add(voter);
-
-            const choice = decodeVoteRevealedChoiceFromLogData(log.data, abiCoder);
-            if (choice !== null) {
-              allTimeVotesByCandidateRef.current.set(choice, (allTimeVotesByCandidateRef.current.get(choice) ?? 0) + 1);
-            }
-          }
-
-          lastScannedBlockRef.current = toBlock;
+          // Next backfill chunk ends just before this range.
+          toBlock = fromBlock - 1;
+          allTimeBackfillToBlockRef.current = toBlock;
           batchSpanRef.current = batchSpan;
-          fromBlock = toBlock + 1;
-          setAllTimeScannedToBlock(toBlock);
+          setAllTimeScannedToBlock(fromBlock); // "backfilled down to"
         } catch (e: any) {
           const maxBlocks = parseLogRangeLimitFromError(e);
           if (maxBlocks && maxBlocks > 0) {
@@ -362,15 +379,9 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
       setVotesRevealedAllTime(revealedVotersRef.current.size);
       setAllTimeCandidateVotes(new Map(allTimeVotesByCandidateRef.current));
 
-      // If we reached the latest block but found no vote events, the most common cause is
-      // a start block that's too recent (often due to non-archive RPCs returning `0x` for historical `getCode`),
-      // so expand the scan window earlier and retry a few times.
-      if (
-        lastScannedBlockRef.current === latestBlock &&
-        committedVotersRef.current.size === 0 &&
-        revealedVotersRef.current.size === 0 &&
-        rescanBackoffCountRef.current < 5
-      ) {
+      // If we included tip blocks and still see no vote events, keep expanding backwards more aggressively.
+      // This typically means we haven't reached the election’s activity range yet.
+      if (committedVotersRef.current.size === 0 && revealedVotersRef.current.size === 0 && rescanBackoffCountRef.current < 5) {
         scheduleExpandAllTimeScanWindowEarlier({ startBlock, configuredStart });
       }
     } catch (e: any) {
@@ -491,7 +502,7 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
             <div><span className="font-semibold">{votesCommittedAllTime ?? '-'}</span> committed</div>
             <div><span className="font-semibold">{votesRevealedAllTime ?? '-'}</span> revealed</div>
             <div className="text-xs text-slate-500 mt-1">
-              Scanned to block {allTimeScannedToBlock ?? '-'}
+              Backfilled down to block {allTimeScannedToBlock ?? '-'}
               {allTimeStartedFromBlock !== null && (
                 <span className="ml-2">· start {allTimeStartedFromBlock}</span>
               )}
