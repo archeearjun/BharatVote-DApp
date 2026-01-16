@@ -112,6 +112,36 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
   const TOPIC_VOTE_REVEALED_V1_UINT8 = useMemo(() => ethers.id('VoteRevealed(address,uint8)'), []);
   const TOPIC_VOTE_REVEALED_V2_UINT8 = useMemo(() => ethers.id('VoteRevealed(address,uint8,uint256)'), []);
 
+  const resetAllTimeScanState = () => {
+    committedVotersRef.current = new Set();
+    revealedVotersRef.current = new Set();
+    allTimeVotesByCandidateRef.current = new Map();
+    lastScannedBlockRef.current = null;
+    setAllTimeScannedToBlock(null);
+  };
+
+  const scheduleExpandAllTimeScanWindowEarlier = ({
+    startBlock,
+    configuredStart,
+  }: {
+    startBlock: number;
+    configuredStart: number;
+  }) => {
+    if (rescanBackoffCountRef.current >= 5) return;
+    const nextCount = rescanBackoffCountRef.current + 1;
+    const step = Math.max(250_000, 250_000 * nextCount);
+    const newStart = Math.max(0, startBlock - step);
+    if (newStart >= startBlock) return;
+
+    rescanBackoffCountRef.current = nextCount;
+    resetAllTimeScanState();
+    effectiveStartBlockRef.current = newStart;
+    setAllTimeScanError(
+      `No vote events found yet in scanned history (from block ${configuredStart}); expanding scan window earlier (from block ${newStart}).`
+    );
+    pendingRestartRef.current = true;
+  };
+
   const parseLogRangeLimitFromError = (err: any): number | null => {
     const message = String(err?.info?.error?.message || err?.error?.message || err?.message || '');
     const m = message.match(/up to a\s+(\d+)\s+block range/i);
@@ -222,23 +252,9 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
         if (
           committedVotersRef.current.size === 0 &&
           revealedVotersRef.current.size === 0 &&
-          startBlock > configuredStart &&
           rescanBackoffCountRef.current < 5
         ) {
-          rescanBackoffCountRef.current += 1;
-          const step = Math.max(250_000, 250_000 * rescanBackoffCountRef.current);
-          const newStart = Math.max(configuredStart, startBlock - step);
-
-          committedVotersRef.current = new Set();
-          revealedVotersRef.current = new Set();
-          allTimeVotesByCandidateRef.current = new Map();
-          lastScannedBlockRef.current = null;
-          effectiveStartBlockRef.current = newStart;
-          setAllTimeScannedToBlock(null);
-          setAllTimeScanError(
-            `No vote events found yet in scanned history; expanding scan window earlier (from block ${newStart}).`
-          );
-          pendingRestartRef.current = true;
+          scheduleExpandAllTimeScanWindowEarlier({ startBlock, configuredStart });
         }
         return;
       }
@@ -247,49 +263,48 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
         batchSpanRef.current ?? Math.max(0, Number(import.meta.env.VITE_PUBLIC_EVENTS_MAX_BLOCK_RANGE ?? 2000) - 1);
       if (!Number.isFinite(batchSpan) || batchSpan < 0) batchSpan = 1999;
 
+      const requestBudget = Math.max(1, maxRequestsPerPoll);
       let requests = 0;
-      while (fromBlock <= latestBlock && requests < Math.max(1, maxRequestsPerPoll)) {
+      const fetchLogsForTopic0 = async (topic0: string, range: { fromBlock: number; toBlock: number }) => {
+        if (!provider || !contract) return [];
+        if (requests >= requestBudget) return [];
+        const address = await contract.getAddress();
+        const logs = await provider.getLogs({
+          address,
+          fromBlock: range.fromBlock,
+          toBlock: range.toBlock,
+          topics: [topic0],
+        });
+        requests += 1;
+        return logs;
+      };
+      while (fromBlock <= latestBlock && requests < requestBudget) {
         const toBlock = Math.min(latestBlock, fromBlock + batchSpan);
+        const range = { fromBlock, toBlock };
 
         try {
-          const address = await contract.getAddress();
-
           // Commit logs
-          if (requests < Math.max(1, maxRequestsPerPoll)) {
-            const commitLogs = await provider.getLogs({
-              address,
-              fromBlock,
-              toBlock,
-              topics: [[TOPIC_VOTE_COMMITTED_V1, TOPIC_VOTE_COMMITTED_V2]],
-            });
-            requests += 1;
-            for (const log of commitLogs) {
-              const voter = parseIndexedAddress(log.topics?.[1]);
-              if (voter) committedVotersRef.current.add(voter);
-            }
+          for (const log of [
+            ...(await fetchLogsForTopic0(TOPIC_VOTE_COMMITTED_V1, range)),
+            ...(await fetchLogsForTopic0(TOPIC_VOTE_COMMITTED_V2, range)),
+          ]) {
+            const voter = parseIndexedAddress(log.topics?.[1]);
+            if (voter) committedVotersRef.current.add(voter);
           }
 
           // Reveal logs (support both signatures with OR topic)
-          if (requests < Math.max(1, maxRequestsPerPoll)) {
-            const revealLogs = await provider.getLogs({
-              address,
-              fromBlock,
-              toBlock,
-              topics: [[TOPIC_VOTE_REVEALED_V1, TOPIC_VOTE_REVEALED_V2, TOPIC_VOTE_REVEALED_V1_UINT8, TOPIC_VOTE_REVEALED_V2_UINT8]],
-            });
-            requests += 1;
+          for (const log of [
+            ...(await fetchLogsForTopic0(TOPIC_VOTE_REVEALED_V1, range)),
+            ...(await fetchLogsForTopic0(TOPIC_VOTE_REVEALED_V2, range)),
+            ...(await fetchLogsForTopic0(TOPIC_VOTE_REVEALED_V1_UINT8, range)),
+            ...(await fetchLogsForTopic0(TOPIC_VOTE_REVEALED_V2_UINT8, range)),
+          ]) {
+            const voter = parseIndexedAddress(log.topics?.[1]);
+            if (voter) revealedVotersRef.current.add(voter);
 
-            for (const log of revealLogs) {
-              const voter = parseIndexedAddress(log.topics?.[1]);
-              if (voter) revealedVotersRef.current.add(voter);
-
-              const choice = decodeVoteRevealedChoiceFromLogData(log.data, abiCoder);
-              if (choice !== null) {
-                allTimeVotesByCandidateRef.current.set(
-                  choice,
-                  (allTimeVotesByCandidateRef.current.get(choice) ?? 0) + 1
-                );
-              }
+            const choice = decodeVoteRevealedChoiceFromLogData(log.data, abiCoder);
+            if (choice !== null) {
+              allTimeVotesByCandidateRef.current.set(choice, (allTimeVotesByCandidateRef.current.get(choice) ?? 0) + 1);
             }
           }
 
@@ -322,23 +337,9 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
         lastScannedBlockRef.current === latestBlock &&
         committedVotersRef.current.size === 0 &&
         revealedVotersRef.current.size === 0 &&
-        startBlock > configuredStart &&
         rescanBackoffCountRef.current < 5
       ) {
-        rescanBackoffCountRef.current += 1;
-        const step = Math.max(250_000, 250_000 * rescanBackoffCountRef.current);
-        const newStart = Math.max(configuredStart, startBlock - step);
-
-        committedVotersRef.current = new Set();
-        revealedVotersRef.current = new Set();
-        allTimeVotesByCandidateRef.current = new Map();
-        lastScannedBlockRef.current = null;
-        effectiveStartBlockRef.current = newStart;
-        setAllTimeScannedToBlock(null);
-        setAllTimeScanError(
-          `No vote events found yet in scanned history; expanding scan window earlier (from block ${newStart}).`
-        );
-        pendingRestartRef.current = true;
+        scheduleExpandAllTimeScanWindowEarlier({ startBlock, configuredStart });
       }
     } catch (e: any) {
       const message = String(e?.info?.error?.message || e?.error?.message || e?.message || 'Failed to scan on-chain events');
