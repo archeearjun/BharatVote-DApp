@@ -234,9 +234,10 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
       const latestBlock = await provider.getBlockNumber();
       const deploymentBlock = await getDeploymentBlock();
       const configuredStart = Math.max(0, Number.isFinite(eventsFromBlock) ? eventsFromBlock : 0);
-      // Prefer an explicit operator-provided start block; deployment detection via historical `getCode`
-      // can be unreliable on non-archive RPCs and may incorrectly "start too late" (missing events).
-      const computedStart = configuredStart > 0 ? configuredStart : deploymentBlock;
+      // Events cannot exist before the contract is deployed, so prefer the deployment block when it's later.
+      // If deployment detection is wrong (common on some RPCs), we fall back by expanding earlier automatically
+      // when we reach latest block but still see zero events.
+      const computedStart = Math.max(configuredStart, deploymentBlock);
       if (effectiveStartBlockRef.current === null) {
         effectiveStartBlockRef.current = computedStart;
       }
