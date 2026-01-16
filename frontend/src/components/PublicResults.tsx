@@ -33,8 +33,8 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [mode, setMode] = useState<ResultsMode>(() => (isDemoElection ? 'allTime' : 'current'));
 
-  const committedVotersRef = useRef<Set<string>>(new Set());
-  const revealedVotersRef = useRef<Set<string>>(new Set());
+  const allTimeCommitEventsCountRef = useRef<number>(0);
+  const allTimeRevealEventsCountRef = useRef<number>(0);
   const allTimeVotesByCandidateRef = useRef<Map<number, number>>(new Map());
   const allTimeLatestProcessedBlockRef = useRef<number | null>(null); // highest block included in totals
   const allTimeBackfillToBlockRef = useRef<number | null>(null); // next block to backfill down from
@@ -71,8 +71,8 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
   }, [isDemoElection]);
 
   useEffect(() => {
-    committedVotersRef.current = new Set();
-    revealedVotersRef.current = new Set();
+    allTimeCommitEventsCountRef.current = 0;
+    allTimeRevealEventsCountRef.current = 0;
     allTimeVotesByCandidateRef.current = new Map();
     allTimeLatestProcessedBlockRef.current = null;
     allTimeBackfillToBlockRef.current = null;
@@ -117,8 +117,8 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
   const TOPIC_VOTE_REVEALED_V2_UINT8 = useMemo(() => ethers.id('VoteRevealed(address,uint8,uint256)'), []);
 
   const resetAllTimeScanState = () => {
-    committedVotersRef.current = new Set();
-    revealedVotersRef.current = new Set();
+    allTimeCommitEventsCountRef.current = 0;
+    allTimeRevealEventsCountRef.current = 0;
     allTimeVotesByCandidateRef.current = new Map();
     allTimeLatestProcessedBlockRef.current = null;
     allTimeBackfillToBlockRef.current = null;
@@ -304,7 +304,7 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
           ...(await fetchLogsForTopic0(TOPIC_VOTE_COMMITTED_V2, range)),
         ]) {
           const voter = parseIndexedAddress(log.topics?.[1]);
-          if (voter) committedVotersRef.current.add(voter);
+          if (voter) allTimeCommitEventsCountRef.current += 1;
         }
 
         // Reveal logs (support multiple signatures)
@@ -315,7 +315,7 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
           ...(await fetchLogsForTopic0(TOPIC_VOTE_REVEALED_V2_UINT8, range)),
         ]) {
           const voter = parseIndexedAddress(log.topics?.[1]);
-          if (voter) revealedVotersRef.current.add(voter);
+          if (voter) allTimeRevealEventsCountRef.current += 1;
 
           const choice = decodeVoteRevealedChoiceFromLogData(log.data, abiCoder);
           if (choice !== null) {
@@ -375,13 +375,13 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
         }
       }
 
-      setVotesCommittedAllTime(committedVotersRef.current.size);
-      setVotesRevealedAllTime(revealedVotersRef.current.size);
+      setVotesCommittedAllTime(allTimeCommitEventsCountRef.current);
+      setVotesRevealedAllTime(allTimeRevealEventsCountRef.current);
       setAllTimeCandidateVotes(new Map(allTimeVotesByCandidateRef.current));
 
       // If we included tip blocks and still see no vote events, keep expanding backwards more aggressively.
       // This typically means we haven't reached the election’s activity range yet.
-      if (committedVotersRef.current.size === 0 && revealedVotersRef.current.size === 0 && rescanBackoffCountRef.current < 5) {
+      if (allTimeCommitEventsCountRef.current === 0 && allTimeRevealEventsCountRef.current === 0 && rescanBackoffCountRef.current < 5) {
         scheduleExpandAllTimeScanWindowEarlier({ startBlock, configuredStart });
       }
     } catch (e: any) {
