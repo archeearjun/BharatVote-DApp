@@ -13,7 +13,7 @@ This document verifies all components required for local deployment of the Bhara
 - Hardhat configuration for local blockchain node
 - Deployment scripts for smart contracts
 - Backend server configuration
-- Frontend and mobile app setup
+- Frontend setup
 
 **How to Deploy Locally:**
 
@@ -36,11 +36,6 @@ npm install
 npm run dev
 # Web app runs on http://localhost:5173
 
-# Terminal 5: Start Mobile App (Optional)
-cd mobile
-npm install
-npm start
-# Then: npm run android or npm run ios
 ```
 
 ---
@@ -68,52 +63,20 @@ npm start
 
 ---
 
-## ✅ 3. Mobile Application
-
-### Status: **COMPLETE**
-
-**What's Present:**
-- React Native mobile app
-- Complete voting flow
-- All screens implemented:
-  - KYC Screen
-  - Wallet Connect Screen
-  - Voter Screen
-  - Admin Screen
-  - Tally Screen
-- Navigation setup
-- ethers.js integration for blockchain
-
-**Key Files:**
-- `mobile/src/App.tsx` - Main app component
-- `mobile/src/screens/` - All screen components
-- `mobile/src/services/` - Blockchain services
-
-**Platform Support:**
-- ✅ Android
-- ✅ iOS (basic support)
-
----
-
 ## ✅ 4. Mock OTP Functionality
 
 ### Status: **COMPLETE**
 
 **What's Present:**
 
-### Web App (`frontend/src/KycPage.tsx`)
-- OTP input interface (6-digit)
-- Mock OTP validation
-- Auto-focus between input fields
-- Resend OTP functionality
-
-### Mobile App (`mobile/src/screens/KycScreen.tsx`)
-- OTP input interface
-- Mock OTP validation
-- Alert notifications
-
-**Mock OTP Mapping:**
-```javascript
+ ### Web App (`frontend/src/KycPage.tsx`)
+ - OTP input interface (6-digit)
+ - Mock OTP validation
+ - Auto-focus between input fields
+ - Resend OTP functionality
+ 
+ **Mock OTP Mapping:**
+ ```javascript
 VOTER1 → 123456
 VOTER2 → 234567
 VOTER3 → 345678
@@ -123,7 +86,6 @@ Default → 123456 (for any other voter ID)
 
 **Implementation Details:**
 - Lines 115-152 in `frontend/src/KycPage.tsx`
-- Lines 104-135 in `mobile/src/screens/KycScreen.tsx`
 - Debug logging for troubleshooting
 - Helpful error messages showing expected OTP values
 
@@ -214,21 +176,6 @@ Default → 123456 (for any other voter ID)
 - Triggered after OTP verification
 - Modal dialog with webcam preview
 
-### ⚠️ Mobile App - DEMO MODE ONLY
-**Implementation:** `mobile/src/components/FaceRecognition.tsx` (75 lines)
-
-**Current State:**
-- No real camera integration
-- Shows "Camera functionality temporarily disabled" message
-- Manual "Continue (Demo Mode)" button
-- Simulates 2-second loading delay
-
-**Why Mobile is Limited:**
-- React Native camera requires native permissions
-- Would need `react-native-camera` or `react-native-vision-camera`
-- Requires Android/iOS permission configuration
-- Face detection on mobile needs different libraries (ML Kit, Vision API)
-
 ---
 
 ## 📋 Summary
@@ -238,13 +185,11 @@ Default → 123456 (for any other voter ID)
 | Local Blockchain | ✅ Complete | Hardhat node + deployment scripts |
 | Smart Contracts | ✅ Complete | BharatVote.sol with commit-reveal voting |
 | Web Frontend | ✅ Complete | React + TypeScript with full UI |
-| Mobile App | ✅ Complete | React Native with all screens |
 | Backend Server | ✅ Complete | Express.js on port 3001 |
-| Mock OTP | ✅ Complete | Implemented in both web and mobile |
+| Mock OTP | ✅ Complete | Implemented in web frontend |
 | Voter ID Verification | ✅ Complete | `/api/kyc` microservice endpoint |
 | Merkle Proof Service | ✅ Complete | `/api/merkle-proof` endpoint |
 | Webcam (Web) | ✅ Complete | Full face-api.js integration |
-| Webcam (Mobile) | ⚠️ Demo Mode | Manual verification only |
 
 ---
 

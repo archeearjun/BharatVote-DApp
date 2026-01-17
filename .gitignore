@@ -17,6 +17,9 @@ node_modules
 ignition/deployments/chain-31337
 
 # Added by Cursor for temporary/build files
+.cursor/
 **/tsconfig.tsbuildinfo
 npx
 taskkill
+mobile/
+BharatVoteMobileTemp/

@@ -410,25 +410,9 @@ If you need to start fresh:
 
 ---
 
-## 📱 Mobile App (Optional)
+## 📱 Mobile App
 
-The mobile app also works locally, but requires more setup:
-
-### For Android:
-```bash
-cd mobile
-npm install
-npm run android
-```
-
-### Configure Backend URL:
-Edit `mobile/.env`:
-```
-BACKEND_URL=http://10.0.2.2:3001
-```
-(Android emulator uses 10.0.2.2 for localhost)
-
-**Note:** Mobile app uses demo mode for face recognition (just a button instead of actual camera).
+The React Native mobile app has been removed from this repository to keep the project focused on the web demo.
 
 ---
 

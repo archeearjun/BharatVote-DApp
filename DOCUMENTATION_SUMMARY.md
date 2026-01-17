@@ -91,7 +91,7 @@ A comprehensive Mermaid flowchart showing the complete user journey through both
 
 The documentation is based on your actual codebase analysis:
 - **Web Frontend**: React TypeScript with Material-UI theming
-- **Mobile App**: React Native with cross-platform compatibility
+- **Mobile App**: Removed from this repository (web-only scope)
 - **Blockchain Integration**: MetaMask wallet connection
 - **Backend Services**: KYC verification and voter validation
 

@@ -2,15 +2,17 @@
 
 ## System Overview
 
+Note: The React Native mobile app has been removed from this repository to keep the project focused on the web demo.
+
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                        LOCAL DEPLOYMENT STACK                        │
 └─────────────────────────────────────────────────────────────────────┘
 
 ┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
-│   Web Frontend   │     │   Mobile App     │     │   Admin Panel    │
-│  (React + TS)    │     │ (React Native)   │     │   (React + TS)   │
-│  localhost:5173  │     │    Android/iOS   │     │  localhost:5173  │
+│   Web Frontend   │     │ Mobile (removed) │     │   Admin Panel    │
+│  (React + TS)    │     │   (not in repo)  │     │   (React + TS)   │
+│  localhost:5173  │     │       N/A        │     │  localhost:5173  │
 └────────┬─────────┘     └────────┬─────────┘     └────────┬─────────┘
          │                        │                        │
          └────────────────────────┼────────────────────────┘
@@ -363,15 +365,6 @@ Reveal Phase:
 | Network | Hardhat Node | Local blockchain |
 | Library | OpenZeppelin | Secure contract libraries |
 
-### Mobile
-| Component | Technology | Purpose |
-|-----------|------------|---------|
-| Framework | React Native | Cross-platform mobile |
-| Language | TypeScript | Type safety |
-| Navigation | React Navigation | Screen routing |
-| Blockchain | ethers.js | Web3 integration |
-| Wallet | MetaMask Mobile | Deep linking integration |
-
 ---
 
 ## Port Configuration
@@ -381,7 +374,6 @@ Reveal Phase:
 | Frontend (Web) | 5173 | http://localhost:5173 | User interface |
 | Backend (API) | 3001 | http://localhost:3001 | Microservices |
 | Blockchain (RPC) | 8545 | http://localhost:8545 | Hardhat node |
-| Mobile Backend | 3001 | http://10.0.2.2:3001 | Android emulator |
 
 ---
 
