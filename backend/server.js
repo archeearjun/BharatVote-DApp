@@ -120,6 +120,10 @@ const rebuildTree = () => {
 rebuildTree();
 
 const DEMO_ELECTION_ABI = [
+  // Custom errors (helps decode/label revert reasons in automation logs)
+  'error NotAdmin()',
+  'error WrongPhase()',
+  'error CanOnlyResetAfterFinish()',
   'function merkleRoot() view returns (bytes32)',
   'function setMerkleRoot(bytes32 _root)',
   'function admin() view returns (address)',
@@ -128,6 +132,8 @@ const DEMO_ELECTION_ABI = [
   'function finishElection()',
   'function resetElection()',
 ];
+
+const DEMO_ELECTION_IFACE = new ethers.Interface(DEMO_ELECTION_ABI);
 
 async function syncDemoElectionMerkleRootIfConfigured({ onlyIfChanged }) {
   if (!provider || !adminWallet) {
@@ -179,6 +185,7 @@ const demoState = {
   address: DEMO_ELECTION_ADDRESS,
   adminOk: false,
   roundId: 0,
+  lastObservedPhase: null,
   roundStartedAtMs: null,
   commitEndsAtMs: null,
   revealEndsAtMs: null,
@@ -189,6 +196,7 @@ const demoState = {
   lastAttemptAtMs: null,
   lastError: null,
   lastErrorAtMs: null,
+  lastErrorPhase: null,
   transitioning: false,
 };
 
@@ -198,6 +206,54 @@ function nowMs() {
 
 function isPositiveInt(n) {
   return Number.isFinite(n) && n > 0;
+}
+
+function extractRevertData(err) {
+  const candidates = [
+    err?.data,
+    err?.error?.data,
+    err?.info?.error?.data,
+    err?.info?.error?.data?.data,
+    err?.info?.data,
+  ];
+
+  for (const value of candidates) {
+    if (typeof value === 'string' && value.startsWith('0x') && value.length >= 10) return value;
+  }
+
+  return null;
+}
+
+function formatDemoAutomationError({ action, err }) {
+  const code = err?.code ? String(err.code) : null;
+  const revertData = extractRevertData(err);
+
+  let parsedError = null;
+  if (revertData) {
+    try {
+      parsedError = DEMO_ELECTION_IFACE.parseError(revertData);
+    } catch {
+      parsedError = null;
+    }
+  }
+
+  const parsedName = parsedError?.name ? String(parsedError.name) : null;
+  const base =
+    parsedName ||
+    (err?.shortMessage ? String(err.shortMessage) : null) ||
+    (err?.message ? String(err.message) : String(err));
+
+  const cleaned = base
+    // Ethers error messages often include giant `receipt={...}` payloads; strip them for UI.
+    .replace(/,\s*receipt=\{[\s\S]*$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const prefix = action ? `${action}: ` : '';
+  const suffix = code ? ` (${code})` : '';
+  const max = 260;
+  const msg = `${prefix}${cleaned}${suffix}`;
+  return msg.length > max ? `${msg.slice(0, max)}…` : msg;
 }
 
 function ensureDemoSchedule(phase) {
@@ -338,6 +394,7 @@ async function runDemoSchedulerOnce() {
 
   try {
     const phase = Number(await contract.phase());
+    demoState.lastObservedPhase = phase;
 
     // If configured to start only when first user joins, do not schedule until we have roundStartedAtMs.
     if (DEMO_START_MODE === 'on_first_join' && !demoState.roundStartedAtMs && phase === 0) {
@@ -357,6 +414,28 @@ async function runDemoSchedulerOnce() {
     demoState.lastAttemptAtMs = nowMs();
     demoState.lastError = null;
     demoState.lastErrorAtMs = null;
+    demoState.lastErrorPhase = null;
+
+    const action = shouldStartReveal ? 'startReveal' : shouldFinish ? 'finishElection' : 'resetElection';
+
+    // Avoid paying gas for predictable failures. This also gives us useful revert data for custom errors.
+    try {
+      await contract[action].staticCall();
+    } catch (err) {
+      const formatted = formatDemoAutomationError({ action, err });
+      demoState.lastError = formatted;
+      demoState.lastErrorAtMs = nowMs();
+      demoState.lastErrorPhase = phase;
+
+      // If the configured wallet is no longer admin, disable autophasing to stop noisy retries.
+      if (/\bNotAdmin\b/.test(formatted)) {
+        demoState.enabled = false;
+        demoState.reasonDisabled = 'wallet_not_demo_admin';
+      }
+
+      return;
+    }
+
     if (shouldStartReveal) {
       const tx = await contract.startReveal();
       await waitForTx(tx);
@@ -384,8 +463,9 @@ async function runDemoSchedulerOnce() {
     }
   } catch (e) {
     console.error('? Demo scheduler tick failed:', e);
-    demoState.lastError = e?.message || String(e);
+    demoState.lastError = formatDemoAutomationError({ action: null, err: e });
     demoState.lastErrorAtMs = nowMs();
+    demoState.lastErrorPhase = demoState.lastObservedPhase;
   } finally {
     demoState.transitioning = false;
   }
@@ -439,6 +519,13 @@ app.get('/api/demo/status', async (_req, res) => {
       const contract = await getDemoContract();
       if (contract) phase = Number(await contract.phase());
       if (phase !== null) ensureDemoSchedule(phase);
+
+      // If the on-chain phase changed (e.g., manual admin action), clear any stale error message.
+      if (typeof phase === 'number' && typeof demoState.lastErrorPhase === 'number' && phase !== demoState.lastErrorPhase) {
+        demoState.lastError = null;
+        demoState.lastErrorAtMs = null;
+        demoState.lastErrorPhase = null;
+      }
     } catch {
       // ignore
     }

@@ -96,6 +96,9 @@ export default function DemoTimerBanner({ enabled }: { enabled: boolean }) {
   const remaining =
     typeof status?.timeRemainingMs === "number" ? formatMs(status.timeRemainingMs) : null;
 
+  const lastError =
+    status?.lastError && status.lastError.length > 260 ? `${status.lastError.slice(0, 260)}…` : status?.lastError;
+
   const waitingForFirst =
     status?.enabled &&
     status?.phase === 0 &&
@@ -122,9 +125,9 @@ export default function DemoTimerBanner({ enabled }: { enabled: boolean }) {
 
       {error && <div className="mt-2 text-xs text-red-700">{error}</div>}
 
-      {status?.lastError && (
+      {lastError && (
         <div className="mt-2 text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-lg p-2">
-          Demo autophasing warning: <span className="font-mono">{status.lastError}</span>
+          Demo autophasing warning: <span className="font-mono">{lastError}</span>
         </div>
       )}
 
