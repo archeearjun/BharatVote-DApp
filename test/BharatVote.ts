@@ -3,9 +3,11 @@ import { ethers } from "hardhat";
 import { MerkleTree } from "merkletreejs";
 import { keccak256, solidityPackedKeccak256, zeroPadValue } from "ethers";
 import type { BharatVote } from "../typechain-types";
+import type { ElectionFactory } from "../typechain-types";
 
 describe("BharatVote", () => {
   let vote: BharatVote;
+  let electionFactory: ElectionFactory;
   let admin: any;
   let voter1: any;
   let voter2: any;
@@ -40,10 +42,34 @@ describe("BharatVote", () => {
     merkleTree = createMerkleTree(eligibleVoters);
     merkleRoot = '0x' + merkleTree.getRoot().toString('hex');
     
-    // Deploy contract
-    const BV = await ethers.getContractFactory("BharatVote");
-    vote = (await BV.connect(admin).deploy()) as BharatVote;
-    await vote.waitForDeployment();
+    // Deploy implementation + factory, then create an initialized clone election.
+    // `BharatVote` is designed for Clones + `initialize(...)` (constructor disables initializers),
+    // so direct deployment is not usable for tests that require an admin.
+    const BV = await ethers.getContractFactory("BharatVote", admin);
+    const implementation = (await BV.deploy()) as BharatVote;
+    await implementation.waitForDeployment();
+
+    const Factory = await ethers.getContractFactory("ElectionFactory", admin);
+    electionFactory = (await Factory.deploy(await implementation.getAddress())) as ElectionFactory;
+    await electionFactory.waitForDeployment();
+
+    const createTx = await electionFactory.connect(admin).createElection("Test Election");
+    const receipt = await createTx.wait();
+    const created = receipt?.logs
+      .map((log) => {
+        try {
+          return electionFactory.interface.parseLog(log as any);
+        } catch {
+          return null;
+        }
+      })
+      .find((parsed) => parsed?.name === "ElectionCreated");
+
+    if (!created) {
+      throw new Error("ElectionCreated event not found");
+    }
+
+    vote = BV.attach(created.args.election) as BharatVote;
     
     // Set Merkle root
     await vote.connect(admin).setMerkleRoot(merkleRoot);

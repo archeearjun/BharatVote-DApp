@@ -525,7 +525,10 @@ export default function Admin({ contract, phase, backendMerkleRoot, contractMerk
       await tx.wait();
 
       setState(prev => ({ ...prev, success: "Merkle root updated on-chain", loading: false }));
-      setTimeout(() => window.location.reload(), 600);
+      const mode = (import.meta as any)?.env?.MODE;
+      if (mode !== 'test') {
+        setTimeout(() => window.location.reload(), 600);
+      }
     } catch (err: any) {
       const message = extractErrorMessage(err);
       setState(prev => ({ ...prev, error: message, loading: false }));

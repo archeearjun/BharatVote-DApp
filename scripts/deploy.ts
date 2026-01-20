@@ -39,13 +39,37 @@ async function main() {
 
   console.log("\n🚀 Deploying BharatVote...");
   const BharatVoteFactory = await ethers.getContractFactory("BharatVote");
-  const bharatVote = await BharatVoteFactory.deploy();
-  await bharatVote.waitForDeployment();
+  const implementation = await BharatVoteFactory.deploy();
+  await implementation.waitForDeployment();
+
+  // BharatVote is designed to be used via Clones + initialize(...).
+  // Create an initialized clone election instance via ElectionFactory.
+  const ElectionFactoryFactory = await ethers.getContractFactory("ElectionFactory");
+  const electionFactory = await ElectionFactoryFactory.deploy(await implementation.getAddress());
+  await electionFactory.waitForDeployment();
+
+  const createTx = await electionFactory.createElection("BharatVote");
+  const receipt = await createTx.wait();
+  const created = receipt?.logs
+    .map((log: any) => {
+      try {
+        return electionFactory.interface.parseLog(log);
+      } catch {
+        return null;
+      }
+    })
+    .find((parsed: any) => parsed?.name === "ElectionCreated");
+
+  if (!created) {
+    throw new Error("ElectionCreated event not found");
+  }
+
+  const bharatVote = BharatVoteFactory.attach(created.args.election);
 
   const address = await bharatVote.getAddress();
-  console.log(`✓ Deployed at: ${address}`);
+  console.log(`✓ Election deployed at: ${address}`);
 
-  // Verify the admin address in the deployed contract
+  // Verify the admin address in the deployed election
   const contractAdmin = await bharatVote.admin();
   console.log(`🔍 Contract admin address: ${contractAdmin}`);
   console.log(`✅ Admin verification: ${contractAdmin.toLowerCase() === expectedAdmin.toLowerCase()}`);

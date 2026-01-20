@@ -12,16 +12,22 @@ const mockSetMerkleRoot = vi.fn(() => ({
 }));
 
 const mockContract = {
+  getCandidates: vi.fn().mockResolvedValue([]),
+  candidateCount: vi.fn().mockResolvedValue(0n),
   setMerkleRoot: mockSetMerkleRoot,
 };
 
 describe("Admin merkle root helpers", () => {
   beforeEach(() => {
     mockSetMerkleRoot.mockClear();
-    global.fetch = vi.fn().mockResolvedValue({
+    const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ merkleRoot: "0xabc" }),
-    }) as any;
+      json: async () => ({ merkleRoot: `0x${"a".repeat(64)}` }),
+    });
+
+    // Ensure the component sees our mocked fetch regardless of which global it uses.
+    (globalThis as any).fetch = fetchMock;
+    (window as any).fetch = fetchMock;
   });
 
   it("fetches merkle root and calls setMerkleRoot", async () => {
@@ -29,19 +35,18 @@ describe("Admin merkle root helpers", () => {
       <Admin
         contract={mockContract as any}
         phase={0}
+        backendMerkleRoot="0x01"
+        contractMerkleRoot="0x02"
         onError={() => {}}
         onPhaseChange={() => {}}
       />
     );
 
-    const fetchButton = await screen.findByText(/Fetch Merkle Root/i);
-    fireEvent.click(fetchButton);
+    const syncButton = await screen.findByRole('button', { name: /Sync Now/i });
+    await waitFor(() => expect(syncButton).not.toBeDisabled());
+    fireEvent.click(syncButton);
 
-    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
-
-    const setButton = await screen.findByText(/Set Root On-Chain/i);
-    fireEvent.click(setButton);
-
-    await waitFor(() => expect(mockSetMerkleRoot).toHaveBeenCalledWith("0xabc"));
+    await waitFor(() => expect((globalThis as any).fetch).toHaveBeenCalled());
+    await waitFor(() => expect(mockSetMerkleRoot).toHaveBeenCalledWith(`0x${"a".repeat(64)}`));
   });
 });

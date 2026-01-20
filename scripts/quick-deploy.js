@@ -11,9 +11,31 @@ async function main() {
   
   // Deploy contract
   const BharatVote = await hre.ethers.getContractFactory("BharatVote");
-  const contract = await BharatVote.deploy();
-  await contract.waitForDeployment();
+  const implementation = await BharatVote.deploy();
+  await implementation.waitForDeployment();
   
+  const ElectionFactory = await hre.ethers.getContractFactory("ElectionFactory");
+  const electionFactory = await ElectionFactory.deploy(await implementation.getAddress());
+  await electionFactory.waitForDeployment();
+
+  const createTx = await electionFactory.createElection("BharatVote");
+  const receipt = await createTx.wait();
+  const created = receipt?.logs
+    .map((log) => {
+      try {
+        return electionFactory.interface.parseLog(log);
+      } catch {
+        return null;
+      }
+    })
+    .find((parsed) => parsed?.name === "ElectionCreated");
+
+  if (!created) {
+    throw new Error("ElectionCreated event not found");
+  }
+
+  const contract = BharatVote.attach(created.args.election);
+
   const address = await contract.getAddress();
   console.log("✅ Contract deployed at:", address);
   
