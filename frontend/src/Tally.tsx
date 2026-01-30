@@ -26,6 +26,7 @@ interface TallyProps {
   phase: number;
   refreshTrigger: number;
   eligibleCount?: number;
+  isDemoElection?: boolean;
 }
 
 interface Candidate {
@@ -34,7 +35,7 @@ interface Candidate {
   voteCount: number;
 }
 
-const Tally: React.FC<TallyProps> = ({ contract, phase, refreshTrigger, eligibleCount }) => {
+const Tally: React.FC<TallyProps> = ({ contract, phase, refreshTrigger, eligibleCount, isDemoElection }) => {
   const { t } = useI18n();
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [totalVotes, setTotalVotes] = useState(0);
@@ -113,12 +114,16 @@ const Tally: React.FC<TallyProps> = ({ contract, phase, refreshTrigger, eligible
     ? `${Math.min(100, (totalVotes / eligibleCount) * 100).toFixed(1)}%`
     : '—';
 
+  const showEligibility = !isDemoElection;
+  const headerLabel = isDemoElection ? 'Demo Results' : t('tally.electionResults');
+  const phaseLabel = phase === 0 ? t('tally.commit') : phase === 1 ? t('tally.reveal') : t('tally.finished');
+
   return (
     <div className="space-y-6">
       {/* Header with Refresh */}
       <div className="flex items-center justify-between">
         <Typography variant="h5" className="font-semibold text-gray-800">
-          {t('tally.electionResults')}
+          {headerLabel}
         </Typography>
         <Tooltip title={t('tally.refreshResults')}>
           <IconButton 
@@ -132,19 +137,28 @@ const Tally: React.FC<TallyProps> = ({ contract, phase, refreshTrigger, eligible
       </div>
 
       {/* High-level participation stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="p-4 rounded-lg bg-slate-50 border border-slate-100">
-          <p className="text-xs uppercase tracking-wide text-slate-600">Eligible Voters</p>
-          <p className="text-2xl font-semibold text-slate-900 mt-1">{eligibleCount ?? '—'}</p>
-        </div>
+      <div className={`grid grid-cols-1 ${showEligibility ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-3`}>
+        {showEligibility && (
+          <div className="p-4 rounded-lg bg-slate-50 border border-slate-100">
+            <p className="text-xs uppercase tracking-wide text-slate-600">Eligible Voters</p>
+            <p className="text-2xl font-semibold text-slate-900 mt-1">{eligibleCount ?? '—'}</p>
+          </div>
+        )}
         <div className="p-4 rounded-lg bg-blue-50 border border-blue-100">
           <p className="text-xs uppercase tracking-wide text-blue-600">Votes Cast</p>
           <p className="text-2xl font-semibold text-blue-700 mt-1">{totalVotes}</p>
         </div>
-        <div className="p-4 rounded-lg bg-green-50 border border-green-100">
-          <p className="text-xs uppercase tracking-wide text-green-600">Completion</p>
-          <p className="text-2xl font-semibold text-green-700 mt-1">{completionPct}</p>
-        </div>
+        {showEligibility ? (
+          <div className="p-4 rounded-lg bg-green-50 border border-green-100">
+            <p className="text-xs uppercase tracking-wide text-green-600">Completion</p>
+            <p className="text-2xl font-semibold text-green-700 mt-1">{completionPct}</p>
+          </div>
+        ) : (
+          <div className="p-4 rounded-lg bg-slate-50 border border-slate-100">
+            <p className="text-xs uppercase tracking-wide text-slate-600">Phase</p>
+            <p className="text-2xl font-semibold text-slate-900 mt-1">{phaseLabel}</p>
+          </div>
+        )}
       </div>
 
       {/* Error Message */}

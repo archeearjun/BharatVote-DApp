@@ -10,7 +10,8 @@ import {
   AlertTriangle,
   X,
   Shuffle,
-  Loader2
+  Loader2,
+  Sparkles
 } from 'lucide-react';
 import { ethers } from 'ethers';
 import { BACKEND_URL } from './constants';
@@ -532,11 +533,19 @@ const Voter: React.FC<VoterProps> = ({
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <div className={`badge ${isEligible ? 'badge-success' : 'badge-error'}`}>
-              <Shield className="w-3 h-3" />
-              <span className="hidden sm:inline">{isEligible ? t('voter.eligible') : t('voter.notEligible')}</span>
-              <span className="sm:hidden">{isEligible ? 'Eligible' : 'Not Eligible'}</span>
-            </div>
+            {isDemoElection ? (
+              <div className="badge badge-info">
+                <Sparkles className="w-3 h-3" />
+                <span className="hidden sm:inline">Open Demo</span>
+                <span className="sm:hidden">Demo</span>
+              </div>
+            ) : (
+              <div className={`badge ${isEligible ? 'badge-success' : 'badge-error'}`}>
+                <Shield className="w-3 h-3" />
+                <span className="hidden sm:inline">{isEligible ? t('voter.eligible') : t('voter.notEligible')}</span>
+                <span className="sm:hidden">{isEligible ? 'Eligible' : 'Not Eligible'}</span>
+              </div>
+            )}
             <div className="badge badge-info">
               <currentPhase.icon className="w-3 h-3" />
               <span className="hidden sm:inline">{currentPhase.label}</span>

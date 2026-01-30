@@ -63,6 +63,7 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
   const [adminTallyOpen, setAdminTallyOpen] = useState(false);
   const [showPublicResults, setShowPublicResults] = useState(false);
   const totalEligibleVoters = (eligibleVoters as string[])?.length || 0;
+  const eligibleCountForTally = isDemoElection ? undefined : totalEligibleVoters;
   const expectedChainId = getExpectedChainId();
   const demoElectionAddress = import.meta.env.VITE_DEMO_ELECTION_ADDRESS as string | undefined;
   const isDemoElection = useMemo(() => {
@@ -789,7 +790,8 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
                     contract={contract}
                     phase={phase}
                     refreshTrigger={tallyRefreshKey}
-                    eligibleCount={totalEligibleVoters}
+                    eligibleCount={eligibleCountForTally}
+                    isDemoElection={isDemoElection}
                   />
                 </Suspense>
               )}
@@ -859,9 +861,10 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
                 <Tally 
                   contract={contract} 
                   phase={phase} 
-                  refreshTrigger={tallyRefreshKey} 
-                  eligibleCount={totalEligibleVoters}
-                />
+                    refreshTrigger={tallyRefreshKey}
+                    eligibleCount={eligibleCountForTally}
+                    isDemoElection={isDemoElection}
+                  />
               </Suspense>
             )}
             
@@ -877,7 +880,8 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
                   contract={contract} 
                   phase={phase} 
                   refreshTrigger={tallyRefreshKey} 
-                  eligibleCount={totalEligibleVoters}
+                  eligibleCount={eligibleCountForTally}
+                  isDemoElection={isDemoElection}
                 />
               </Suspense>
             )}
