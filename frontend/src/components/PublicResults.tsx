@@ -481,17 +481,22 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
   }, [contract, isDemoElection, mode, backendUrl]);
 
   const useBackendAnalytics = isDemoElection && mode === 'allTime' && demoAnalytics && demoAnalytics.source === 'backend';
-  const allTimeCommitted = useBackendAnalytics ? (demoAnalytics?.committedCount ?? null) : votesCommittedAllTime;
-  const allTimeRevealed = useBackendAnalytics ? (demoAnalytics?.revealedCount ?? null) : votesRevealedAllTime;
+  const backendHasData = useBackendAnalytics &&
+    ((demoAnalytics?.committedCount ?? 0) > 0 ||
+      (demoAnalytics?.revealedCount ?? 0) > 0 ||
+      Object.keys(demoAnalytics?.candidateVotes || {}).length > 0);
+  const useBackendForDisplay = useBackendAnalytics && backendHasData;
+  const allTimeCommitted = useBackendForDisplay ? (demoAnalytics?.committedCount ?? null) : votesCommittedAllTime;
+  const allTimeRevealed = useBackendForDisplay ? (demoAnalytics?.revealedCount ?? null) : votesRevealedAllTime;
   const analyticsCandidateVotes = useMemo(() => {
-    if (!useBackendAnalytics) return allTimeCandidateVotes;
+    if (!useBackendForDisplay) return allTimeCandidateVotes;
     const map = new Map<number, number>();
     Object.entries(demoAnalytics?.candidateVotes || {}).forEach(([key, value]) => {
       const id = Number(key);
       if (Number.isFinite(id)) map.set(id, Number(value || 0));
     });
     return map;
-  }, [useBackendAnalytics, demoAnalytics, allTimeCandidateVotes]);
+  }, [useBackendForDisplay, demoAnalytics, allTimeCandidateVotes]);
 
   const allTimeTotalRevealedVotes = useMemo(() => {
     return Array.from(analyticsCandidateVotes.values()).reduce((sum, value) => sum + value, 0);
@@ -564,7 +569,7 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
         <div className="p-4 rounded-lg bg-slate-50 border border-slate-200">
           <p className="text-xs uppercase tracking-wide text-slate-600">{mode === 'allTime' ? 'Votes Cast (All-Time)' : 'Votes Revealed (Current)'}</p>
           <p className="text-3xl font-bold text-slate-900 mt-1">
-            {mode === 'allTime' ? (votesCommittedAllTime ?? '-') : totalVotes}
+            {mode === 'allTime' ? (allTimeCommitted ?? '-') : totalVotes}
           </p>
         </div>
         <div className="p-4 rounded-lg bg-slate-50 border border-slate-200">
@@ -580,9 +585,11 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
           <div>
             <div className="font-semibold text-slate-900">All-time demo participation</div>
             <div className="text-slate-600">
-              {useBackendAnalytics ? 'Counts are indexed by the demo backend (persists while backend is live).' : 'Counts are computed from on-chain events (persists across resets).'}
+              {useBackendForDisplay
+                ? 'Counts are indexed by the demo backend (persists while backend is live).'
+                : 'Counts are computed from on-chain events (persists across resets).'}
             </div>
-            {!useBackendAnalytics && allTimeScanError && (
+            {!useBackendForDisplay && allTimeScanError && (
               <div className="mt-1 text-xs text-amber-800">
                 Event scan issue: <span className="font-mono">{allTimeScanError}</span>
               </div>
@@ -592,10 +599,10 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
             <div><span className="font-semibold">{allTimeCommitted ?? '-'}</span> committed</div>
             <div><span className="font-semibold">{allTimeRevealed ?? '-'}</span> revealed</div>
             <div className="text-xs text-slate-500 mt-1">
-              {useBackendAnalytics
+              {useBackendForDisplay
                 ? `Indexed to block ${demoAnalytics?.lastProcessedBlock ?? '-'}`
                 : `Backfilled down to block ${allTimeScannedToBlock ?? '-'}`}
-              {!useBackendAnalytics && allTimeStartedFromBlock !== null && (
+              {!useBackendForDisplay && allTimeStartedFromBlock !== null && (
                 <span className="ml-2">· start {allTimeStartedFromBlock}</span>
               )}
             </div>
