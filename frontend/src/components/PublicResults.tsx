@@ -487,19 +487,19 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="p-4 rounded-lg bg-blue-50 border border-blue-100">
-          <p className="text-xs uppercase tracking-wide text-blue-600">Candidates</p>
-          <p className="text-3xl font-bold text-blue-700 mt-1">{candidates.length}</p>
+        <div className="p-4 rounded-lg bg-slate-50 border border-slate-200">
+          <p className="text-xs uppercase tracking-wide text-slate-600">Candidates</p>
+          <p className="text-3xl font-bold text-slate-900 mt-1">{candidates.length}</p>
         </div>
-        <div className="p-4 rounded-lg bg-green-50 border border-green-100">
-          <p className="text-xs uppercase tracking-wide text-green-600">{mode === 'allTime' ? 'Votes Cast (All-Time)' : 'Votes Revealed (Current)'}</p>
-          <p className="text-3xl font-bold text-green-700 mt-1">
+        <div className="p-4 rounded-lg bg-slate-50 border border-slate-200">
+          <p className="text-xs uppercase tracking-wide text-slate-600">{mode === 'allTime' ? 'Votes Cast (All-Time)' : 'Votes Revealed (Current)'}</p>
+          <p className="text-3xl font-bold text-slate-900 mt-1">
             {mode === 'allTime' ? (votesCommittedAllTime ?? '-') : totalVotes}
           </p>
         </div>
-        <div className="p-4 rounded-lg bg-purple-50 border border-purple-100">
-          <p className="text-xs uppercase tracking-wide text-purple-600">Phase</p>
-          <p className="text-3xl font-bold text-purple-700 mt-1">
+        <div className="p-4 rounded-lg bg-slate-50 border border-slate-200">
+          <p className="text-xs uppercase tracking-wide text-slate-600">Phase</p>
+          <p className="text-3xl font-bold text-slate-900 mt-1">
             {phase === null ? '-' : phase === 0 ? 'Commit' : phase === 1 ? 'Reveal' : 'Finished'}
           </p>
         </div>
@@ -577,7 +577,7 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
                 </div>
                 <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
                   <div
-                    className="h-2 bg-blue-500 transition-all"
+                    className="h-2 bg-slate-900 transition-all"
                     style={{ width: pctBase > 0 ? `${(voteCount / pctBase) * 100}%` : '0%' }}
                   />
                 </div>

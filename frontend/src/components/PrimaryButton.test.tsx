@@ -52,8 +52,6 @@ describe('PrimaryButton', () => {
   it('has proper default styling classes', () => {
     render(<PrimaryButton>Button</PrimaryButton>)
     const button = screen.getByRole('button')
-    expect(button).toHaveClass('bg-emerald-600')
-    expect(button).toHaveClass('text-white')
-    expect(button).toHaveClass('font-semibold')
+    expect(button).toHaveClass('btn-primary')
   })
 }) 

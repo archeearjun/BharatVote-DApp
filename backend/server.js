@@ -56,6 +56,17 @@ const DEMO_REVEAL_SECONDS = Number.parseInt(String(process.env.DEMO_REVEAL_SECON
 const DEMO_RESET_GRACE_SECONDS = Number.parseInt(String(process.env.DEMO_RESET_GRACE_SECONDS || '15'), 10);
 const DEMO_POLL_INTERVAL_MS = Number.parseInt(String(process.env.DEMO_POLL_INTERVAL_MS || '5000'), 10);
 
+const sanitizeVoterId = (id) => (typeof id === 'string' ? id.replace(/[^\w-]/g, '').slice(0, 64) : '');
+
+const kycData = (() => {
+  try {
+    const data = require('./kyc-data.json');
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+})();
+
 const keccak256Hasher = (data) => {
   if (typeof data === 'string') {
     // Leaf hashing must match contract: keccak256(abi.encodePacked(address))
@@ -478,6 +489,21 @@ console.log(`🌿 Merkle Root: ${merkleRoot}`);
 console.log('------------------------------------------------');
 
 // --- ENDPOINTS ---
+
+// 0. Mock KYC (main elections)
+app.get('/api/kyc', (req, res) => {
+  const voterId = sanitizeVoterId(req.query?.voter_id);
+  if (!voterId) {
+    return res.status(400).json({ eligible: false, error: 'voter_id is required' });
+  }
+
+  const record = kycData.find((r) => String(r?.voterId || '').toUpperCase() === voterId.toUpperCase());
+  if (!record) {
+    return res.json({ eligible: false });
+  }
+
+  return res.json({ eligible: true, address: record.address });
+});
 
 // 1. Get Root (Frontend checks this against contract)
 app.get('/api/merkle-root', (_req, res) => {

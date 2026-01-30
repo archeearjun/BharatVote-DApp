@@ -19,16 +19,16 @@ const PrimaryButton: React.FC<PrimaryButtonProps> = ({
   className = '',
   ...props 
 }) => {
-  const baseClasses = "w-full rounded-lg py-2.5 font-semibold tracking-tight transition-all disabled:cursor-not-allowed shadow-sm hover:shadow";
+  const baseClasses = "w-full";
   
   const variantClasses = {
-    primary: "bg-emerald-600 text-white hover:bg-emerald-700 disabled:bg-slate-300 disabled:text-slate-500",
-    secondary: "bg-white text-indigo-600 border border-indigo-600 hover:bg-indigo-50 disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-300"
+    primary: "btn-primary",
+    secondary: "btn-secondary"
   };
 
   return (
     <button
-      className={`${baseClasses} ${variantClasses[variant]} ${className}`}
+      className={`${variantClasses[variant]} ${baseClasses} ${className}`}
       disabled={disabled || loading}
       {...props}
     >

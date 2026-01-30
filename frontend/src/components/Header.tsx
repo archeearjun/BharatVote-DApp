@@ -2,10 +2,6 @@ import React, { useState } from 'react';
 import { useI18n } from '../i18n';
 import { getExpectedChainId } from '@/utils/chain';
 import { 
-  Typography, 
-  Chip, 
-  Avatar, 
-  IconButton, 
   Menu, 
   MenuItem, 
   Tooltip
@@ -17,13 +13,15 @@ import {
   User,
   Clock,
   Eye,
-  CheckSquare
+  CheckSquare,
+  Sparkles
 } from 'lucide-react';
 
 interface HeaderProps {
   account?: string;
   phase?: number;
   isAdmin?: boolean;
+  isDemoElection?: boolean;
   chainId?: number | null;
   expectedChainId?: number;
   backendMerkleRoot?: string | null;
@@ -35,6 +33,7 @@ const Header: React.FC<HeaderProps> = ({
   account,
   phase = 0,
   isAdmin = false,
+  isDemoElection = false,
   chainId = null,
   expectedChainId = getExpectedChainId(),
   backendMerkleRoot,
@@ -80,6 +79,17 @@ const Header: React.FC<HeaderProps> = ({
   const phaseInfo = getPhaseInfo();
   const chainMatch = expectedChainId !== undefined && chainId !== null && Number(chainId) === Number(expectedChainId);
   const merkleAligned = backendMerkleRoot && contractMerkleRoot && backendMerkleRoot.toLowerCase() === contractMerkleRoot.toLowerCase();
+
+  const modeBadge = (() => {
+    if (!account) return null;
+    if (isDemoElection) {
+      return { label: 'Demo Mode', icon: Sparkles, className: 'bg-slate-50 text-slate-700 border-slate-200' };
+    }
+    if (isAdmin) {
+      return { label: 'Admin Mode', icon: Shield, className: 'bg-slate-900 text-white border-slate-900' };
+    }
+    return { label: 'Voter Mode', icon: User, className: 'bg-slate-50 text-slate-700 border-slate-200' };
+  })();
 
   const getNetworkLabel = (id?: number | null) => {
     if (id === null || id === undefined) return 'Network';
@@ -154,6 +164,12 @@ const Header: React.FC<HeaderProps> = ({
             {/* Network and root status pills */}
             {account && (
               <div className="hidden lg:flex items-center space-x-2">
+                {modeBadge && (
+                  <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border ${modeBadge.className}`}>
+                    <modeBadge.icon className="w-3 h-3" />
+                    <span>{modeBadge.label}</span>
+                  </div>
+                )}
                 <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border ${chainMatch ? 'bg-success-50 text-success-700 border-success-200' : 'bg-warning-50 text-warning-700 border-warning-200'}`}>
                   <div className={`w-1.5 h-1.5 rounded-full ${chainMatch ? 'bg-success-500' : 'bg-warning-500'}`} />
                   <span>{chainMatch ? `🟢 ${getNetworkLabel(expectedChainId)}` : `Wrong network (${getNetworkLabel(chainId)})`}</span>

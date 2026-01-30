@@ -100,7 +100,7 @@ export default function LandingPage() {
             BharatVote
           </h1>
           <p className="text-sm sm:text-base text-slate-600 mt-2">
-            Create an election or join one in seconds.
+            Create or join a Sepolia election in seconds.
           </p>
         </div>
 
@@ -112,9 +112,12 @@ export default function LandingPage() {
                 <Shield className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h2 className="text-xl font-semibold text-slate-900">Create Election</h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl font-semibold text-slate-900">Create Election</h2>
+                  <span className="badge badge-info">Admin</span>
+                </div>
                 <p className="text-sm text-slate-600 mt-1">
-                  Deploy a new secure voting contract to Sepolia.
+                  Admin portal to deploy and manage elections on Sepolia.
                 </p>
               </div>
             </div>
@@ -128,24 +131,46 @@ export default function LandingPage() {
                 <Users className="w-6 h-6 text-slate-700" />
               </div>
               <div>
-                <h2 className="text-xl font-semibold text-slate-900">Cast Your Vote</h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl font-semibold text-slate-900">Join an Election</h2>
+                  <span className="badge badge-info">Voter</span>
+                </div>
                 <p className="text-sm text-slate-600 mt-1">
-                  Join an existing election by address.
+                  Enter an election address and complete KYC to vote.
                 </p>
               </div>
             </div>
 
             {/* Public Demo */}
-            <div className="rounded-2xl border border-purple-200 bg-purple-50 p-4">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-xl bg-purple-600 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center">
                   <Sparkles className="w-5 h-5 text-white" />
                 </div>
                 <div className="flex-1">
-                  <div className="text-sm font-semibold text-purple-900">✨ Public Demo</div>
-                  <div className="text-sm text-purple-800 mt-1">
-                    Try the system with free test tokens.
+                  <div className="text-sm font-semibold text-slate-900">🍕 Great Pizza Debate (Demo)</div>
+                  <div className="text-sm text-slate-600 mt-1">
+                    Instant demo with auto Sepolia switch and demo gas funding.
                   </div>
+                </div>
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600">
+                <div className="flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-slate-900 text-white flex items-center justify-center text-[10px]">1</span>
+                  <span>Connect MetaMask</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-slate-900 text-white flex items-center justify-center text-[10px]">2</span>
+                  <span>Auto-switch Sepolia</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-slate-900 text-white flex items-center justify-center text-[10px]">3</span>
+                  <span>Auto-fund gas</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-slate-900 text-white flex items-center justify-center text-[10px]">4</span>
+                  <span>Cast vote</span>
                 </div>
               </div>
 
@@ -153,18 +178,14 @@ export default function LandingPage() {
                 type="button"
                 onClick={joinDemo}
                 disabled={!demoEnabled || isJoiningDemo}
-                className={`mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium transition ${
-                  demoEnabled && !isJoiningDemo
-                    ? "bg-purple-600 text-white hover:bg-purple-700"
-                    : "bg-purple-200 text-purple-700 cursor-not-allowed"
-                }`}
+                className={`btn-primary w-full mt-4 ${!demoEnabled || isJoiningDemo ? 'opacity-70 cursor-not-allowed' : ''}`}
               >
                 {isJoiningDemo ? 'Setting up your wallet...' : 'Join Demo Election'}
                 {!isJoiningDemo && <ArrowRight className="w-4 h-4" />}
               </button>
 
               {!demoEnabled && (
-                <div className="mt-2 text-xs text-purple-800/80">
+                <div className="mt-2 text-xs text-slate-600">
                   Demo is not configured. Set <span className="font-mono">VITE_DEMO_ELECTION_ADDRESS</span>.
                 </div>
               )}
@@ -189,12 +210,15 @@ export default function LandingPage() {
                 <button
                   type="button"
                   onClick={() => goToElection(addressInput)}
-                  className="btn-primary px-5"
+                  className="btn-secondary px-5"
                 >
                   Go
                 </button>
               </div>
               {joinError && <div className="mt-2 text-sm text-red-600">{joinError}</div>}
+              <p className="mt-3 text-xs text-slate-500">
+                Main elections use a mock KYC flow (EPIC → OTP → Face) hosted on the backend.
+              </p>
             </div>
           </div>
         </div>

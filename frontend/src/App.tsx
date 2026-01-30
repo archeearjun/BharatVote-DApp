@@ -2,7 +2,6 @@ import { useEffect, Suspense, lazy, useState, useMemo } from "react";
 import { Routes, Route, Navigate, useParams } from "react-router-dom";
 import eligibleVoters from "../../eligibleVoters.json";
 import MainContainer from './components/MainContainer';
-import PrimaryButton from './components/PrimaryButton';
 import Header from './components/Header';
 import Toast from './components/Toast';
 import { 
@@ -26,7 +25,6 @@ import {
 import StepWizard from './components/StepWizard';
 import PublicResults from './components/PublicResults';
 import LandingPage from "./components/LandingPage";
-import DemoTimerBanner from "./components/DemoTimerBanner";
 import { getExpectedChainId } from "@/utils/chain";
 
 const AdminPanel = lazy(() => import('./Admin'));
@@ -63,6 +61,7 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
   const [hasUserCommitted, setHasUserCommitted] = useState(false);
   const [hasUserRevealed, setHasUserRevealed] = useState(false);
   const [adminTallyOpen, setAdminTallyOpen] = useState(false);
+  const [showPublicResults, setShowPublicResults] = useState(false);
   const totalEligibleVoters = (eligibleVoters as string[])?.length || 0;
   const expectedChainId = getExpectedChainId();
   const demoElectionAddress = import.meta.env.VITE_DEMO_ELECTION_ADDRESS as string | undefined;
@@ -724,6 +723,7 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
         account={account} 
         phase={phase} 
         isAdmin={isAdmin} 
+        isDemoElection={isDemoElection}
         chainId={chainId}
         expectedChainId={getExpectedChainId()}
         backendMerkleRoot={backendMerkleRoot}
@@ -739,18 +739,6 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
             currentStep={currentStep}
             lockedReason={!isAdmin && !isKycVerified ? 'Complete verification to proceed' : undefined}
           />
-        </div>
-
-        <DemoTimerBanner enabled={isDemoElection} />
-
-        {/* Public results section (read-only, no wallet needed) */}
-        <div className="flex justify-end">
-          <a href="#public-tally" className="text-sm text-blue-600 hover:text-blue-800 underline">
-            View public tally (no wallet)
-          </a>
-        </div>
-        <div id="public-tally" className="mt-4">
-          <PublicResults contractAddress={electionAddress} isDemoElection={isDemoElection} />
         </div>
 
         {isAdmin ? (
@@ -895,6 +883,30 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
             )}
           </div>
         )}
+
+        <div className="mt-8 card-premium p-5">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h3 className="text-base font-semibold text-slate-900">Public Results (Read-only)</h3>
+              <p className="text-sm text-slate-600">
+                View the live tally without connecting a wallet.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowPublicResults((prev) => !prev)}
+              className="btn-secondary inline-flex items-center gap-2"
+            >
+              {showPublicResults ? 'Hide Results' : 'View Results'}
+            </button>
+          </div>
+
+          {showPublicResults && (
+            <div className="mt-4">
+              <PublicResults contractAddress={electionAddress} isDemoElection={isDemoElection} />
+            </div>
+          )}
+        </div>
       </MainContainer>
 
       {toast && (

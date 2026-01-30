@@ -105,7 +105,7 @@ export default function CreateElection() {
       </div>
 
       <PrimaryButton onClick={onCreate} loading={isLoading || isCreating} loadingText={loadingText}>
-        {isConnected ? "Create via Factory" : "Connect Wallet"}
+        {isConnected ? "Create Election" : "Connect Wallet"}
       </PrimaryButton>
 
       {txHash && (

@@ -5,10 +5,8 @@ import {
   Lock,
   Unlock,
   Vote,
-  Users,
   Shield,
   CheckSquare,
-  User,
   AlertTriangle,
   X,
   Shuffle,
@@ -16,6 +14,7 @@ import {
 } from 'lucide-react';
 import { ethers } from 'ethers';
 import { BACKEND_URL } from './constants';
+import DemoTimerBanner from './components/DemoTimerBanner';
 
 interface VoterProps {
   contract: any;
@@ -609,6 +608,12 @@ const Voter: React.FC<VoterProps> = ({
             </div>
           </div>
 
+          {isDemoElection && (
+            <div className="mb-4">
+              <DemoTimerBanner enabled={true} variant="inline" />
+            </div>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Candidate Selection */}
             <div>
@@ -786,6 +791,9 @@ const Voter: React.FC<VoterProps> = ({
                 {isCommitting ? 'Submitting...' : t('voter.commitVote')}
               </span>
             </button>
+            {!canCommit && commitDisabledReason && (
+              <p className="mt-2 text-xs text-slate-500">{commitDisabledReason}</p>
+            )}
           </div>
         </div>
       )}
@@ -802,6 +810,12 @@ const Voter: React.FC<VoterProps> = ({
               <p className="text-sm text-slate-600">Reveal your encrypted vote to be counted</p>
             </div>
           </div>
+
+          {isDemoElection && (
+            <div className="mb-4">
+              <DemoTimerBanner enabled={true} variant="inline" />
+            </div>
+          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Candidate Selection */}
@@ -1016,51 +1030,6 @@ const Voter: React.FC<VoterProps> = ({
           </p>
         </div>
       )}
-
-      {/* Candidates List */}
-      <div className="card-premium p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center">
-            <Users className="w-5 h-5 text-slate-700" />
-          </div>
-          <div>
-            <h2 className="text-lg font-semibold text-slate-900">{t('voter.candidates')}</h2>
-            <p className="text-sm text-slate-600">
-              {candidates.length} candidate{candidates.length !== 1 ? 's' : ''} registered
-            </p>
-          </div>
-        </div>
-
-        {candidates.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {candidates.map((candidate, index) => (
-              <div key={index} className="p-4 bg-slate-50 rounded-xl border border-slate-200">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-medium text-slate-500">#{index + 1}</span>
-                  <div className="badge badge-success">
-                    {t('common.active')}
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-slate-200 rounded-lg flex items-center justify-center">
-                    <User className="w-4 h-4 text-slate-600" />
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-slate-900">{candidate.name}</h3>
-                    <p className="text-sm text-slate-600">ID: {candidate.id}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-8">
-            <User className="w-12 h-12 text-slate-400 mx-auto mb-3" />
-            <p className="text-slate-600 mb-2">{t('voter.noCandidatesAvailable')}</p>
-            <p className="text-sm text-slate-500">{t('voter.candidatesNeedAdmin')}</p>
-          </div>
-        )}
-      </div>
 
       {/* Commit Confirmation Modal */}
       {showCommitModal && (

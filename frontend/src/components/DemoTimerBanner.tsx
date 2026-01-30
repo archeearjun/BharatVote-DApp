@@ -33,7 +33,13 @@ function phaseLabel(phase: number | null | undefined) {
   return "Demo status";
 }
 
-export default function DemoTimerBanner({ enabled }: { enabled: boolean }) {
+export default function DemoTimerBanner({
+  enabled,
+  variant = "card",
+}: {
+  enabled: boolean;
+  variant?: "card" | "inline";
+}) {
   const [status, setStatus] = useState<DemoStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const lastKickAtMsRef = useRef<number>(0);
@@ -104,11 +110,16 @@ export default function DemoTimerBanner({ enabled }: { enabled: boolean }) {
     status?.phase === 0 &&
     (status?.nextPhaseAtMs === null || typeof status?.nextPhaseAtMs === "undefined");
 
+  const containerClass =
+    variant === "inline"
+      ? "rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
+      : "card-premium p-4";
+
   return (
-    <div className="card-premium p-4">
+    <div className={containerClass}>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
-          <div className="text-sm font-semibold text-slate-900">Public Demo</div>
+          <div className="text-xs font-semibold text-slate-900 uppercase tracking-wide">Demo Status</div>
           <div className="text-sm text-slate-600 mt-1">{title}</div>
         </div>
 
