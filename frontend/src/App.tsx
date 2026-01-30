@@ -601,6 +601,11 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
                   ? t('wallet.securelyConnect')
                   : t('wallet.installMetaMask')}
               </p>
+              {hasMetaMask && (
+                <p className="text-xs text-slate-500 mt-3">
+                  {t('wallet.autoSepolia')}
+                </p>
+              )}
             </div>
 
             {/* Call to Action */}

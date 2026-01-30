@@ -93,8 +93,8 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-subtle font-sans">
-      <MainContainer className="space-y-6">
+    <div className="min-h-screen bg-gradient-subtle font-sans md:flex md:items-center">
+      <MainContainer className="space-y-6" paddingYClassName="py-10 md:py-0">
         <div className="text-center">
           <h1 className="text-2xl sm:text-3xl font-semibold text-slate-900 tracking-tight">
             BharatVote

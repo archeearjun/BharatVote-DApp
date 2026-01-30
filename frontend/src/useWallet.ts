@@ -3,7 +3,7 @@ import { ethers } from "ethers";
 import type { WalletState } from "./types/wallet";
 import { WALLET_ERRORS, CONTRACT_ERRORS } from "./constants";
 import { getElectionContract } from "@/utils/contract";
-import { getExpectedChainId } from "@/utils/chain";
+import { getChainConfig, getExpectedChainId } from "@/utils/chain";
 
 function normalizeChainId(chainId: unknown): number | null {
   if (typeof chainId === "bigint") return Number(chainId);
@@ -21,6 +21,10 @@ function normalizeChainId(chainId: unknown): number | null {
     return Number.isFinite(parsed) ? parsed : null;
   }
   return null;
+}
+
+function toHexChainId(chainId: number): string {
+  return `0x${chainId.toString(16)}`;
 }
 
 declare global {
@@ -106,7 +110,7 @@ export default function useWallet(electionAddress?: string) {
       setState((prev: WalletState) => ({ ...prev, isLoading: true, error: null }));
       console.log('DEBUG useWallet: Requesting Ethereum accounts...');
 
-      const provider = new ethers.BrowserProvider(window.ethereum);
+      let provider = new ethers.BrowserProvider(window.ethereum);
       console.log('DEBUG useWallet: Provider created.', provider);
 
       const accounts = await provider.send("eth_requestAccounts", []);
@@ -116,7 +120,7 @@ export default function useWallet(electionAddress?: string) {
       }
       console.log('DEBUG useWallet: Accounts obtained:', accounts);
 
-      const network = await provider.getNetwork();
+      let network = await provider.getNetwork();
       console.log('DEBUG useWallet: Network obtained:', network);
 
       if (!checkNetwork(network.chainId)) {
@@ -124,16 +128,40 @@ export default function useWallet(electionAddress?: string) {
         try {
           await window.ethereum.request({
             method: "wallet_switchEthereumChain",
-            params: [{ chainId: `0x${requiredChainId.toString(16)}` }],
+            params: [{ chainId: toHexChainId(requiredChainId) }],
           });
+        } catch (switchError: any) {
+          if (switchError?.code === 4902) {
+            const chainConfig = getChainConfig(requiredChainId);
+            if (!chainConfig) {
+              handleError(switchError, WALLET_ERRORS.WRONG_NETWORK);
+              return null;
+            }
+            try {
+              await window.ethereum.request({
+                method: "wallet_addEthereumChain",
+                params: [chainConfig],
+              });
+              await window.ethereum.request({
+                method: "wallet_switchEthereumChain",
+                params: [{ chainId: toHexChainId(requiredChainId) }],
+              });
+            } catch (addError) {
+              handleError(addError, WALLET_ERRORS.WRONG_NETWORK);
+              return null;
+            }
+          } else {
+            throw switchError;
+          }
+        }
+
+        // Recreate provider after network switch to avoid stale network state.
+        provider = new ethers.BrowserProvider(window.ethereum);
+        network = await provider.getNetwork();
+
+        if (!checkNetwork(network.chainId)) {
           setState((prev: WalletState) => ({ ...prev, isLoading: false }));
           return null;
-        } catch (switchError: any) {
-          if (switchError.code === 4902) {
-            handleError(switchError, WALLET_ERRORS.WRONG_NETWORK);
-            return null;
-          }
-          throw switchError;
         }
       }
       console.log('DEBUG useWallet: Network is correct.');
