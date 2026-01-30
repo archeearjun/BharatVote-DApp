@@ -37,6 +37,7 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
   const [allTimeCandidateVotes, setAllTimeCandidateVotes] = useState<Map<number, number>>(new Map());
   const [demoAnalytics, setDemoAnalytics] = useState<DemoAnalytics | null>(null);
   const [demoAnalyticsError, setDemoAnalyticsError] = useState<string | null>(null);
+  const demoAnalyticsRef = useRef<DemoAnalytics | null>(null);
   const [allTimeScanError, setAllTimeScanError] = useState<string | null>(null);
   const [allTimeScannedToBlock, setAllTimeScannedToBlock] = useState<number | null>(null);
   const [allTimeStartedFromBlock, setAllTimeStartedFromBlock] = useState<number | null>(null);
@@ -93,10 +94,21 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
         throw new Error(`HTTP ${resp.status}`);
       }
       const data = (await resp.json()) as DemoAnalytics;
-      setDemoAnalytics(data);
+      const prev = demoAnalyticsRef.current;
+      const isSame =
+        prev &&
+        prev.committedCount === data.committedCount &&
+        prev.revealedCount === data.revealedCount &&
+        prev.lastProcessedBlock === data.lastProcessedBlock &&
+        JSON.stringify(prev.candidateVotes || {}) === JSON.stringify(data.candidateVotes || {});
+      if (!isSame) {
+        demoAnalyticsRef.current = data;
+        setDemoAnalytics(data);
+      }
       setDemoAnalyticsError(null);
     } catch (e: any) {
       setDemoAnalyticsError(e?.message || 'Failed to load demo analytics');
+      demoAnalyticsRef.current = null;
       setDemoAnalytics(null);
     }
   };
@@ -451,7 +463,7 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
     fetchResults();
     if (isDemoElection && mode === 'allTime') {
       fetchDemoAnalytics().catch(() => {});
-      if (!demoAnalytics) {
+      if (!demoAnalyticsRef.current) {
         fetchAllTimeFromEvents().catch((err) => console.warn('PublicResults: event scan failed', err));
       }
     }
@@ -459,14 +471,14 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
       fetchResults();
       if (isDemoElection && mode === 'allTime') {
         fetchDemoAnalytics().catch(() => {});
-        if (!demoAnalytics) {
+        if (!demoAnalyticsRef.current) {
           fetchAllTimeFromEvents().catch((err) => console.warn('PublicResults: event scan failed', err));
         }
       }
     }, POLL_INTERVAL_MS);
     return () => clearInterval(id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contract, isDemoElection, mode, backendUrl, demoAnalytics]);
+  }, [contract, isDemoElection, mode, backendUrl]);
 
   const useBackendAnalytics = isDemoElection && mode === 'allTime' && demoAnalytics && demoAnalytics.source === 'backend';
   const allTimeCommitted = useBackendAnalytics ? (demoAnalytics?.committedCount ?? null) : votesCommittedAllTime;
@@ -518,7 +530,7 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
               fetchResults();
               if (isDemoElection && mode === 'allTime') {
                 fetchDemoAnalytics().catch(() => {});
-                if (!demoAnalytics) {
+                if (!demoAnalyticsRef.current) {
                   fetchAllTimeFromEvents().catch((err) => console.warn('PublicResults: event scan failed', err));
                 }
               }
