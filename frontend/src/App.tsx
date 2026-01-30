@@ -62,14 +62,14 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
   const [hasUserRevealed, setHasUserRevealed] = useState(false);
   const [adminTallyOpen, setAdminTallyOpen] = useState(false);
   const [showPublicResults, setShowPublicResults] = useState(false);
-  const totalEligibleVoters = (eligibleVoters as string[])?.length || 0;
-  const eligibleCountForTally = isDemoElection ? undefined : totalEligibleVoters;
-  const expectedChainId = getExpectedChainId();
   const demoElectionAddress = import.meta.env.VITE_DEMO_ELECTION_ADDRESS as string | undefined;
   const isDemoElection = useMemo(() => {
     if (!demoElectionAddress || !electionAddress) return false;
     return String(demoElectionAddress).toLowerCase() === String(electionAddress).toLowerCase();
   }, [demoElectionAddress, electionAddress]);
+  const totalEligibleVoters = (eligibleVoters as string[])?.length || 0;
+  const eligibleCountForTally = isDemoElection ? undefined : totalEligibleVoters;
+  const expectedChainId = getExpectedChainId();
 
   // Demo convenience: bypass KYC gate for demo election even if user deep-links to /election/:address.
   useEffect(() => {
