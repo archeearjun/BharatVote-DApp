@@ -232,6 +232,23 @@ const decodeChoiceFromLogData = (data) => {
   return null;
 };
 
+const parseLogRangeLimitFromError = (err) => {
+  const message = String(err?.info?.error?.message || err?.error?.message || err?.message || '');
+  const m = message.match(/block range should work:\s*\[\s*0x([0-9a-fA-F]+)\s*,\s*0x([0-9a-fA-F]+)\s*\]/i);
+  if (m) {
+    const from = Number.parseInt(m[1], 16);
+    const to = Number.parseInt(m[2], 16);
+    const blocks = Number.isFinite(from) && Number.isFinite(to) ? (to - from + 1) : NaN;
+    return Number.isFinite(blocks) && blocks > 0 ? blocks : null;
+  }
+  const m2 = message.match(/up to a\s+(\d+)\s+block range/i);
+  if (m2) {
+    const blocks = Number(m2[1]);
+    return Number.isFinite(blocks) && blocks > 0 ? blocks : null;
+  }
+  return null;
+};
+
 const scanDemoAnalyticsOnce = async () => {
   if (!DEMO_ANALYTICS_ENABLED) return;
   if (!provider) return;
@@ -246,14 +263,25 @@ const scanDemoAnalyticsOnce = async () => {
   if (fromBlock > latest) return;
 
   let requests = 0;
+  let batchSize = Math.max(1, DEMO_ANALYTICS_BATCH_SIZE);
   while (fromBlock <= latest && requests < Math.max(1, DEMO_ANALYTICS_MAX_REQUESTS)) {
-    const toBlock = Math.min(latest, fromBlock + Math.max(0, DEMO_ANALYTICS_BATCH_SIZE - 1));
-    const logs = await provider.getLogs({
-      address: DEMO_ELECTION_ADDRESS,
-      fromBlock,
-      toBlock,
-    });
-    requests += 1;
+    const toBlock = Math.min(latest, fromBlock + Math.max(0, batchSize - 1));
+    let logs = [];
+    try {
+      logs = await provider.getLogs({
+        address: DEMO_ELECTION_ADDRESS,
+        fromBlock,
+        toBlock,
+      });
+      requests += 1;
+    } catch (e) {
+      const maxBlocks = parseLogRangeLimitFromError(e);
+      if (maxBlocks && maxBlocks > 0 && maxBlocks < batchSize) {
+        batchSize = maxBlocks;
+        continue;
+      }
+      throw e;
+    }
 
     for (const log of logs) {
       const topic0 = log?.topics?.[0];
