@@ -6,6 +6,7 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const express = require('express');
 const cors = require('cors');
+const axios = require('axios');
 const { ethers } = require('ethers');
 const { MerkleTree } = require('merkletreejs');
 
@@ -61,6 +62,11 @@ const DEMO_ANALYTICS_FROM_BLOCK = Number.parseInt(String(process.env.DEMO_ANALYT
 const DEMO_ANALYTICS_BATCH_SIZE = Number.parseInt(String(process.env.DEMO_ANALYTICS_BATCH_SIZE || '2000'), 10);
 const DEMO_ANALYTICS_MAX_REQUESTS = Number.parseInt(String(process.env.DEMO_ANALYTICS_MAX_REQUESTS || '3'), 10);
 const DEMO_ANALYTICS_PATH = path.join(__dirname, 'demo-analytics.json');
+const UPSTASH_REDIS_REST_URL = process.env.UPSTASH_REDIS_REST_URL;
+const UPSTASH_REDIS_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+const DEMO_ANALYTICS_STORAGE =
+  process.env.DEMO_ANALYTICS_STORAGE ||
+  (UPSTASH_REDIS_REST_URL && UPSTASH_REDIS_REST_TOKEN ? 'upstash' : 'file');
 
 const sanitizeVoterId = (id) => (typeof id === 'string' ? id.replace(/[^\w-]/g, '').slice(0, 64) : '');
 
@@ -150,10 +156,42 @@ const demoAnalytics = {
   updatedAtMs: null,
 };
 
-const loadDemoAnalytics = () => {
+const upstashKeyForDemo = () => {
+  if (!DEMO_ELECTION_ADDRESS) return 'bharatvote:demo:analytics';
+  return `bharatvote:demo:${String(DEMO_ELECTION_ADDRESS).toLowerCase()}:analytics`;
+};
+
+const upstashGet = async (key) => {
+  const url = `${UPSTASH_REDIS_REST_URL}/get/${encodeURIComponent(key)}`;
+  const resp = await axios.get(url, {
+    headers: { Authorization: `Bearer ${UPSTASH_REDIS_REST_TOKEN}` },
+  });
+  return resp?.data?.result ?? null;
+};
+
+const upstashSet = async (key, value) => {
+  const url = `${UPSTASH_REDIS_REST_URL}/set/${encodeURIComponent(key)}/${encodeURIComponent(value)}`;
   try {
-    if (!fs.existsSync(DEMO_ANALYTICS_PATH)) return;
-    const raw = fs.readFileSync(DEMO_ANALYTICS_PATH, 'utf8');
+    await axios.post(url, null, {
+      headers: { Authorization: `Bearer ${UPSTASH_REDIS_REST_TOKEN}` },
+    });
+  } catch (e) {
+    // Fallback: some setups allow GET for REST commands
+    await axios.get(url, {
+      headers: { Authorization: `Bearer ${UPSTASH_REDIS_REST_TOKEN}` },
+    });
+  }
+};
+
+const loadDemoAnalytics = async () => {
+  try {
+    let raw = null;
+    if (DEMO_ANALYTICS_STORAGE === 'upstash' && UPSTASH_REDIS_REST_URL && UPSTASH_REDIS_REST_TOKEN) {
+      raw = await upstashGet(upstashKeyForDemo());
+    } else if (fs.existsSync(DEMO_ANALYTICS_PATH)) {
+      raw = fs.readFileSync(DEMO_ANALYTICS_PATH, 'utf8');
+    }
+    if (!raw) return;
     const parsed = JSON.parse(raw);
     if (parsed?.electionAddress && DEMO_ELECTION_ADDRESS && String(parsed.electionAddress).toLowerCase() !== String(DEMO_ELECTION_ADDRESS).toLowerCase()) {
       return;
@@ -164,9 +202,14 @@ const loadDemoAnalytics = () => {
   }
 };
 
-const saveDemoAnalytics = () => {
+const saveDemoAnalytics = async () => {
   try {
-    fs.writeFileSync(DEMO_ANALYTICS_PATH, JSON.stringify(demoAnalytics, null, 2));
+    const payload = JSON.stringify(demoAnalytics, null, 2);
+    if (DEMO_ANALYTICS_STORAGE === 'upstash' && UPSTASH_REDIS_REST_URL && UPSTASH_REDIS_REST_TOKEN) {
+      await upstashSet(upstashKeyForDemo(), payload);
+      return;
+    }
+    fs.writeFileSync(DEMO_ANALYTICS_PATH, payload);
   } catch (e) {
     console.warn('Demo analytics: failed to persist file', e?.message || e);
   }
@@ -237,10 +280,10 @@ const scanDemoAnalyticsOnce = async () => {
     fromBlock = toBlock + 1;
   }
 
-  saveDemoAnalytics();
+  await saveDemoAnalytics();
 };
 
-loadDemoAnalytics();
+loadDemoAnalytics().catch((e) => console.warn('Demo analytics: failed to initialize', e?.message || e));
 
 // Merkle tree state
 let tree = null;
