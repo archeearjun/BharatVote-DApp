@@ -1,4 +1,5 @@
 const path = require('path');
+const fs = require('fs');
 
 // Load env from repo root so `npm -C backend start` works.
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
@@ -55,6 +56,11 @@ const DEMO_COMMIT_SECONDS = Number.parseInt(String(process.env.DEMO_COMMIT_SECON
 const DEMO_REVEAL_SECONDS = Number.parseInt(String(process.env.DEMO_REVEAL_SECONDS || '120'), 10);
 const DEMO_RESET_GRACE_SECONDS = Number.parseInt(String(process.env.DEMO_RESET_GRACE_SECONDS || '15'), 10);
 const DEMO_POLL_INTERVAL_MS = Number.parseInt(String(process.env.DEMO_POLL_INTERVAL_MS || '5000'), 10);
+const DEMO_ANALYTICS_ENABLED = String(process.env.DEMO_ANALYTICS_ENABLED || 'true').toLowerCase() !== 'false';
+const DEMO_ANALYTICS_FROM_BLOCK = Number.parseInt(String(process.env.DEMO_ANALYTICS_FROM_BLOCK || '0'), 10);
+const DEMO_ANALYTICS_BATCH_SIZE = Number.parseInt(String(process.env.DEMO_ANALYTICS_BATCH_SIZE || '2000'), 10);
+const DEMO_ANALYTICS_MAX_REQUESTS = Number.parseInt(String(process.env.DEMO_ANALYTICS_MAX_REQUESTS || '3'), 10);
+const DEMO_ANALYTICS_PATH = path.join(__dirname, 'demo-analytics.json');
 
 const sanitizeVoterId = (id) => (typeof id === 'string' ? id.replace(/[^\w-]/g, '').slice(0, 64) : '');
 
@@ -117,6 +123,124 @@ const eligibleVoters = Array.from(
 // --- 2. SETUP BLOCKCHAIN CONNECTION ---
 const provider = RPC_URL ? new ethers.JsonRpcProvider(RPC_URL) : null;
 const adminWallet = provider && NORMALIZED_PRIVATE_KEY ? new ethers.Wallet(NORMALIZED_PRIVATE_KEY, provider) : null;
+
+const TOPIC_VOTE_COMMITTED_V1 = ethers.id('VoteCommitted(address,bytes32)');
+const TOPIC_VOTE_COMMITTED_V2 = ethers.id('VoteCommitted(address,bytes32,uint256)');
+const TOPIC_VOTE_REVEALED_V1 = ethers.id('VoteRevealed(address,uint256)');
+const TOPIC_VOTE_REVEALED_V2 = ethers.id('VoteRevealed(address,uint256,uint256)');
+const TOPIC_VOTE_REVEALED_V1_UINT8 = ethers.id('VoteRevealed(address,uint8)');
+const TOPIC_VOTE_REVEALED_V2_UINT8 = ethers.id('VoteRevealed(address,uint8,uint256)');
+const ANALYTICS_REVEAL_TOPICS = new Set([
+  TOPIC_VOTE_REVEALED_V1,
+  TOPIC_VOTE_REVEALED_V2,
+  TOPIC_VOTE_REVEALED_V1_UINT8,
+  TOPIC_VOTE_REVEALED_V2_UINT8,
+]);
+const ANALYTICS_COMMIT_TOPICS = new Set([TOPIC_VOTE_COMMITTED_V1, TOPIC_VOTE_COMMITTED_V2]);
+
+const abiCoder = new ethers.AbiCoder();
+
+const demoAnalytics = {
+  version: 1,
+  electionAddress: DEMO_ELECTION_ADDRESS || null,
+  committedCount: 0,
+  revealedCount: 0,
+  candidateVotes: {},
+  lastProcessedBlock: null,
+  updatedAtMs: null,
+};
+
+const loadDemoAnalytics = () => {
+  try {
+    if (!fs.existsSync(DEMO_ANALYTICS_PATH)) return;
+    const raw = fs.readFileSync(DEMO_ANALYTICS_PATH, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (parsed?.electionAddress && DEMO_ELECTION_ADDRESS && String(parsed.electionAddress).toLowerCase() !== String(DEMO_ELECTION_ADDRESS).toLowerCase()) {
+      return;
+    }
+    Object.assign(demoAnalytics, parsed);
+  } catch (e) {
+    console.warn('Demo analytics: failed to load persisted file', e?.message || e);
+  }
+};
+
+const saveDemoAnalytics = () => {
+  try {
+    fs.writeFileSync(DEMO_ANALYTICS_PATH, JSON.stringify(demoAnalytics, null, 2));
+  } catch (e) {
+    console.warn('Demo analytics: failed to persist file', e?.message || e);
+  }
+};
+
+const decodeChoiceFromLogData = (data) => {
+  if (!data || data === '0x') return null;
+  try {
+    return Number(abiCoder.decode(['uint256'], data)[0]);
+  } catch {}
+  try {
+    return Number(abiCoder.decode(['uint8'], data)[0]);
+  } catch {}
+  try {
+    return Number(abiCoder.decode(['uint256', 'uint256'], data)[0]);
+  } catch {}
+  try {
+    return Number(abiCoder.decode(['uint8', 'uint256'], data)[0]);
+  } catch {}
+  return null;
+};
+
+const scanDemoAnalyticsOnce = async () => {
+  if (!DEMO_ANALYTICS_ENABLED) return;
+  if (!provider) return;
+  if (!DEMO_ELECTION_ADDRESS || !ethers.isAddress(DEMO_ELECTION_ADDRESS)) return;
+
+  const latest = await provider.getBlockNumber();
+  let fromBlock =
+    typeof demoAnalytics.lastProcessedBlock === 'number'
+      ? demoAnalytics.lastProcessedBlock + 1
+      : Math.max(0, Number.isFinite(DEMO_ANALYTICS_FROM_BLOCK) ? DEMO_ANALYTICS_FROM_BLOCK : 0);
+
+  if (fromBlock > latest) return;
+
+  let requests = 0;
+  while (fromBlock <= latest && requests < Math.max(1, DEMO_ANALYTICS_MAX_REQUESTS)) {
+    const toBlock = Math.min(latest, fromBlock + Math.max(0, DEMO_ANALYTICS_BATCH_SIZE - 1));
+    const logs = await provider.getLogs({
+      address: DEMO_ELECTION_ADDRESS,
+      fromBlock,
+      toBlock,
+    });
+    requests += 1;
+
+    for (const log of logs) {
+      const topic0 = log?.topics?.[0];
+      if (!topic0) continue;
+
+      if (ANALYTICS_COMMIT_TOPICS.has(topic0)) {
+        demoAnalytics.committedCount += 1;
+        continue;
+      }
+
+      if (ANALYTICS_REVEAL_TOPICS.has(topic0)) {
+        demoAnalytics.revealedCount += 1;
+        const choice = decodeChoiceFromLogData(log.data);
+        if (typeof choice === 'number' && Number.isFinite(choice)) {
+          const key = String(choice);
+          demoAnalytics.candidateVotes[key] = (demoAnalytics.candidateVotes[key] || 0) + 1;
+        }
+      }
+    }
+
+    demoAnalytics.lastProcessedBlock = toBlock;
+    demoAnalytics.updatedAtMs = Date.now();
+    demoAnalytics.electionAddress = DEMO_ELECTION_ADDRESS;
+    fromBlock = toBlock + 1;
+  }
+
+  saveDemoAnalytics();
+};
+
+loadDemoAnalytics();
 
 // Merkle tree state
 let tree = null;
@@ -560,6 +684,29 @@ app.get('/api/demo/status', async (_req, res) => {
   return res.json(demoStatusPayload({ phase }));
 });
 
+// 2.7 Demo analytics (all-time counts for demo election)
+app.get('/api/demo/analytics', async (_req, res) => {
+  if (!DEMO_ELECTION_ADDRESS || !ethers.isAddress(DEMO_ELECTION_ADDRESS)) {
+    return res.status(503).json({ error: 'Demo is not configured on the backend (missing VITE_DEMO_ELECTION_ADDRESS)' });
+  }
+
+  if (!DEMO_ANALYTICS_ENABLED) {
+    return res.status(503).json({ error: 'Demo analytics disabled' });
+  }
+
+  try {
+    await scanDemoAnalyticsOnce();
+  } catch (e) {
+    console.warn('Demo analytics scan failed', e?.message || e);
+  }
+
+  return res.json({
+    ...demoAnalytics,
+    source: 'backend',
+    latestKnownBlock: provider ? await provider.getBlockNumber() : null,
+  });
+});
+
 // 2.6 Demo tick: triggers one scheduler check (helps wake a cold backend).
 app.post('/api/demo/tick', async (_req, res) => {
   if (!demoState.enabled) {
@@ -715,6 +862,15 @@ app.listen(PORT, () => {
         );
 
         setInterval(runDemoSchedulerOnce, Math.max(1000, DEMO_POLL_INTERVAL_MS));
+        if (DEMO_ANALYTICS_ENABLED) {
+          const analyticsPollMs = Math.max(5000, DEMO_POLL_INTERVAL_MS);
+          setInterval(() => {
+            scanDemoAnalyticsOnce().catch((e) => console.warn('Demo analytics scan failed', e?.message || e));
+          }, analyticsPollMs);
+          setTimeout(() => {
+            scanDemoAnalyticsOnce().catch((e) => console.warn('Demo analytics scan failed', e?.message || e));
+          }, 2000);
+        }
         setTimeout(runDemoSchedulerOnce, 1500);
       })
       .catch((e) => console.error('🤖 Demo autophasing init failed:', e));

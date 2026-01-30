@@ -15,6 +15,17 @@ interface PublicResultsProps {
   isDemoElection?: boolean;
 }
 
+type DemoAnalytics = {
+  electionAddress?: string | null;
+  committedCount?: number;
+  revealedCount?: number;
+  candidateVotes?: Record<string, number>;
+  lastProcessedBlock?: number | null;
+  latestKnownBlock?: number | null;
+  updatedAtMs?: number | null;
+  source?: string;
+};
+
 const POLL_INTERVAL_MS = 15000;
 type ResultsMode = 'current' | 'allTime';
 
@@ -24,6 +35,8 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
   const [votesCommittedAllTime, setVotesCommittedAllTime] = useState<number | null>(null);
   const [votesRevealedAllTime, setVotesRevealedAllTime] = useState<number | null>(null);
   const [allTimeCandidateVotes, setAllTimeCandidateVotes] = useState<Map<number, number>>(new Map());
+  const [demoAnalytics, setDemoAnalytics] = useState<DemoAnalytics | null>(null);
+  const [demoAnalyticsError, setDemoAnalyticsError] = useState<string | null>(null);
   const [allTimeScanError, setAllTimeScanError] = useState<string | null>(null);
   const [allTimeScannedToBlock, setAllTimeScannedToBlock] = useState<number | null>(null);
   const [allTimeStartedFromBlock, setAllTimeStartedFromBlock] = useState<number | null>(null);
@@ -47,6 +60,7 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
 
   const rpcUrl = import.meta.env.VITE_PUBLIC_RPC_URL;
   const publicContractAddress = import.meta.env.VITE_PUBLIC_CONTRACT_ADDRESS;
+  const backendUrl = import.meta.env.VITE_BACKEND_URL;
   const eventsFromBlock = Number(import.meta.env.VITE_PUBLIC_EVENTS_FROM_BLOCK ?? 0);
   const maxRequestsPerPoll = Number(import.meta.env.VITE_PUBLIC_EVENTS_MAX_REQUESTS_PER_POLL ?? 6);
 
@@ -69,6 +83,23 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
   useEffect(() => {
     setMode(isDemoElection ? 'allTime' : 'current');
   }, [isDemoElection]);
+
+  const fetchDemoAnalytics = async () => {
+    if (!isDemoElection || mode !== 'allTime') return;
+    if (!backendUrl) return;
+    try {
+      const resp = await fetch(`${backendUrl}/api/demo/analytics`, { cache: 'no-store' });
+      if (!resp.ok) {
+        throw new Error(`HTTP ${resp.status}`);
+      }
+      const data = (await resp.json()) as DemoAnalytics;
+      setDemoAnalytics(data);
+      setDemoAnalyticsError(null);
+    } catch (e: any) {
+      setDemoAnalyticsError(e?.message || 'Failed to load demo analytics');
+      setDemoAnalytics(null);
+    }
+  };
 
   useEffect(() => {
     allTimeCommitEventsCountRef.current = 0;
@@ -419,21 +450,40 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
   useEffect(() => {
     fetchResults();
     if (isDemoElection && mode === 'allTime') {
-      fetchAllTimeFromEvents().catch((err) => console.warn('PublicResults: event scan failed', err));
+      fetchDemoAnalytics().catch(() => {});
+      if (!demoAnalytics) {
+        fetchAllTimeFromEvents().catch((err) => console.warn('PublicResults: event scan failed', err));
+      }
     }
     const id = setInterval(() => {
       fetchResults();
       if (isDemoElection && mode === 'allTime') {
-        fetchAllTimeFromEvents().catch((err) => console.warn('PublicResults: event scan failed', err));
+        fetchDemoAnalytics().catch(() => {});
+        if (!demoAnalytics) {
+          fetchAllTimeFromEvents().catch((err) => console.warn('PublicResults: event scan failed', err));
+        }
       }
     }, POLL_INTERVAL_MS);
     return () => clearInterval(id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contract, isDemoElection, mode]);
+  }, [contract, isDemoElection, mode, backendUrl, demoAnalytics]);
+
+  const useBackendAnalytics = isDemoElection && mode === 'allTime' && demoAnalytics && demoAnalytics.source === 'backend';
+  const allTimeCommitted = useBackendAnalytics ? (demoAnalytics?.committedCount ?? null) : votesCommittedAllTime;
+  const allTimeRevealed = useBackendAnalytics ? (demoAnalytics?.revealedCount ?? null) : votesRevealedAllTime;
+  const analyticsCandidateVotes = useMemo(() => {
+    if (!useBackendAnalytics) return allTimeCandidateVotes;
+    const map = new Map<number, number>();
+    Object.entries(demoAnalytics?.candidateVotes || {}).forEach(([key, value]) => {
+      const id = Number(key);
+      if (Number.isFinite(id)) map.set(id, Number(value || 0));
+    });
+    return map;
+  }, [useBackendAnalytics, demoAnalytics, allTimeCandidateVotes]);
 
   const allTimeTotalRevealedVotes = useMemo(() => {
-    return Array.from(allTimeCandidateVotes.values()).reduce((sum, value) => sum + value, 0);
-  }, [allTimeCandidateVotes]);
+    return Array.from(analyticsCandidateVotes.values()).reduce((sum, value) => sum + value, 0);
+  }, [analyticsCandidateVotes]);
 
   return (
     <div className="card-premium p-6 space-y-4">
@@ -467,7 +517,10 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
             onClick={() => {
               fetchResults();
               if (isDemoElection && mode === 'allTime') {
-                fetchAllTimeFromEvents().catch((err) => console.warn('PublicResults: event scan failed', err));
+                fetchDemoAnalytics().catch(() => {});
+                if (!demoAnalytics) {
+                  fetchAllTimeFromEvents().catch((err) => console.warn('PublicResults: event scan failed', err));
+                }
               }
             }}
             disabled={isLoading}
@@ -483,6 +536,11 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
         <div className="p-3 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 flex items-start gap-2">
           <AlertTriangle className="w-4 h-4 mt-0.5" />
           <div className="text-sm">{error}</div>
+        </div>
+      )}
+      {demoAnalyticsError && (
+        <div className="p-3 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-sm">
+          Demo analytics unavailable (falling back to on-chain scan): {demoAnalyticsError}
         </div>
       )}
 
@@ -509,19 +567,23 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
         <div className="p-4 rounded-lg border border-slate-100 bg-white text-sm text-slate-700 flex items-center justify-between">
           <div>
             <div className="font-semibold text-slate-900">All-time demo participation</div>
-            <div className="text-slate-600">Counts are computed from on-chain events (persists across resets).</div>
-            {allTimeScanError && (
+            <div className="text-slate-600">
+              {useBackendAnalytics ? 'Counts are indexed by the demo backend (persists while backend is live).' : 'Counts are computed from on-chain events (persists across resets).'}
+            </div>
+            {!useBackendAnalytics && allTimeScanError && (
               <div className="mt-1 text-xs text-amber-800">
                 Event scan issue: <span className="font-mono">{allTimeScanError}</span>
               </div>
             )}
           </div>
           <div className="text-right">
-            <div><span className="font-semibold">{votesCommittedAllTime ?? '-'}</span> committed</div>
-            <div><span className="font-semibold">{votesRevealedAllTime ?? '-'}</span> revealed</div>
+            <div><span className="font-semibold">{allTimeCommitted ?? '-'}</span> committed</div>
+            <div><span className="font-semibold">{allTimeRevealed ?? '-'}</span> revealed</div>
             <div className="text-xs text-slate-500 mt-1">
-              Backfilled down to block {allTimeScannedToBlock ?? '-'}
-              {allTimeStartedFromBlock !== null && (
+              {useBackendAnalytics
+                ? `Indexed to block ${demoAnalytics?.lastProcessedBlock ?? '-'}`
+                : `Backfilled down to block ${allTimeScannedToBlock ?? '-'}`}
+              {!useBackendAnalytics && allTimeStartedFromBlock !== null && (
                 <span className="ml-2">· start {allTimeStartedFromBlock}</span>
               )}
             </div>
@@ -558,7 +620,7 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
           <div className="space-y-4">
             {candidates.map((c) => {
               const voteCount = mode === 'allTime'
-                ? (allTimeCandidateVotes.get(c.id) ?? 0)
+                ? (analyticsCandidateVotes.get(c.id) ?? 0)
                 : c.voteCount;
               const pctBase = mode === 'allTime' ? allTimeTotalRevealedVotes : totalVotes;
               const pct = pctBase === 0 ? '0%' : `${((voteCount / pctBase) * 100).toFixed(1)}%`;
