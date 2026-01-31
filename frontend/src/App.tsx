@@ -313,7 +313,8 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
     return 3;
   }, [isAdmin, isKycVerified, phase, account]);
 
-  const canShowVoterTally = hasUserCommitted || hasUserRevealed;
+  const canShowVoterTally = isDemoElection ? (hasUserCommitted || hasUserRevealed) : (hasUserRevealed || phase === 2);
+  const canShowPublicResults = isDemoElection || hasUserRevealed || phase === 2;
 
   /**
    * Initiates the wallet connection process.
@@ -933,17 +934,26 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
               <p className="text-sm text-slate-600">
                 View the live tally without connecting a wallet.
               </p>
+              {!canShowPublicResults && !isDemoElection && (
+                <p className="text-xs text-slate-500 mt-2">
+                  Results unlock after you reveal your vote or when the election finishes.
+                </p>
+              )}
             </div>
             <button
               type="button"
-              onClick={() => setShowPublicResults((prev) => !prev)}
-              className="btn-secondary inline-flex items-center gap-2"
+              onClick={() => {
+                if (!canShowPublicResults && !isDemoElection) return;
+                setShowPublicResults((prev) => !prev);
+              }}
+              className={`btn-secondary inline-flex items-center gap-2 ${!canShowPublicResults && !isDemoElection ? 'opacity-60 cursor-not-allowed' : ''}`}
+              disabled={!canShowPublicResults && !isDemoElection}
             >
               {showPublicResults ? 'Hide Results' : 'View Results'}
             </button>
           </div>
 
-          {showPublicResults && (
+          {showPublicResults && (canShowPublicResults || isDemoElection) && (
             <div className="mt-4">
               <PublicResults contractAddress={electionAddress} isDemoElection={isDemoElection} />
             </div>
