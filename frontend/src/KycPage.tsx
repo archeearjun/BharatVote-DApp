@@ -181,6 +181,9 @@ const KycPage: React.FC<KycPageProps> = ({ account, onVerified }) => {
               </div>
               <h1 className="text-2xl font-semibold text-slate-900 mb-2">BharatVote</h1>
               <p className="text-sm text-slate-600">{t('kyc.voterVerification')}</p>
+              <p className="text-xs text-slate-500 mt-2">
+                Demo elections skip KYC. You’re verifying for a main election.
+              </p>
             </div>
 
             {/* Progress Bar */}

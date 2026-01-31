@@ -117,7 +117,7 @@ const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="bg-white border-b border-slate-200 h-16 shadow-sm">
+    <header className="bg-white border-b border-slate-200 h-16 shadow-sm sticky top-0 z-40">
       <div className="max-w-7xl mx-auto px-4 h-full">
         <div className="flex items-center justify-between h-full">
           {/* Left: Logo and title */}
@@ -139,6 +139,7 @@ const Header: React.FC<HeaderProps> = ({
               </h1>
               <p className="text-xs text-slate-500">
                 {t('app.subtitle')}
+                {isDemoElection && <span className="ml-2 text-slate-400">· Open demo (no KYC)</span>}
               </p>
             </div>
             <div className="sm:hidden">
@@ -204,8 +205,11 @@ const Header: React.FC<HeaderProps> = ({
 
                 {/* Account Address */}
                 <div className="flex items-center space-x-2 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200">
-                  <span className="font-mono text-sm text-slate-700">
+                  <span className="font-mono text-sm text-slate-700 hidden sm:inline">
                     {shortenAddress(account)}
+                  </span>
+                  <span className="font-mono text-xs text-slate-700 sm:hidden">
+                    {account.slice(0, 4)}…{account.slice(-2)}
                   </span>
                   
                   {/* Admin Badge */}

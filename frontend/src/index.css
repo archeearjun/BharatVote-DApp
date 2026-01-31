@@ -62,7 +62,7 @@
   
   /* Premium Card */
   .card-premium {
-    @apply bg-white rounded-2xl border border-slate-200 shadow-lg hover:shadow-xl transition-all duration-300;
+    @apply bg-white rounded-2xl border border-slate-200 shadow-md hover:shadow-lg transition-all duration-300;
   }
   
   /* Input Base */

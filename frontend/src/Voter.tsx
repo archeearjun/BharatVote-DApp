@@ -749,6 +749,9 @@ const Voter: React.FC<VoterProps> = ({
                   onChange={(e) => setSalt(e.target.value)}
                   className="input-base"
                 />
+                <p className="text-xs text-slate-500">
+                  Any phrase works. You must use the exact same one during reveal.
+                </p>
                 <button
                   onClick={handleNewSalt}
                   className="btn-ghost text-sm"
@@ -827,8 +830,23 @@ const Voter: React.FC<VoterProps> = ({
           )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Salt Input */}
+            <div className="order-1 lg:order-2">
+              <label className="block text-sm font-medium text-slate-900 mb-4">{t('voter.yourSalt')}</label>
+              <input
+                type="text"
+                placeholder={t('voter.enterExactSalt')}
+                value={salt}
+                onChange={(e) => setSalt(e.target.value)}
+                className="input-base"
+              />
+              <p className="text-xs text-slate-500 mt-3">
+                Enter the exact same password you used during the commit phase.
+              </p>
+            </div>
+
             {/* Candidate Selection */}
-            <div>
+            <div className="order-2 lg:order-1">
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-slate-900 mb-4">
                   {t('voter.selectCandidateVotedFor')}
@@ -945,21 +963,6 @@ const Voter: React.FC<VoterProps> = ({
                   <span>{t('voter.selectSameCandidate')}</span>
                 </p>
               </div>
-            </div>
-
-            {/* Salt Input */}
-            <div>
-              <label className="block text-sm font-medium text-slate-900 mb-4">{t('voter.yourSalt')}</label>
-              <input
-                type="text"
-                placeholder={t('voter.enterExactSalt')}
-                value={salt}
-                onChange={(e) => setSalt(e.target.value)}
-                className="input-base"
-              />
-              <p className="text-xs text-slate-500 mt-3">
-                Enter the exact same password you used during the commit phase.
-              </p>
             </div>
           </div>
 

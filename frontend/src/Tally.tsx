@@ -122,9 +122,14 @@ const Tally: React.FC<TallyProps> = ({ contract, phase, refreshTrigger, eligible
     <div className="space-y-6">
       {/* Header with Refresh */}
       <div className="flex items-center justify-between">
-        <Typography variant="h5" className="font-semibold text-gray-800">
-          {headerLabel}
-        </Typography>
+        <div className="flex items-center gap-2">
+          <Typography variant="h5" className="font-semibold text-gray-800">
+            {headerLabel}
+          </Typography>
+          {isDemoElection && (
+            <Chip label="Demo" size="small" color="default" variant="outlined" />
+          )}
+        </div>
         <Tooltip title={t('tally.refreshResults')}>
           <IconButton 
             onClick={fetchResults} 
@@ -238,7 +243,7 @@ const Tally: React.FC<TallyProps> = ({ contract, phase, refreshTrigger, eligible
       {(phase === 1 || phase === 2) && hasData && (
         <Card className="shadow-sm border border-gray-100">
           <CardContent className="p-6">
-            <Typography variant="h4" className="text-center mb-6 font-bold text-gray-800">
+            <Typography variant="h5" className="text-center mb-4 font-semibold text-gray-800">
               {phase === 1 ? t('tally.liveResults') : t('tally.finalResults')}
             </Typography>
             

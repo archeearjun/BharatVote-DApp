@@ -38,6 +38,7 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
   const [demoAnalytics, setDemoAnalytics] = useState<DemoAnalytics | null>(null);
   const [demoAnalyticsError, setDemoAnalyticsError] = useState<string | null>(null);
   const demoAnalyticsRef = useRef<DemoAnalytics | null>(null);
+  const lastSnapshotRef = useRef<string | null>(null);
   const [allTimeScanError, setAllTimeScanError] = useState<string | null>(null);
   const [allTimeScannedToBlock, setAllTimeScannedToBlock] = useState<number | null>(null);
   const [allTimeStartedFromBlock, setAllTimeStartedFromBlock] = useState<number | null>(null);
@@ -288,9 +289,20 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
         withVotes.push({ id: idNum, name, voteCount: votes });
       }
       setCandidates(withVotes);
-      setTotalVotes(withVotes.reduce((s, c) => s + c.voteCount, 0));
-      setPhase(Number(phaseVal));
-      setLastUpdated(new Date());
+      const nextTotalVotes = withVotes.reduce((s, c) => s + c.voteCount, 0);
+      setTotalVotes(nextTotalVotes);
+      const nextPhase = Number(phaseVal);
+      setPhase(nextPhase);
+
+      const snapshot = JSON.stringify({
+        phase: nextPhase,
+        totalVotes: nextTotalVotes,
+        candidates: withVotes.map((c) => ({ id: c.id, votes: c.voteCount })),
+      });
+      if (lastSnapshotRef.current !== snapshot) {
+        lastSnapshotRef.current = snapshot;
+        setLastUpdated(new Date());
+      }
     } catch (err: any) {
       console.error('PublicResults fetch failed', err);
       setError(err?.message || 'Failed to fetch public results');
@@ -486,6 +498,11 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
       (demoAnalytics?.revealedCount ?? 0) > 0 ||
       Object.keys(demoAnalytics?.candidateVotes || {}).length > 0);
   const useBackendForDisplay = useBackendAnalytics && backendHasData;
+  const dataSourceLabel = !isDemoElection || mode !== 'allTime'
+    ? 'On-chain (live)'
+    : useBackendForDisplay
+      ? 'Backend index'
+      : 'On-chain scan';
   const allTimeCommitted = useBackendForDisplay ? (demoAnalytics?.committedCount ?? null) : votesCommittedAllTime;
   const allTimeRevealed = useBackendForDisplay ? (demoAnalytics?.revealedCount ?? null) : votesRevealedAllTime;
   const analyticsCandidateVotes = useMemo(() => {
@@ -510,6 +527,7 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
           <p className="text-sm text-slate-600">
             Read-only view, no wallet required. Auto-refresh every 15s.
           </p>
+          <p className="text-xs text-slate-500 mt-1">Data source: {dataSourceLabel}</p>
         </div>
         <div className="flex items-center gap-2">
           {isDemoElection && (

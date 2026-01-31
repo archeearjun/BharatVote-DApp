@@ -29,8 +29,14 @@ const Toast: React.FC<ToastProps> = ({ type, message, isVisible, onClose }) => {
   const bgColor = type === 'success' ? 'bg-green-500' : 'bg-red-500';
   const icon = type === 'success' ? '✓' : '✕';
 
+  const live = type === 'error' ? 'assertive' : 'polite';
+
   return (
-    <div className={`fixed bottom-4 right-4 z-50 transition-transform duration-300 ${show ? 'translate-y-0' : 'translate-y-full'}`}>
+    <div
+      className={`fixed bottom-4 right-4 z-50 transition-transform duration-300 ${show ? 'translate-y-0' : 'translate-y-full'}`}
+      role={type === 'error' ? 'alert' : 'status'}
+      aria-live={live}
+    >
       <div className={`${bgColor} text-white px-4 py-3 rounded-lg shadow-lg flex items-center space-x-2 max-w-sm`}>
         <span className="text-lg">{icon}</span>
         <span className="text-sm font-medium">{message}</span>

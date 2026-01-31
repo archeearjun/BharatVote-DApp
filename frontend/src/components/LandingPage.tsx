@@ -104,6 +104,12 @@ export default function LandingPage() {
           </p>
         </div>
 
+        <div className="card p-4 bg-slate-50 border-slate-200 text-sm text-slate-700">
+          <span className="font-semibold text-slate-900">Demo:</span> Open to everyone, no KYC.
+          <span className="mx-2 text-slate-400">•</span>
+          <span className="font-semibold text-slate-900">Main:</span> Requires mock KYC verification.
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
           {/* Left: Admin */}
           <div className="card-premium p-6">
@@ -213,6 +219,20 @@ export default function LandingPage() {
                   className="btn-secondary px-5"
                 >
                   Go
+                </button>
+              </div>
+              <div className="mt-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const text = await navigator.clipboard.readText();
+                      if (text) setAddressInput(text.trim());
+                    } catch {}
+                  }}
+                  className="text-xs text-slate-500 hover:text-slate-700 underline"
+                >
+                  Paste from clipboard
                 </button>
               </div>
               {joinError && <div className="mt-2 text-sm text-red-600">{joinError}</div>}
