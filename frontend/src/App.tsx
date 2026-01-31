@@ -25,7 +25,7 @@ import {
 import StepWizard from './components/StepWizard';
 import PublicResults from './components/PublicResults';
 import LandingPage from "./components/LandingPage";
-import { getExpectedChainId } from "@/utils/chain";
+import { getChainConfig, getExpectedChainId } from "@/utils/chain";
 
 const AdminPanel = lazy(() => import('./Admin'));
 const Voter = lazy(() => import('./Voter'));
@@ -548,6 +548,38 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
 
   // Display an error message if there's an error during wallet connection or app initialization.
   if (error) {
+    const isWrongNetwork = error.toLowerCase().includes('switch to the configured network');
+    const handleSwitchNetwork = async () => {
+      if (!(window as any)?.ethereum) return;
+      try {
+        await (window as any).ethereum.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: `0x${expectedChainId.toString(16)}` }],
+        });
+        await connectWallet();
+      } catch (switchError: any) {
+        if (switchError?.code === 4902) {
+          const config = getChainConfig(expectedChainId);
+          if (!config) return;
+          try {
+            await (window as any).ethereum.request({
+              method: "wallet_addEthereumChain",
+              params: [config],
+            });
+            await (window as any).ethereum.request({
+              method: "wallet_switchEthereumChain",
+              params: [{ chainId: `0x${expectedChainId.toString(16)}` }],
+            });
+            await connectWallet();
+          } catch (addError) {
+            console.error('Network add/switch failed', addError);
+          }
+        } else {
+          console.error('Network switch failed', switchError);
+        }
+      }
+    };
+
     return (
       <div className="min-h-screen bg-gradient-subtle font-sans">
         <div className="flex items-center justify-center min-h-screen px-4">
@@ -559,13 +591,24 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
             </div>
             <h2 className="text-xl font-semibold text-slate-900 mb-3">Connection Error</h2>
             <p className="text-slate-600 mb-8 text-balance">{error}</p>
-            <button 
-              onClick={() => window.location.reload()}
-              className="btn-primary w-full"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Retry Connection
-            </button>
+            <div className="space-y-3">
+              {isWrongNetwork && (
+                <button
+                  onClick={handleSwitchNetwork}
+                  className="btn-primary w-full"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Switch to Sepolia
+                </button>
+              )}
+              <button 
+                onClick={() => window.location.reload()}
+                className="btn-secondary w-full"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Retry Connection
+              </button>
+            </div>
           </div>
         </div>
       </div>
