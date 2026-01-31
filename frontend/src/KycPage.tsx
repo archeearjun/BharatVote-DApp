@@ -16,10 +16,11 @@ import {
 
 interface KycPageProps {
   account: string;
+  electionAddress?: string;
   onVerified: (voterId: string) => void;
 }
 
-const KycPage: React.FC<KycPageProps> = ({ account, onVerified }) => {
+const KycPage: React.FC<KycPageProps> = ({ account, electionAddress, onVerified }) => {
   const { t } = useI18n();
   const [step, setStep] = useState(0);
   const [activeTab, setActiveTab] = useState(0);
@@ -49,7 +50,15 @@ const KycPage: React.FC<KycPageProps> = ({ account, onVerified }) => {
       console.log('DEBUG KYC: Account:', account);
 
       // Call backend KYC validation
-      const response = await fetch(`${BACKEND_URL}/api/kyc?voter_id=${voterId}`);
+      const kycUrl = new URL(`${BACKEND_URL}/api/kyc`);
+      kycUrl.searchParams.set('voter_id', voterId);
+      if (account) {
+        kycUrl.searchParams.set('address', account);
+      }
+      if (electionAddress) {
+        kycUrl.searchParams.set('electionAddress', electionAddress);
+      }
+      const response = await fetch(kycUrl.toString());
       console.log('DEBUG KYC: Backend response status:', response.status);
       
       if (!response.ok) {
@@ -125,14 +134,7 @@ const KycPage: React.FC<KycPageProps> = ({ account, onVerified }) => {
     }
 
     // For demo purposes, accept these test OTPs based on voter ID
-    const validOtps: Record<string, string> = {
-      'VOTER1': '123456',
-      'VOTER2': '234567', 
-      'VOTER3': '345678',
-      'VOTER4': '456789'
-    };
-
-    const expectedOtp = validOtps[voterId] || '123456'; // Default fallback
+    const expectedOtp = '123456';
     console.log('DEBUG KYC: Voter ID:', voterId);
     console.log('DEBUG KYC: Expected OTP:', expectedOtp);
     console.log('DEBUG KYC: OTP match:', otpString === expectedOtp);
@@ -322,10 +324,7 @@ const KycPage: React.FC<KycPageProps> = ({ account, onVerified }) => {
                   Enter the 6-digit OTP sent to your registered mobile number
                 </p>
                 <div className="text-xs text-slate-500 bg-slate-50 p-2 rounded">
-                  <strong>Demo Mode:</strong> Use OTP <code className="bg-slate-200 px-1 rounded">123456</code> for VOTER1, 
-                  <code className="bg-slate-200 px-1 rounded ml-1">234567</code> for VOTER2, 
-                  <code className="bg-slate-200 px-1 rounded ml-1">345678</code> for VOTER3, 
-                  <code className="bg-slate-200 px-1 rounded ml-1">456789</code> for VOTER4
+                  <strong>Mock Mode:</strong> Use OTP <code className="bg-slate-200 px-1 rounded">123456</code>
                 </div>
               </div>
               

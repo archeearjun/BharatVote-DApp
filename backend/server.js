@@ -777,16 +777,50 @@ console.log('------------------------------------------------');
 // 0. Mock KYC (main elections)
 app.get('/api/kyc', (req, res) => {
   const voterId = sanitizeVoterId(req.query?.voter_id);
+  const electionAddress = req.query?.electionAddress ? String(req.query.electionAddress).trim() : '';
+  const address = req.query?.address ? String(req.query.address).trim() : '';
+
   if (!voterId) {
     return res.status(400).json({ eligible: false, error: 'voter_id is required' });
   }
 
+  if (electionAddress) {
+    if (!ethers.isAddress(electionAddress)) {
+      return res.status(400).json({ eligible: false, error: 'Invalid election address' });
+    }
+    if (!address || !ethers.isAddress(address)) {
+      return res.status(400).json({ eligible: false, error: 'Valid wallet address is required' });
+    }
+
+    // Demo elections skip KYC in the frontend, but guard anyway.
+    if (DEMO_ELECTION_ADDRESS && String(electionAddress).toLowerCase() === String(DEMO_ELECTION_ADDRESS).toLowerCase()) {
+      return res.json({ eligible: true, address: ethers.getAddress(address), voterId });
+    }
+
+    const allowlist = getElectionAllowlist(electionAddress);
+    if (!allowlist || !Array.isArray(allowlist.addresses)) {
+      return res.status(404).json({ eligible: false, error: 'Allowlist not uploaded for this election' });
+    }
+
+    const normalized = ethers.getAddress(address);
+    const isEligible = allowlist.addresses.some(
+      (entry) => String(entry).toLowerCase() === normalized.toLowerCase()
+    );
+
+    if (!isEligible) {
+      return res.json({ eligible: false });
+    }
+
+    return res.json({ eligible: true, address: normalized, voterId });
+  }
+
+  // Fallback to static mock data when no election context is provided.
   const record = kycData.find((r) => String(r?.voterId || '').toUpperCase() === voterId.toUpperCase());
   if (!record) {
     return res.json({ eligible: false });
   }
 
-  return res.json({ eligible: true, address: record.address });
+  return res.json({ eligible: true, address: record.address, voterId });
 });
 
 // 1. Get Root (Frontend checks this against contract)

@@ -759,6 +759,7 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
     return (
       <KycPage
         account={account}
+        electionAddress={electionAddress}
         onVerified={(voterId: string) => {
           console.log('DEBUG: KYC verification completed for voterId:', voterId);
           setIsKycVerified(true);
