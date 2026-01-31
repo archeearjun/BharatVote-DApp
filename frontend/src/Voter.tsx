@@ -24,6 +24,7 @@ interface VoterProps {
   account: string;
   voterId: string;
   isDemoElection?: boolean;
+  electionAddress?: string;
   onRevealSuccess: () => void;
   candidates?: any[];
   onCommitSuccess?: () => void;
@@ -36,6 +37,7 @@ const Voter: React.FC<VoterProps> = ({
   account,
   voterId,
   isDemoElection,
+  electionAddress,
   onRevealSuccess,
   candidates = [],
   onCommitSuccess,
@@ -100,7 +102,11 @@ const Voter: React.FC<VoterProps> = ({
             body: JSON.stringify({ address: account }),
           });
         }
-        const resp = await fetch(`${BACKEND_URL}/api/merkle-proof/${encodeURIComponent(account)}`);
+        const proofUrl = new URL(`${BACKEND_URL}/api/merkle-proof/${encodeURIComponent(account)}`);
+        if (electionAddress) {
+          proofUrl.searchParams.set('electionAddress', electionAddress);
+        }
+        const resp = await fetch(proofUrl.toString());
         if (resp.ok) {
           setIsEligible(true);
         } else {
@@ -114,7 +120,7 @@ const Voter: React.FC<VoterProps> = ({
 
     checkEligibility();
     checkVoteStatus();
-  }, [contract, account]);
+  }, [contract, account, electionAddress, isDemoElection]);
 
   const checkVoteStatus = async () => {
     if (!contract || !account) {
@@ -229,7 +235,11 @@ const Voter: React.FC<VoterProps> = ({
 
       // Fetch Merkle proof from backend using verified voterId
       console.log('DEBUG handleCommitVote: Fetching Merkle proof from backend...');
-      let resp = await fetch(`${BACKEND_URL}/api/merkle-proof/${encodeURIComponent(account)}`);
+      const proofUrl = new URL(`${BACKEND_URL}/api/merkle-proof/${encodeURIComponent(account)}`);
+      if (electionAddress) {
+        proofUrl.searchParams.set('electionAddress', electionAddress);
+      }
+      let resp = await fetch(proofUrl.toString());
       // If this is demo mode and the voter wasn't eligible yet, retry once after a join call.
       if (isDemoElection && !resp.ok) {
         try {
@@ -238,7 +248,7 @@ const Voter: React.FC<VoterProps> = ({
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ address: account }),
           });
-          resp = await fetch(`${BACKEND_URL}/api/merkle-proof/${encodeURIComponent(account)}`);
+          resp = await fetch(proofUrl.toString());
         } catch {}
       }
       if (!resp.ok) {
@@ -402,7 +412,13 @@ const Voter: React.FC<VoterProps> = ({
   };
   
   // Make the action buttons clickable as soon as inputs are present; we surface errors if prerequisites are missing
-  const canCommit = selectedCandidateId !== null && !!salt.trim() && !isCommitting && !hasVoted && phase === 0;
+  const canCommit =
+    selectedCandidateId !== null &&
+    !!salt.trim() &&
+    !isCommitting &&
+    !hasVoted &&
+    phase === 0 &&
+    (isDemoElection || isEligible);
   const canReveal = selectedCandidateId !== null && !!salt.trim() && !isRevealing && hasVoted && !hasRevealed && phase === 1;
 
   const commitDisabledReason = (() => {
@@ -411,6 +427,7 @@ const Voter: React.FC<VoterProps> = ({
     if (hasVoted) return 'You have already committed a vote';
     if (!salt.trim()) return 'Enter a password/salt to secure your vote';
     if (selectedCandidateId === null) return 'Select a candidate to commit';
+    if (!isDemoElection && !isEligible) return 'You are not in the eligible voter list';
     return null;
   })();
 

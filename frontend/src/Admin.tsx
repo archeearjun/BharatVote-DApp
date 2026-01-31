@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { ethers } from "ethers";
 import { PHASE_LABELS, ERROR_MESSAGES, COMMIT_PHASE, REVEAL_PHASE, FINISH_PHASE, CANDIDATE_MESSAGES, SUCCESS_MESSAGES, BACKEND_URL } from "./constants";
 import { useI18n } from './i18n';
@@ -27,6 +27,9 @@ interface AdminProps {
   phase: number;
   backendMerkleRoot?: string | null;
   contractMerkleRoot?: string | null;
+  electionAddress?: string;
+  isDemoElection?: boolean;
+  onAllowlistUpdated?: (info: { count: number; merkleRoot: string }) => void;
   onError?: (error: string) => void;
   onPhaseChange?: () => void;
 }
@@ -51,9 +54,25 @@ const initialState: AdminState = {
   merkleLoading: false,
 };
 
-export default function Admin({ contract, phase, backendMerkleRoot, contractMerkleRoot, onError, onPhaseChange }: AdminProps) {
+export default function Admin({
+  contract,
+  phase,
+  backendMerkleRoot,
+  contractMerkleRoot,
+  electionAddress,
+  isDemoElection,
+  onAllowlistUpdated,
+  onError,
+  onPhaseChange,
+}: AdminProps) {
   const [state, setState] = useState<AdminState>(initialState);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [allowlistInput, setAllowlistInput] = useState('');
+  const [allowlistCount, setAllowlistCount] = useState<number | null>(null);
+  const [allowlistRoot, setAllowlistRoot] = useState<string | null>(null);
+  const [allowlistLoading, setAllowlistLoading] = useState(false);
+  const [allowlistError, setAllowlistError] = useState<string | null>(null);
+  const [allowlistSuccess, setAllowlistSuccess] = useState<string | null>(null);
   const { t } = useI18n();
   const rootsAligned =
     Boolean(contract) &&
@@ -483,10 +502,53 @@ export default function Admin({ contract, phase, backendMerkleRoot, contractMerk
 
   const PhaseIcon = getPhaseIcon(phase);
 
+  const parseAllowlistAddresses = useCallback((raw: string): string[] => {
+    if (!raw) return [];
+    let list: string[] = [];
+    try {
+      const maybeJson = JSON.parse(raw);
+      if (Array.isArray(maybeJson)) {
+        list = maybeJson.map((entry) => String(entry));
+      } else if (Array.isArray(maybeJson?.addresses)) {
+        list = maybeJson.addresses.map((entry: any) => String(entry));
+      }
+    } catch {
+      list = raw.split(/[\s,;]+/).map((entry) => entry.trim()).filter(Boolean);
+    }
+    const normalized = list
+      .filter((addr) => ethers.isAddress(addr))
+      .map((addr) => ethers.getAddress(addr));
+    return Array.from(new Set(normalized));
+  }, []);
+
+  const allowlistPreview = useMemo(() => parseAllowlistAddresses(allowlistInput), [allowlistInput, parseAllowlistAddresses]);
+
+  const fetchAllowlistSummary = useCallback(async () => {
+    if (!electionAddress || !ethers.isAddress(electionAddress)) return;
+    try {
+      const resp = await fetch(`${BACKEND_URL}/api/admin/voter-list/${encodeURIComponent(electionAddress)}`);
+      if (!resp.ok) return;
+      const data = await resp.json();
+      if (typeof data?.count === 'number') setAllowlistCount(data.count);
+      if (data?.merkleRoot) setAllowlistRoot(data.merkleRoot);
+    } catch (err) {
+      console.warn('Failed to fetch allowlist summary', err);
+    }
+  }, [electionAddress]);
+
+  useEffect(() => {
+    if (isDemoElection) return;
+    fetchAllowlistSummary();
+  }, [fetchAllowlistSummary, isDemoElection]);
+
   const fetchMerkleRoot = useCallback(async () => {
     setState(prev => ({ ...prev, merkleLoading: true, error: null, success: null }));
     try {
-      const resp = await fetch(`${BACKEND_URL}/api/merkle-root`);
+      const url = new URL(`${BACKEND_URL}/api/merkle-root`);
+      if (electionAddress) {
+        url.searchParams.set('electionAddress', electionAddress);
+      }
+      const resp = await fetch(url.toString());
       if (!resp.ok) {
         throw new Error(`Backend returned ${resp.status}`);
       }
@@ -535,6 +597,58 @@ export default function Admin({ contract, phase, backendMerkleRoot, contractMerk
       onError?.(message);
     }
   }, [contract, fetchMerkleRoot, onError, extractErrorMessage]);
+
+  const handleAllowlistUpload = useCallback(async () => {
+    if (!electionAddress || !ethers.isAddress(electionAddress)) {
+      setAllowlistError('No valid election address found.');
+      return;
+    }
+    if (isDemoElection) {
+      setAllowlistError('Demo election uses open enrollment. No allowlist needed.');
+      return;
+    }
+
+    const parsed = parseAllowlistAddresses(allowlistInput);
+    if (!parsed.length) {
+      setAllowlistError('Paste a list of valid wallet addresses first.');
+      return;
+    }
+
+    setAllowlistLoading(true);
+    setAllowlistError(null);
+    setAllowlistSuccess(null);
+    try {
+      const resp = await fetch(`${BACKEND_URL}/api/admin/voter-list`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ electionAddress, addresses: parsed }),
+      });
+      if (!resp.ok) {
+        const message = await resp.text();
+        throw new Error(message || `Upload failed (${resp.status})`);
+      }
+      const data = await resp.json();
+      setAllowlistCount(data?.count ?? parsed.length);
+      setAllowlistRoot(data?.merkleRoot || null);
+      setAllowlistSuccess(`Uploaded ${data?.count ?? parsed.length} eligible voters.`);
+      onAllowlistUpdated?.({ count: data?.count ?? parsed.length, merkleRoot: data?.merkleRoot });
+      await fetchAllowlistSummary();
+    } catch (err: any) {
+      setAllowlistError(err?.message || 'Failed to upload allowlist');
+    } finally {
+      setAllowlistLoading(false);
+    }
+  }, [allowlistInput, electionAddress, fetchAllowlistSummary, isDemoElection, onAllowlistUpdated, parseAllowlistAddresses]);
+
+  const handleAllowlistFile = async (file: File | null) => {
+    if (!file) return;
+    try {
+      const text = await file.text();
+      setAllowlistInput(text);
+    } catch (err) {
+      console.warn('Failed to read allowlist file', err);
+    }
+  };
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -622,6 +736,73 @@ export default function Admin({ contract, phase, backendMerkleRoot, contractMerk
         <div className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-success-50 border border-success-200 text-success-800 w-fit">
           <CheckCircle className="w-4 h-4 text-success-600" />
           <span className="text-sm font-medium">Voter list synced</span>
+        </div>
+      )}
+
+      {!isDemoElection && (
+        <div className="card-premium p-6">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center">
+              <Users className="w-5 h-5 text-slate-700" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">Eligible Voters</h2>
+              <p className="text-sm text-slate-600">Upload wallet addresses allowed to vote in this election.</p>
+            </div>
+          </div>
+
+          {allowlistError && (
+            <div className="mb-4 p-3 rounded-xl border border-error-200 bg-error-50 text-sm text-error-700">
+              {allowlistError}
+            </div>
+          )}
+          {allowlistSuccess && (
+            <div className="mb-4 p-3 rounded-xl border border-success-200 bg-success-50 text-sm text-success-700">
+              {allowlistSuccess}
+            </div>
+          )}
+
+          <div className="grid gap-6 lg:grid-cols-3">
+            <div className="lg:col-span-2 space-y-3">
+              <textarea
+                value={allowlistInput}
+                onChange={(e) => setAllowlistInput(e.target.value)}
+                className="input-base min-h-[180px]"
+                placeholder="Paste wallet addresses here (one per line or comma-separated)."
+              />
+              <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                <span>Preview: {allowlistPreview.length} valid address{allowlistPreview.length === 1 ? '' : 'es'}</span>
+                <label className="inline-flex items-center gap-2 cursor-pointer text-slate-600 hover:text-slate-800">
+                  <input
+                    type="file"
+                    accept=".txt,.csv,.json"
+                    className="hidden"
+                    onChange={(e) => handleAllowlistFile(e.target.files?.[0] || null)}
+                  />
+                  Upload file
+                </label>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50">
+                <p className="text-xs uppercase tracking-wide text-slate-500 mb-1">Current count</p>
+                <p className="text-lg font-semibold text-slate-900">{allowlistCount ?? '—'}</p>
+              </div>
+              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50">
+                <p className="text-xs uppercase tracking-wide text-slate-500 mb-1">Backend Merkle Root</p>
+                <p className="text-xs text-slate-700 break-all">{allowlistRoot || backendMerkleRoot || '—'}</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleAllowlistUpload}
+                disabled={allowlistLoading || allowlistPreview.length === 0}
+                className="btn-primary w-full"
+              >
+                {allowlistLoading ? <div className="spinner" /> : 'Upload Eligible Voters'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

@@ -52,6 +52,7 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
   // Merkle roots: backend and contract for readiness alignment
   const [backendMerkleRoot, setBackendMerkleRoot] = useState<string | null>(null);
   const [contractMerkleRoot, setContractMerkleRoot] = useState<string | null>(null);
+  const [backendAllowlistCount, setBackendAllowlistCount] = useState<number | null>(null);
   // State to force a refresh of the tally component
   const [tallyRefreshKey, setTallyRefreshKey] = useState<number>(0);
   const [candidates, setCandidates] = useState<any[]>([]);
@@ -68,7 +69,7 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
     return String(demoElectionAddress).toLowerCase() === String(electionAddress).toLowerCase();
   }, [demoElectionAddress, electionAddress]);
   const totalEligibleVoters = (eligibleVoters as string[])?.length || 0;
-  const eligibleCountForTally = isDemoElection ? undefined : totalEligibleVoters;
+  const eligibleCountForTally = isDemoElection ? undefined : backendAllowlistCount ?? totalEligibleVoters;
   const expectedChainId = getExpectedChainId();
 
   // Demo convenience: bypass KYC gate for demo election even if user deep-links to /election/:address.
@@ -207,7 +208,11 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
   useEffect(() => {
     const fetchBackendRoot = async () => {
       try {
-        const resp = await fetch(`${import.meta.env.VITE_BACKEND_URL || BACKEND_URL}/api/merkle-root`);
+        setBackendMerkleRoot(null);
+        const base = import.meta.env.VITE_BACKEND_URL || BACKEND_URL;
+        const url = new URL(`${base}/api/merkle-root`);
+        url.searchParams.set('electionAddress', electionAddress);
+        const resp = await fetch(url.toString());
         if (!resp.ok) return;
         const data = await resp.json();
         if (data?.merkleRoot) {
@@ -218,7 +223,29 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
       }
     };
     fetchBackendRoot();
-  }, []);
+  }, [electionAddress]);
+
+  useEffect(() => {
+    if (isDemoElection) {
+      setBackendAllowlistCount(null);
+      return;
+    }
+    const fetchAllowlistSummary = async () => {
+      try {
+        setBackendAllowlistCount(null);
+        const base = import.meta.env.VITE_BACKEND_URL || BACKEND_URL;
+        const resp = await fetch(`${base}/api/admin/voter-list/${encodeURIComponent(electionAddress)}`);
+        if (!resp.ok) return;
+        const data = await resp.json();
+        if (typeof data?.count === 'number') {
+          setBackendAllowlistCount(data.count);
+        }
+      } catch (err) {
+        console.warn('DEBUG: Failed to fetch allowlist summary', err);
+      }
+    };
+    fetchAllowlistSummary();
+  }, [electionAddress, isDemoElection]);
 
   // Fetch contract merkle root when contract is ready
   useEffect(() => {
@@ -757,6 +784,16 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
                  phase={phase}
                  backendMerkleRoot={backendMerkleRoot}
                  contractMerkleRoot={contractMerkleRoot}
+                 electionAddress={electionAddress}
+                 isDemoElection={isDemoElection}
+                 onAllowlistUpdated={(info) => {
+                   if (typeof info?.count === 'number') {
+                     setBackendAllowlistCount(info.count);
+                   }
+                   if (info?.merkleRoot) {
+                     setBackendMerkleRoot(info.merkleRoot);
+                   }
+                 }}
                   onError={(error: string) => setToast({ type: 'error', message: error })}
                   onPhaseChange={() => {
                     contract.phase().then((p: any) => setPhase(Number(p)));
@@ -812,17 +849,18 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
                 </div>
               </div>
             }>
-              <Voter 
-                contract={contract} 
-                phase={phase} 
-                setPhase={setPhase} 
-                account={account as string}
-                voterId={(verifiedVoterId || account) as string} 
-                isDemoElection={isDemoElection}
-                onRevealSuccess={() => {
-                  setHasUserRevealed(true);
-                  setTallyRefreshKey(prev => prev + 1);
-                }} 
+                <Voter 
+                  contract={contract} 
+                  phase={phase} 
+                  setPhase={setPhase} 
+                  account={account as string}
+                  voterId={(verifiedVoterId || account) as string} 
+                  isDemoElection={isDemoElection}
+                  electionAddress={electionAddress}
+                  onRevealSuccess={() => {
+                    setHasUserRevealed(true);
+                    setTallyRefreshKey(prev => prev + 1);
+                  }} 
                 onCommitSuccess={() => setHasUserCommitted(true)}
                 onStatusChange={({ committed, revealed }) => {
                   setHasUserCommitted(committed);

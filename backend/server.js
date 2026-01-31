@@ -336,6 +336,84 @@ const rebuildTree = () => {
 
 rebuildTree();
 
+// --- 2.1 Admin-managed allowlists (per election) ---
+const VOTER_LISTS_PATH = path.join(__dirname, 'voter-lists.json');
+const electionAllowlists = {};
+const electionTrees = new Map();
+
+const normalizeAddressList = (raw) => {
+  let list = [];
+  if (Array.isArray(raw)) {
+    list = raw.map((x) => String(x));
+  } else if (typeof raw === 'string') {
+    list = raw
+      .split(/[\s,;]+/)
+      .map((x) => x.trim())
+      .filter(Boolean);
+  }
+  const normalized = list
+    .filter((a) => ethers.isAddress(a))
+    .map((a) => ethers.getAddress(a));
+  return Array.from(new Set(normalized));
+};
+
+const buildElectionTree = (addresses) => {
+  const leaves = addresses.map((addr) => keccak256Hasher(addr));
+  const t = new MerkleTree(leaves, keccak256Hasher, { sortLeaves: true, sortPairs: true });
+  const root = '0x' + t.getRoot().toString('hex');
+  return { tree: t, merkleRoot: root };
+};
+
+const saveElectionAllowlists = () => {
+  try {
+    fs.writeFileSync(VOTER_LISTS_PATH, JSON.stringify(electionAllowlists, null, 2));
+  } catch (e) {
+    console.warn('Failed to persist voter list file', e?.message || e);
+  }
+};
+
+const loadElectionAllowlists = () => {
+  try {
+    if (!fs.existsSync(VOTER_LISTS_PATH)) return;
+    const raw = fs.readFileSync(VOTER_LISTS_PATH, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return;
+    Object.assign(electionAllowlists, parsed);
+    Object.entries(electionAllowlists).forEach(([key, value]) => {
+      const addresses = normalizeAddressList(value?.addresses || []);
+      const { tree: t, merkleRoot: root } = buildElectionTree(addresses);
+      electionTrees.set(key, t);
+      electionAllowlists[key] = { addresses, merkleRoot: root };
+    });
+  } catch (e) {
+    console.warn('Failed to load voter list file', e?.message || e);
+  }
+};
+
+const setElectionAllowlist = (electionAddress, addresses) => {
+  const key = String(electionAddress).toLowerCase();
+  const normalized = normalizeAddressList(addresses);
+  const { tree: t, merkleRoot: root } = buildElectionTree(normalized);
+  electionAllowlists[key] = { addresses: normalized, merkleRoot: root };
+  electionTrees.set(key, t);
+  saveElectionAllowlists();
+  return { count: normalized.length, merkleRoot: root };
+};
+
+const getElectionAllowlist = (electionAddress) => {
+  if (!electionAddress) return null;
+  const key = String(electionAddress).toLowerCase();
+  return electionAllowlists[key] || null;
+};
+
+const getElectionTree = (electionAddress) => {
+  if (!electionAddress) return null;
+  const key = String(electionAddress).toLowerCase();
+  return electionTrees.get(key) || null;
+};
+
+loadElectionAllowlists();
+
 const DEMO_ELECTION_ABI = [
   // Custom errors (helps decode/label revert reasons in automation logs)
   'error NotAdmin()',
@@ -712,31 +790,120 @@ app.get('/api/kyc', (req, res) => {
 });
 
 // 1. Get Root (Frontend checks this against contract)
-app.get('/api/merkle-root', (_req, res) => {
-  // Return both keys for backward compatibility with older frontend code.
+app.get('/api/merkle-root', (req, res) => {
+  const electionAddress = req.query?.electionAddress ? String(req.query.electionAddress).trim() : '';
+  if (electionAddress) {
+    if (!ethers.isAddress(electionAddress)) {
+      return res.status(400).json({ error: 'Invalid election address' });
+    }
+
+    if (DEMO_ELECTION_ADDRESS && String(electionAddress).toLowerCase() === String(DEMO_ELECTION_ADDRESS).toLowerCase()) {
+      return res.json({ root: merkleRoot, merkleRoot, electionAddress: ethers.getAddress(electionAddress) });
+    }
+
+    const allowlist = getElectionAllowlist(electionAddress);
+    if (!allowlist?.merkleRoot) {
+      return res.status(404).json({ error: 'No allowlist uploaded for this election' });
+    }
+
+    return res.json({
+      root: allowlist.merkleRoot,
+      merkleRoot: allowlist.merkleRoot,
+      electionAddress: ethers.getAddress(electionAddress),
+      count: allowlist.addresses?.length || 0,
+    });
+  }
+
+  // Backward-compatible demo root fallback.
   res.json({ root: merkleRoot, merkleRoot });
 });
 
 // 2. Get Proof (Voter needs this to Commit)
 app.get('/api/merkle-proof/:address', (req, res) => {
   const address = String(req.params.address || '').trim();
-  if (!ethers.isAddress(address) || !tree) {
+  if (!ethers.isAddress(address)) {
     return res.status(400).json({ error: 'Invalid address' });
+  }
+
+  const electionAddress = req.query?.electionAddress ? String(req.query.electionAddress).trim() : '';
+  let activeTree = tree;
+  let isDemoTarget = true;
+
+  if (electionAddress) {
+    if (!ethers.isAddress(electionAddress)) {
+      return res.status(400).json({ error: 'Invalid election address' });
+    }
+    if (DEMO_ELECTION_ADDRESS && String(electionAddress).toLowerCase() === String(DEMO_ELECTION_ADDRESS).toLowerCase()) {
+      activeTree = tree;
+      isDemoTarget = true;
+    } else {
+      activeTree = getElectionTree(electionAddress);
+      isDemoTarget = false;
+      if (!activeTree) {
+        return res.status(404).json({ error: 'No allowlist uploaded for this election' });
+      }
+    }
+  }
+
+  if (!activeTree) {
+    return res.status(400).json({ error: 'Merkle tree not configured' });
   }
 
   const normalized = ethers.getAddress(address);
 
   // Keep the public demo usable: if the backend allowlist changed, ensure the demo contract merkleRoot is synced.
-  // This is a no-op when demo is not configured or when the root is already up to date.
-  syncDemoElectionMerkleRootIfConfigured({ onlyIfChanged: true }).catch(() => {});
+  if (isDemoTarget) {
+    syncDemoElectionMerkleRootIfConfigured({ onlyIfChanged: true }).catch(() => {});
+  }
 
   const leaf = keccak256Hasher(normalized);
-  const proofElements = tree.getProof(leaf);
-  const ok = tree.verify(proofElements, leaf, tree.getRoot());
+  const proofElements = activeTree.getProof(leaf);
+  const ok = activeTree.verify(proofElements, leaf, activeTree.getRoot());
   if (!ok) return res.status(404).json({ error: 'Not eligible' });
 
   const proof = proofElements.map((x) => '0x' + x.data.toString('hex'));
   return res.json({ proof });
+});
+
+// 2.2 Admin allowlist upload (main elections)
+app.post('/api/admin/voter-list', (req, res) => {
+  const electionAddress = String(req.body?.electionAddress || '').trim();
+  if (!electionAddress || !ethers.isAddress(electionAddress)) {
+    return res.status(400).json({ error: 'Valid electionAddress is required' });
+  }
+
+  if (DEMO_ELECTION_ADDRESS && String(electionAddress).toLowerCase() === String(DEMO_ELECTION_ADDRESS).toLowerCase()) {
+    return res.status(400).json({ error: 'Demo election allowlist is managed automatically' });
+  }
+
+  const addresses = req.body?.addresses;
+  const { count, merkleRoot: root } = setElectionAllowlist(electionAddress, addresses || []);
+
+  return res.json({
+    success: true,
+    electionAddress: ethers.getAddress(electionAddress),
+    count,
+    merkleRoot: root,
+  });
+});
+
+// 2.3 Admin allowlist summary
+app.get('/api/admin/voter-list/:electionAddress', (req, res) => {
+  const electionAddress = String(req.params?.electionAddress || '').trim();
+  if (!electionAddress || !ethers.isAddress(electionAddress)) {
+    return res.status(400).json({ error: 'Valid electionAddress is required' });
+  }
+
+  const allowlist = getElectionAllowlist(electionAddress);
+  if (!allowlist) {
+    return res.status(404).json({ error: 'No allowlist uploaded for this election' });
+  }
+
+  return res.json({
+    electionAddress: ethers.getAddress(electionAddress),
+    count: allowlist.addresses?.length || 0,
+    merkleRoot: allowlist.merkleRoot,
+  });
 });
 
 // 2.5 Demo status (timer + current phase). Safe for public access.
