@@ -17,6 +17,7 @@ app.use(express.json());
 const PORT = process.env.PORT || 3000;
 const PRIVATE_KEY = process.env.PRIVATE_KEY; // Admin Private Key
 const RPC_URL = process.env.VITE_SEPOLIA_RPC_URL || process.env.RPC_URL; // Alchemy/Infura URL
+const DEMO_ANALYTICS_RPC_URL = process.env.DEMO_ANALYTICS_RPC_URL || '';
 const DEMO_ELECTION_ADDRESS =
   process.env.VITE_DEMO_ELECTION_ADDRESS ||
   process.env.DEMO_ELECTION_ADDRESS ||
@@ -128,6 +129,9 @@ const eligibleVoters = Array.from(
 
 // --- 2. SETUP BLOCKCHAIN CONNECTION ---
 const provider = RPC_URL ? new ethers.JsonRpcProvider(RPC_URL) : null;
+const analyticsProvider = DEMO_ANALYTICS_RPC_URL
+  ? new ethers.JsonRpcProvider(DEMO_ANALYTICS_RPC_URL)
+  : provider;
 const adminWallet = provider && NORMALIZED_PRIVATE_KEY ? new ethers.Wallet(NORMALIZED_PRIVATE_KEY, provider) : null;
 
 const TOPIC_VOTE_COMMITTED_V1 = ethers.id('VoteCommitted(address,bytes32)');
@@ -251,10 +255,10 @@ const parseLogRangeLimitFromError = (err) => {
 
 const scanDemoAnalyticsOnce = async () => {
   if (!DEMO_ANALYTICS_ENABLED) return;
-  if (!provider) return;
+  if (!analyticsProvider) return;
   if (!DEMO_ELECTION_ADDRESS || !ethers.isAddress(DEMO_ELECTION_ADDRESS)) return;
 
-  const latest = await provider.getBlockNumber();
+  const latest = await analyticsProvider.getBlockNumber();
   let fromBlock =
     typeof demoAnalytics.lastProcessedBlock === 'number'
       ? demoAnalytics.lastProcessedBlock + 1
@@ -268,7 +272,7 @@ const scanDemoAnalyticsOnce = async () => {
     const toBlock = Math.min(latest, fromBlock + Math.max(0, batchSize - 1));
     let logs = [];
     try {
-      logs = await provider.getLogs({
+      logs = await analyticsProvider.getLogs({
         address: DEMO_ELECTION_ADDRESS,
         fromBlock,
         toBlock,
@@ -774,7 +778,7 @@ app.get('/api/demo/analytics', async (_req, res) => {
   return res.json({
     ...demoAnalytics,
     source: 'backend',
-    latestKnownBlock: provider ? await provider.getBlockNumber() : null,
+    latestKnownBlock: analyticsProvider ? await analyticsProvider.getBlockNumber() : null,
   });
 });
 
