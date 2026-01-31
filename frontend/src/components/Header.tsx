@@ -125,19 +125,16 @@ const Header: React.FC<HeaderProps> = ({
             <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center shadow-sm">
               <Shield className="w-5 h-5 text-white" />
             </div>
-            <div className="hidden sm:block">
-              <h1 className="text-lg font-semibold text-slate-900 tracking-tight">
-                <span>{t('app.title')}</span>
-                {electionName && (
-                  <span
-                    className="ml-2 text-slate-500 font-medium truncate max-w-[28ch] inline-block align-bottom"
-                    title={electionName}
-                  >
-                    · {electionName}
-                  </span>
-                )}
+            <div className="hidden sm:block min-w-0">
+              <h1 className="text-lg font-semibold text-slate-900 tracking-tight leading-tight truncate">
+                {t('app.title')}
               </h1>
-              <p className="text-xs text-slate-500">
+              {electionName && (
+                <p className="text-sm text-slate-500 truncate max-w-[32ch]" title={electionName}>
+                  · {electionName}
+                </p>
+              )}
+              <p className="text-xs text-slate-500 leading-tight">
                 {t('app.subtitle')}
               </p>
             </div>
