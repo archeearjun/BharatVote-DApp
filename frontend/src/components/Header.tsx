@@ -137,9 +137,9 @@ const Header: React.FC<HeaderProps> = ({
                   </span>
                 )}
               </h1>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-slate-500 truncate max-w-[28ch]">
                 {t('app.subtitle')}
-                {isDemoElection && <span className="ml-2 text-slate-400">· Open demo (no KYC)</span>}
+                {isDemoElection && <span className="hidden lg:inline text-slate-400"> · Open demo (no KYC)</span>}
               </p>
             </div>
             <div className="sm:hidden">
