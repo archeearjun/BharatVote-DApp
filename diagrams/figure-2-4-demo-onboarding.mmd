@@ -1,0 +1,9 @@
+flowchart TD
+  U[User Wallet] --> FE[Frontend]
+  FE -->|POST /api/join {address}| BE[Backend]
+  BE --> AL[Allowlist Store]
+  BE --> MERK[Rebuild Merkle Tree]
+  MERK -->|new root| BE
+  BE -->|setMerkleRoot(newRoot)| DEMO[Demo Election Contract]
+  BE -->|optional gas top-up| U
+  BE --> FE

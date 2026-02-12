@@ -1,0 +1,15 @@
+flowchart LR
+  U[User Browser (Admin/Voter)] --> FE[Frontend DApp (Vite/React)]
+  FE --> MM[MetaMask Wallet]
+  FE --> BE[Backend API (Express)]
+  FE --> RPC[Sepolia RPC Provider]
+  MM --> RPC
+  BE --> RPC
+  RPC --> FACT[ElectionFactory Contract]
+  RPC --> ELEC[Election Contract(s)]
+  BE --> KYC[Allowlist + KYC Data (eligibleVoters.json, kyc-data.json)]
+  BE --> MERK[Merkle Tree Builder]
+  BE --> ANA[Demo Analytics Store (Upstash or file)]
+  BE --> SIGNER[Backend Admin Signer (Wallet)]
+  SIGNER --> RPC
+  BE --> IPFS[IPFS/Pinata (Optional)]

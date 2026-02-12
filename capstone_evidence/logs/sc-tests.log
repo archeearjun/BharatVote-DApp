@@ -1,0 +1,46 @@
+
+> bharatvote@1.0.0 test:contracts
+> npx hardhat test
+
+[dotenv@17.2.3] injecting env (3) from .env -- tip: 🔐 prevent committing .env to code: https://dotenvx.com/precommit
+
+
+  BharatVote
+    Deployment
+      √ should set the correct admin (114ms)
+      √ should start in commit phase
+      √ should have zero candidates initially
+    Candidate Management
+      √ allows admin to add candidate and emits event
+      √ blocks non-admin from adding candidate (48ms)
+      √ allows admin to deactivate candidate
+      √ blocks adding candidate with empty name
+    Phase Management
+      √ allows admin to advance to reveal phase
+      √ allows admin to advance to finish phase
+      √ blocks non-admin from advancing phase
+      √ blocks phase advancement in wrong order
+    Voting Process
+      √ allows eligible voter to commit vote
+      √ blocks ineligible voter from committing
+      √ blocks double voting
+      √ blocks committing empty hash
+      √ allows vote revealing in reveal phase
+      √ blocks revealing with wrong salt
+      √ blocks revealing in wrong phase
+      √ blocks revealing without commit
+    Vote Tallying
+      √ correctly tallies votes
+      √ returns correct tally array
+    Voter Status Tracking
+      √ tracks voter commit and reveal status
+    Gas Usage
+Commit vote gas used: 120884
+      √ should use reasonable gas for voting operations
+    Election Reset
+      √ allows admin to reset election after completion
+      √ blocks reset before election is finished
+
+
+  25 passing (6s)
+

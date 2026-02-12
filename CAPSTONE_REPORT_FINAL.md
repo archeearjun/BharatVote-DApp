@@ -1,142 +1,146 @@
 # BharatVote – Capstone Project Report (Final Product)
 
-> Replace all fields in **[square brackets]** before exporting to PDF.  
-> Formatting (Word/Docs): Times New Roman, 12 body, 14 headings, 1.5 spacing, 1-inch margins, page numbers bottom-center.
+> Replace all fields in **[square brackets]** before exporting to PDF.
+> Formatting: Times New Roman, 12 body, 14 headings, 1.5 spacing, 1-inch margins, page numbers bottom-center.
 
 ---
 
-## COVER PAGE
+# COVER PAGE
 
-**Project Title:** BharatVote – Decentralized Digital Voting Platform (Commit–Reveal + Merkle Eligibility)  
-**Student Name(s) & Roll Number(s):** [Name 1 – Roll No], [Name 2 – Roll No]  
-**Program:** BSc Computer Science (Online Mode)  
-**Institution Name:** [Institution Name]  
-**Academic Year:** [YYYY–YYYY]  
+**Project Title:** BharatVote – Decentralized Digital Voting Platform (Commit–Reveal + Merkle Eligibility)
+**Student Name(s) & Roll Number(s):** [Name 1 – Roll No], [Name 2 – Roll No]
+**Program:** BSc Computer Science (Online Mode)
+**Institution Name:** [Institution Name]
+**Academic Year:** [YYYY–YYYY]
 **Internal Supervisor Name:** [Supervisor Name]
 
 ---
 
-## DECLARATION
+# DECLARATION
 
 I hereby declare that this capstone project titled **“BharatVote – Decentralized Digital Voting Platform (Commit–Reveal + Merkle Eligibility)”** is an original work carried out by me/us and has not been submitted to any other university or institution for the award of any degree.
 
-**Student Signature(s):** ____________________  
+**Student Signature(s):** ____________________
 **Date:** ____________________
 
 ---
 
-## ABSTRACT (200–300 words)
+# ABSTRACT (200–300 words)
 
-BharatVote is a decentralized digital voting platform built as a web-based DApp to demonstrate secure, verifiable elections using blockchain and applied cryptography. The project addresses key issues found in traditional electronic voting systems such as centralized trust, weak auditability, and the risk of vote tampering, while also preserving voter privacy during the voting period. BharatVote implements an on-chain election lifecycle and vote counting using Ethereum smart contracts, with a commit–reveal voting scheme to keep votes hidden during the Commit phase and verifiable during the Reveal phase.  
+BharatVote is a decentralized digital voting platform built as a web-based DApp to demonstrate secure, verifiable elections using blockchain and applied cryptography. The project addresses key issues found in traditional electronic voting systems such as centralized trust, weak auditability, and the risk of vote tampering, while also preserving voter privacy during the voting period. BharatVote implements an on-chain election lifecycle and vote counting using Ethereum smart contracts, with a commit–reveal voting scheme to keep votes hidden during the Commit phase and verifiable during the Reveal phase.
 
-Voter eligibility is enforced using Merkle proof verification: eligible wallet addresses are hashed into a Merkle tree off-chain and the Merkle root is stored on-chain, enabling trustless eligibility checks with minimal on-chain storage. The application provides an Admin interface for creating elections and managing candidates/phases, and a Voter interface for committing and later revealing votes using the same secret salt. A results module displays live and final tallies; for the public demo deployment it also supports “all-time” participation analytics by scanning on-chain events through a public RPC endpoint.  
+Voter eligibility is enforced using Merkle proof verification: eligible wallet addresses are hashed into a Merkle tree off-chain and the Merkle root is stored on-chain, enabling trustless eligibility checks with minimal on-chain storage. The application provides an Admin interface for creating elections, uploading eligible voter lists, and managing candidates/phases, and a Voter interface for committing and later revealing votes using the same secret salt. For main elections, voters must pass a mock KYC flow (OTP = 123456 and camera verification) before they can vote. To discourage strategic voting, public tallies for main elections are shown only after a voter reveals or when the election finishes.
 
-The final product is deployed as a cloud demo on **Sepolia (testnet)** using an **Alchemy RPC** connection, with the **frontend hosted on Vercel** and the **backend hosted on Render**. The system includes a dedicated “Demo Election” contract and a backend-assisted onboarding flow (`/api/join`) that can (a) add new demo participants into the Merkle allowlist, (b) synchronize the updated Merkle root on-chain, and (c) optionally provide testnet gas funding for smooth demonstrations. Automated testing validates contract rules, backend behavior, and key UI components. Overall, BharatVote delivers a working end-to-end blockchain voting demo that is reproducible locally and accessible publicly via testnet deployments.
+The final product is deployed as a cloud demo on **Sepolia (testnet)** using a **public RPC provider** (Alchemy/Ankr) for on-chain reads and analytics. The **frontend is hosted on Vercel** and the **backend is hosted on Render**. A dedicated “Demo Election” contract supports a backend-assisted onboarding flow (`/api/join`) that can (a) add new demo participants into the Merkle allowlist, (b) synchronize the updated Merkle root on-chain, and (c) optionally provide testnet gas funding for smooth demonstrations. Demo “all-time” participation analytics are persisted (Upstash Redis) and updated by scanning on-chain events. Overall, BharatVote delivers a working end-to-end blockchain voting demo that is reproducible locally and accessible publicly via testnet deployments.
 
 ---
 
-## PROBLEM CONTEXT (Brief)
+# PROBLEM CONTEXT (Brief)
 
 Conventional voting systems are often centralized and require full trust in an authority to correctly manage voter lists, preserve ballot secrecy, and publish accurate results. Centralization creates single points of failure and increases the impact of insider threats or database tampering. BharatVote explores a decentralized architecture in which election rules are enforced by smart contracts and eligibility is verified cryptographically, improving transparency and auditability.
 
 ---
 
-## SOLUTION IMPLEMENTED
+# SOLUTION IMPLEMENTED
 
-- **Smart contracts (Solidity)** implement election creation (via Factory + Clones), candidate management, phase transitions, commit–reveal voting, tallying, and voter status tracking.
+- **Smart contracts (Solidity)** implement election creation (Factory + Clones), candidate management, phase transitions, commit–reveal voting, tallying, and voter status tracking.
 - **Merkle-based eligibility** prevents ineligible voting without storing large voter registries on-chain.
+- **Mock KYC for main elections** requires OTP (123456) and camera verification before voting.
 - **Web DApp (React + TypeScript)** provides:
   - Create Election (on Sepolia via factory)
   - Join Election (by address)
   - Public Demo election flow (one-click join)
-  - Admin panel (candidates + phases)
+  - Admin panel (candidates, phases, allowlist upload)
   - Voter panel (commit/reveal)
   - Results (live + public all-time scan)
-- **Backend (Express)** supports the demo onboarding and Merkle proof generation, plus optional KYC/IPFS backend mode for local demonstrations.
-- **Cloud deployment** (final product): Vercel (frontend), Render (backend), Sepolia + Alchemy RPC (blockchain).
+- **Backend (Express)** supports demo onboarding, Merkle proofs, mock KYC checks, analytics indexing, and optional funding for demo participants.
+- **Cloud deployment** (final product): Vercel (frontend), Render (backend), Sepolia + public RPC (blockchain).
 
 ---
 
-## TECHNOLOGIES USED
+# TECHNOLOGIES USED
 
-**Programming languages:** Solidity, TypeScript, JavaScript  
-**Blockchain:** Ethereum (Sepolia testnet), Hardhat (local), OpenZeppelin (Clones/Initializable)  
-**Web3:** MetaMask, ethers.js (v6), TypeChain  
-**Frontend:** React 18, Vite, TailwindCSS, Material UI, lucide-react  
-**Backend:** Node.js, Express, cors, merkletreejs  
-**Optional decentralized storage:** IPFS/Pinata (alternative backend + contract variant)  
+**Programming languages:** Solidity, TypeScript, JavaScript
+**Blockchain:** Ethereum (Sepolia testnet), Hardhat (local), OpenZeppelin (Clones/Initializable)
+**Web3:** MetaMask, ethers.js (v6), TypeChain
+**Frontend:** React 18, Vite, TailwindCSS, Material UI, lucide-react
+**Backend:** Node.js, Express, cors, merkletreejs
+**Persistence (demo analytics):** Upstash Redis
 **Testing:** Hardhat + Chai (contracts), Jest + Supertest (backend), Vitest + RTL (frontend)
 
 ---
 
-## OUTCOMES AND RESULTS
+# OUTCOMES AND RESULTS
 
 - Implemented a complete decentralized voting workflow with:
   - Privacy-preserving commit–reveal
   - On-chain eligibility verification (Merkle root/proofs)
   - Admin controls and real-time results visualization
-- Delivered a working **public cloud demo** on Sepolia using **Vercel + Render + Alchemy RPC**.
-- Automated tests validate smart-contract correctness and backend endpoints; performance benchmarks are documented in the Testing chapter.
+  - Mock KYC gate for main elections
+- Delivered a working **public cloud demo** on Sepolia using **Vercel + Render + public RPC**.
+- Demo analytics persist across restarts via Redis and on-chain log scanning.
 
 ---
 
 # TABLE OF CONTENTS
 
-1. List of Figures  
-2. List of Tables  
-3. List of Abbreviations  
-4. CHAPTER 1: Introduction  
-5. CHAPTER 2: Implementation Details  
-6. CHAPTER 3: Testing, Validation & Results  
-7. CHAPTER 4: Execution / Deployment Details  
-8. CHAPTER 5: Project Execution Evidence  
-9. CHAPTER 6: Conclusion & Future Work  
-10. References  
+1. List of Figures
+2. List of Tables
+3. List of Abbreviations
+4. CHAPTER 1: Introduction
+5. CHAPTER 2: Implementation Details
+6. CHAPTER 3: Testing, Validation & Results
+7. CHAPTER 4: Execution / Deployment Details
+8. CHAPTER 5: Project Execution Evidence
+9. CHAPTER 6: Conclusion & Future Work
+10. References
 11. Appendix
 
 ---
 
 # LIST OF FIGURES (Add page numbers after final formatting)
 
-- Figure 2.1 High-level architecture (Cloud: Vercel + Render + Sepolia)  
-- Figure 2.2 Data flow (Create election, Join demo, Commit–reveal)  
-- Figure 2.3 Election lifecycle (Commit → Reveal → Finished → Reset)  
-- Figure 2.4 Demo onboarding flow (/api/join + Merkle root sync)  
-- Figure 2.5 Public results “all-time” scan (event-based analytics)  
+- Figure 2.1 High-level architecture (Cloud: Vercel + Render + Sepolia)
+- Figure 2.2 Data flow (Create election, Join demo, Commit–reveal)
+- Figure 2.3 Election lifecycle (Commit → Reveal → Finished → Reset)
+- Figure 2.4 Demo onboarding flow (/api/join + Merkle root sync)
+- Figure 2.5 Public results “all-time” scan (event-based analytics)
 - Figure 4.1 Deployment screenshots (Vercel, Render env vars, Sepolia explorer)
 
 ---
 
 # LIST OF TABLES (Add page numbers after final formatting)
 
-- Table 2.1 Technology stack summary  
-- Table 2.2 Module list and responsibilities  
-- Table 3.1 Test cases  
-- Table 3.2 Test results summary  
-- Table 5.1 Weekly progress summary  
+- Table 2.1 Technology stack summary
+- Table 2.2 Module list and responsibilities
+- Table 3.1 Test cases
+- Table 3.2 Test results summary
+- Table 5.1 Weekly progress summary
 - Table 5.2 Supervisor interaction summary
 
 ---
 
 # LIST OF ABBREVIATIONS
 
-- **ABI**: Application Binary Interface  
-- **CID**: Content Identifier (IPFS)  
-- **DApp**: Decentralized Application  
-- **EVM**: Ethereum Virtual Machine  
-- **IPFS**: InterPlanetary File System  
-- **KYC**: Know Your Customer  
-- **OTP**: One-Time Password  
-- **RPC**: Remote Procedure Call  
+- **ABI**: Application Binary Interface
+- **CID**: Content Identifier (IPFS)
+- **DApp**: Decentralized Application
+- **EVM**: Ethereum Virtual Machine
+- **IPFS**: InterPlanetary File System
+- **KYC**: Know Your Customer
+- **OTP**: One-Time Password
+- **RPC**: Remote Procedure Call
 - **UI/UX**: User Interface / User Experience
 
 ---
 
-# CHAPTER 1: INTRODUCTION (2–3 pages)
+# CHAPTER 1: INTRODUCTION (Brief – 2 to 3 pages)
+
+**Note:** Problem identification and system design were completed as part of the Study Project. Use from the previous submission and add any changes if required.
 
 ## 1. Overview of the Project
 
-BharatVote is a decentralized voting platform implemented as a web DApp backed by Ethereum smart contracts. The system enables elections to be created via a factory contract on Sepolia, and also provides a pre-configured Demo Election for public access. The application is designed around election phases (Commit, Reveal, Finished), enabling privacy during voting and transparency after reveal. Voter eligibility is enforced via Merkle proof verification against an on-chain Merkle root.
+BharatVote is a decentralized voting platform implemented as a web DApp backed by Ethereum smart contracts. The system enables elections to be created via a factory contract on Sepolia, and also provides a pre-configured Demo Election for public access. The application is designed around election phases (Commit, Reveal, Finished), enabling privacy during voting and transparency after reveal. Voter eligibility is enforced via Merkle proof verification against an on-chain Merkle root. For main elections, a mock KYC flow (OTP + camera verification) is required before voting.
 
 ## 2. Problem Statement & Motivation
 
@@ -150,7 +154,7 @@ BharatVote is a decentralized voting platform implemented as a web DApp backed b
 2. Enforce eligibility using Merkle proofs and a stored Merkle root.
 3. Build a modern web UI for creating elections, joining elections, voting, and viewing results.
 4. Provide a public testnet deployment for demonstrations using Sepolia ETH.
-5. Provide a backend service to support demo onboarding and proof generation.
+5. Provide a backend service to support demo onboarding, KYC, and proof generation.
 6. Validate system behavior with automated tests.
 
 ## 4. Scope of Implementation
@@ -158,21 +162,22 @@ BharatVote is a decentralized voting platform implemented as a web DApp backed b
 **Included in final product**
 - Sepolia testnet deployment via factory (create new elections)
 - Demo election contract for public demos
-- Render backend for demo onboarding + Merkle proof APIs
+- Render backend for demo onboarding, KYC mock, and Merkle proof APIs
 - Vercel-hosted frontend DApp
 - Public RPC scanning for “all-time” demo participation
 
 **Limitations**
 - Demo election uses testnet ETH; no real-money assets are involved.
 - Secrets (RPC keys/private keys) must be managed via environment variables and should not be committed.
-- Optional KYC/IPFS mode exists for local demonstration; the public demo focuses on the demo election flow.
+- Mock KYC is non-production and used for academic demonstration only.
+- Public RPC log scanning can be rate-limited by providers.
 
 ## 5. Organization of the Report
 
-Chapter 2 describes architecture, modules, and key algorithms.  
-Chapter 3 describes testing methodology and results.  
-Chapter 4 explains both local execution and the deployed cloud demo (Vercel + Render + Sepolia/Alchemy).  
-Chapter 5 provides evidence of project execution.  
+Chapter 2 describes architecture, modules, and key algorithms.
+Chapter 3 describes testing methodology and results.
+Chapter 4 explains both local execution and the deployed cloud demo (Vercel + Render + Sepolia RPC).
+Chapter 5 provides evidence of project execution.
 Chapter 6 concludes the project and proposes future enhancements.
 
 ---
@@ -183,31 +188,137 @@ Chapter 6 concludes the project and proposes future enhancements.
 
 ### 2.1.1 High-Level Architecture Diagram (Insert as Figure 2.1)
 
-```mermaid
-flowchart LR
-  U[User Browser] --> FE[Vercel-hosted Frontend (React+TS+Vite)]
-  FE --> MM[MetaMask Wallet]
-  FE -->|HTTP| BE[Render-hosted Backend (Express)]
-  MM -->|Sign Tx| RPC[Sepolia RPC (Alchemy)]
-  RPC --> SC1[Sepolia ElectionFactory]
-  RPC --> SC2[Sepolia BharatVote Election(s)]
-  BE -->|Merkle root sync, funding| SC2
-  FE -->|Read-only results scan| RPC
+```puml
+@startuml
+left to right direction
+skinparam componentStyle rectangle
+skinparam defaultFontName "Times New Roman"
+
+actor "Admin" as Admin
+actor "Voter" as Voter
+actor "Public Viewer" as Public
+
+package "Frontend DApp (Vercel)" as FE {
+  component "Landing Page\n(Create / Join Demo)" as FE_Landing
+  component "Admin Panel\n(Phases, Candidates,\nAllowlist Upload)" as FE_Admin
+  component "Voter Panel\n(Commit / Reveal)" as FE_Voter
+  component "Public Results\n(Current + All‑Time)" as FE_Public
+  component "Wallet Connect\n(Network Switch)" as FE_Wallet
+}
+
+component "MetaMask Wallet" as MM
+cloud "Sepolia RPC\n(Alchemy / Ankr)" as RPC
+component "ElectionFactory\n(Sepolia)" as FACT
+component "Main Elections\n(BharatVote Contracts)" as MAIN
+component "Demo Election\n(BharatVote Contract)" as DEMO
+
+package "Backend API (Render)" as BE {
+  component "Demo Onboarding\n/api/join" as BE_Join
+  component "Merkle Proof API\n/api/merkle-proof\n/api/merkle-root" as BE_Proof
+  component "Mock KYC\n/api/kyc" as BE_KYC
+  component "Demo Analytics Indexer\n/api/demo/analytics" as BE_Analytics
+  component "Auto‑Phase Scheduler\n(Demo only)" as BE_Auto
+}
+
+database "Allowlist Store\n(voter-lists.json)" as STORE
+database "Upstash Redis\n(Demo Analytics)" as REDIS
+
+Admin --> FE_Landing : Create Election
+Admin --> FE_Admin : Manage phases\nUpload allowlist
+Voter --> FE_Wallet : Connect wallet\nSwitch to Sepolia
+Voter --> FE_Voter : Commit / Reveal
+Public --> FE_Public : View results
+
+FE_Wallet --> MM : connect + sign
+MM --> RPC : tx + reads
+
+FE_Admin --> BE_Proof : Upload allowlist\nFetch backend root
+BE_Proof --> STORE : Save allowlist\nBuild Merkle root
+BE_Proof --> MAIN : Sync merkleRoot\n(admin tx)
+
+FE_Voter --> BE_KYC : Mock KYC\n(OTP + camera)
+BE_KYC --> FE_Voter : KYC status
+FE_Voter --> BE_Proof : Fetch merkle proof
+BE_Proof --> FE_Voter : Merkle proof
+FE_Voter --> RPC : commitVote / revealVote
+RPC --> MAIN : commitVote / revealVote
+
+FE_Landing --> BE_Join : Join Demo
+BE_Join --> DEMO : Update allowlist\nSync merkleRoot\nFund test ETH
+
+BE_Analytics --> RPC : Scan events
+BE_Analytics --> REDIS : Persist counts
+FE_Public --> BE_Analytics : All‑time demo stats
+FE_Public --> RPC : Current tally (read)
+
+RPC --> FACT : createElection
+FACT --> FE_Landing : ElectionCreated(address)
+RPC --> MAIN : Read phase/tally
+RPC --> DEMO : Read phase/tally
+BE_Auto --> DEMO : startReveal / finish / reset
+@enduml
 ```
 
 ### 2.1.2 Data Flow Diagram (DFD Level 0) (Insert as Figure 2.2)
 
-```mermaid
-flowchart TD
-  A[Admin] --> FE[Frontend]
-  FE -->|createElection(name)| F[Factory Contract]
-  F -->|ElectionCreated(election)| FE
-  FE -->|Admin actions| E[Election Contract]
-  V[Voter] --> FE
-  FE -->|Join Demo: /api/join| BE[Backend]
-  BE -->|Update allowlist + merkleRoot| E
-  FE -->|commitVote / revealVote| E
-  FE -->|PublicResults event scan| RPC[Alchemy RPC]
+```puml
+@startuml
+top to bottom direction
+skinparam componentStyle rectangle
+skinparam defaultFontName "Times New Roman"
+
+actor "Admin" as Admin
+actor "Voter" as Voter
+actor "Public Viewer" as Public
+
+rectangle "Frontend DApp" as FE
+rectangle "Backend API" as BE
+cloud "Sepolia RPC" as RPC
+rectangle "ElectionFactory" as FACT
+rectangle "Election Contract (Main)" as MAIN
+rectangle "Election Contract (Demo)" as DEMO
+database "Allowlist Store" as STORE
+database "Analytics Store (Redis)" as REDIS
+
+== Admin Flow ==
+Admin --> FE : create election\nupload allowlist\nmanage phases
+FE --> RPC : createElection(name)
+RPC --> FACT : createElection()
+FACT --> RPC : ElectionCreated(address)
+RPC --> FE : return address
+FE --> BE : POST /api/admin/voter-list
+BE --> STORE : save allowlist
+BE --> FE : merkleRoot + count
+FE --> RPC : setMerkleRoot(root)
+RPC --> MAIN : update merkleRoot
+
+== Voter Flow (Main Election) ==
+Voter --> FE : connect wallet\nstart KYC
+FE --> BE : GET /api/kyc\n(voter_id + address + election)
+BE --> FE : eligible=true/false
+FE --> BE : GET /api/merkle-proof/:address
+BE --> FE : merkle proof
+FE --> RPC : commitVote(hash, proof)
+RPC --> MAIN : store commit
+FE --> RPC : revealVote(choice, salt)
+RPC --> MAIN : tally++
+
+== Demo Flow ==
+Voter --> FE : Join Demo
+FE --> BE : POST /api/join
+BE --> DEMO : update allowlist\nsync merkleRoot\nfund gas (optional)
+BE --> FE : success + status
+FE --> RPC : commit / reveal (demo)
+RPC --> DEMO : store commit / tally
+
+== Public Results ==
+Public --> FE : View results
+FE --> RPC : read current tally
+FE --> BE : GET /api/demo/analytics
+BE --> RPC : scan logs
+BE --> REDIS : persist counts
+BE --> FE : all‑time stats
+@enduml
 ```
 
 ### 2.1.3 Component Interaction (Main vs Demo election)
@@ -216,6 +327,9 @@ flowchart TD
 - Created from the UI using the Sepolia factory contract.
 - Admin = wallet that calls `createElection(name)`.
 - Users join by address (`/election/:address`).
+- Admin uploads eligible voter list; backend builds Merkle root.
+- Voters must pass mock KYC before voting.
+- Public tallies are shown after reveal or when finished.
 
 **Demo election (pre-deployed, public)**
 - Configured via `VITE_DEMO_ELECTION_ADDRESS`.
@@ -223,8 +337,8 @@ flowchart TD
 - Backend may:
   - Add new participant address into allowlist and rebuild Merkle tree.
   - Sync the updated `merkleRoot` to the demo election contract (requires admin key).
-  - Send small Sepolia ETH to new participants if they lack gas (testnet only).
-  - Optionally run timed auto-phase + auto-reset loops for smooth demos.
+  - Send small Sepolia ETH to new participants if they lack gas.
+  - Run timed auto-phase + auto-reset loops for smooth demos.
 
 ## 2.2 Technology Stack
 
@@ -237,7 +351,8 @@ flowchart TD
 | Web3 | ethers.js v6, TypeChain |
 | Smart Contracts | Solidity ^0.8.20, OpenZeppelin Clones/Initializable |
 | Backend | Node.js, Express, merkletreejs |
-| Cloud | Vercel (frontend), Render (backend), Alchemy (Sepolia RPC) |
+| Cloud | Vercel (frontend), Render (backend), Sepolia RPC (Alchemy/Ankr) |
+| Persistence | Upstash Redis (demo analytics) |
 | Testing | Hardhat+Chai, Jest+Supertest, Vitest |
 
 ## 2.3 System Modules
@@ -252,10 +367,10 @@ flowchart TD
 | Create Election UI | `frontend/src/components/CreateElection.tsx` | Calls factory `createElection(name)` on Sepolia |
 | Demo join UI | `frontend/src/components/LandingPage.tsx` | Calls backend `/api/join`, then navigates to demo election |
 | Voter UI | `frontend/src/Voter.tsx` | Eligibility check + commit/reveal workflow |
-| Admin UI | `frontend/src/Admin.tsx` | Candidate/phase management + diagnostics |
-| Results UI (public) | `frontend/src/components/PublicResults.tsx` | Reads contract state + scans logs for all-time results |
-| Demo backend | `backend/server.js` | `/api/join`, `/api/merkle-proof/:address`, `/api/merkle-root`, demo automation |
-| Optional KYC/IPFS backend | `backend/server-with-ipfs.js` | `/api/kyc`, `/api/merkle-proof` (by voter_id), IPFS endpoints |
+| Admin UI | `frontend/src/Admin.tsx` | Candidate/phase management + allowlist upload |
+| Results UI (public) | `frontend/src/components/PublicResults.tsx` | Reads contract state + all-time scan |
+| Demo backend | `backend/server.js` | `/api/join`, `/api/merkle-proof/:address`, `/api/merkle-root`, analytics |
+| KYC mock backend | `backend/server.js` | `/api/kyc` for allowlisted voters |
 
 ## 2.4 Key Algorithms / Logic
 
@@ -274,7 +389,7 @@ flowchart TD
 commitVote(commit, proof):
   require phase == COMMIT
   require verifyMerkle(proof, msg.sender)
-_toggle hasCommitted, store commit
+  store commit
 
 revealVote(choice, salt):
   require phase == REVEAL
@@ -298,38 +413,28 @@ verify(proof[], addr):
 
 ### C) Demo Onboarding & Merkle Root Sync (Backend)
 
-**Idea:** For the public demo election, the backend can expand the allowlist and keep the on-chain Merkle root consistent so new users can vote.
-
 **Flow**
 1. Frontend reads user address from MetaMask.
 2. Frontend calls `POST /api/join { address }`.
-3. Backend adds the address (if not present), rebuilds Merkle tree, and sets demo contract `merkleRoot` (admin-only).
+3. Backend adds the address (if not present), rebuilds Merkle tree, and sets demo contract `merkleRoot`.
 4. Backend may send a small Sepolia ETH top-up (demo convenience).
 
-### D) Public Results – All-Time Scan (Frontend)
+### D) Public Results – All-Time Scan (Frontend/Backend)
 
-For the demo election, the frontend supports an “all-time” participation mode that scans Sepolia logs using a public RPC provider. This produces cumulative metrics even across election resets.
+The demo election supports an “all-time” participation view that scans Sepolia logs and persists counts in Redis.
 
 Configured via:
-- `VITE_PUBLIC_RPC_URL`
-- `VITE_PUBLIC_EVENTS_FROM_BLOCK`
-- `VITE_PUBLIC_EVENTS_MAX_REQUESTS_PER_POLL`
-- `VITE_PUBLIC_EVENTS_MAX_BLOCK_RANGE`
+- `DEMO_ANALYTICS_RPC_URL`
+- `DEMO_ANALYTICS_FROM_BLOCK`
+- `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`
 
 ## 2.5 Screenshots / Code Snippets (Insert in final PDF)
 
 Add screenshots of:
 - Vercel deployment dashboard (project + env vars)
 - Render service dashboard (deploy logs + env vars)
-- Sepolia Etherscan pages for:
-  - Factory contract
-  - Demo election contract
-  - A createElection transaction
-- App UI screens:
-  - Landing page (Create election + Join demo)
-  - Admin panel (candidates/phases)
-  - Voter commit/reveal screens
-  - Public results “all-time” view
+- Sepolia Etherscan pages for factory and demo election contract
+- App UI screens (landing, admin, voter, public results)
 
 ---
 
@@ -357,6 +462,7 @@ Add screenshots of:
 | TC-SC-04 | Reveal increments tally | revealVote | tally++ | Pass |
 | TC-API-01 | Demo join works | POST /api/join | allowlist synced | Pass |
 | TC-API-02 | Merkle proof by address | GET /api/merkle-proof/:address | proof returned | Pass |
+| TC-API-03 | Mock KYC allowlisted | GET /api/kyc | eligible=true | Pass |
 
 ## 3.3 Results & Analysis
 
@@ -364,12 +470,12 @@ Add screenshots of:
 
 ---
 
-# CHAPTER 4: EXECUTION / DEPLOYMENT DETAILS (Final Product)
+# CHAPTER 4: EXECUTION / DEPLOYMENT DETAILS
 
 ## 4.1 Execution Environment
 
 - **Blockchain:** Ethereum Sepolia testnet (Chain ID `11155111`)
-- **RPC provider:** Alchemy (Sepolia RPC)
+- **RPC provider:** Alchemy / Ankr (Sepolia RPC)
 - **Frontend hosting:** Vercel
 - **Backend hosting:** Render (Express API)
 - **Wallet:** MetaMask
@@ -379,55 +485,53 @@ Add screenshots of:
 ### A) Frontend Deployment (Vercel)
 
 1. Create a Vercel project from the Git repository.
-2. Set Vercel project root to `frontend/` (recommended).
+2. Set Vercel project root to `frontend/`.
 3. Build settings:
    - Install: `npm install`
    - Build: `npm run build`
    - Output: `dist`
-4. Configure environment variables in Vercel (do not commit secrets):
+4. Configure environment variables in Vercel:
    - `VITE_FACTORY_ADDRESS` = `[Sepolia factory address]`
    - `VITE_DEMO_ELECTION_ADDRESS` = `[Sepolia demo election address]`
    - `VITE_BACKEND_URL` = `https://[your-render-service].onrender.com`
    - `VITE_SEPOLIA_RPC_URL` = `https://eth-sepolia.g.alchemy.com/v2/[key]`
-   - `VITE_PUBLIC_RPC_URL` = `https://eth-sepolia.g.alchemy.com/v2/[key]`
+   - `VITE_PUBLIC_RPC_URL` = `https://sepolia-rpc.ankr.com/[key]` (optional)
    - `VITE_CHAIN_ID` = `11155111`
-   - Public scan tuning (optional): `VITE_PUBLIC_EVENTS_FROM_BLOCK`, `VITE_PUBLIC_EVENTS_MAX_REQUESTS_PER_POLL`, `VITE_PUBLIC_EVENTS_MAX_BLOCK_RANGE`
 5. Ensure SPA routing works (already supported via `vercel.json` rewrite).
 
 ### B) Backend Deployment (Render)
 
 1. Create a Render Web Service from the repository.
 2. Set root directory to `backend/`.
-3. Start command:
-   - `node server.js`
-4. Configure Render environment variables (required for demo join + on-chain sync):
-   - `VITE_SEPOLIA_RPC_URL` or `RPC_URL` = `https://eth-sepolia.g.alchemy.com/v2/[key]`
+3. Start command: `node server.js`
+4. Configure Render environment variables:
+   - `RPC_URL` or `VITE_SEPOLIA_RPC_URL` = `https://eth-sepolia.g.alchemy.com/v2/[key]`
    - `PRIVATE_KEY` = `[admin key for demo election; keep secret]`
    - `VITE_DEMO_ELECTION_ADDRESS` = `[Sepolia demo election address]`
+   - `DEMO_ANALYTICS_RPC_URL` = `https://sepolia-rpc.ankr.com/[key]`
+   - `UPSTASH_REDIS_REST_URL` = `[your Upstash URL]`
+   - `UPSTASH_REDIS_REST_TOKEN` = `[your Upstash token]`
    - `PORT` = `3000` (or Render default)
-   - Optional: `DEMO_AUTOPHASE_ENABLED`, `DEMO_COMMIT_SECONDS`, `DEMO_REVEAL_SECONDS`, `DEMO_AUTORESET_ENABLED`
 
-**Note:** The backend must use a wallet that is the **admin** of the demo election contract to set `merkleRoot` and optionally manage phases/funding.
+**Note:** The backend wallet must be the **admin** of the demo election contract to set `merkleRoot` and manage demo phase/funding.
 
 ### C) Sepolia Contracts (Factory + Elections)
 
 - **Factory contract** is deployed on Sepolia and configured in the frontend via `VITE_FACTORY_ADDRESS`.
-- **Main elections** are created by calling `createElection(name)` from the UI; the deployed election address is taken from the `ElectionCreated` event and used in the route `/election/:address`.
+- **Main elections** are created by calling `createElection(name)`; the deployed election address is used in `/election/:address`.
 - **Demo election** is pre-deployed and referenced via `VITE_DEMO_ELECTION_ADDRESS`.
 
-## 4.3 Deployment Steps (Local, for supervisor demo)
+## 4.3 Deployment Steps (Local)
 
-Local mode is useful for offline demonstrations and faster iteration:
-
-1. Install dependencies: `npm run install:all`
-2. Start Hardhat: `npm run node`
-3. Deploy local election: `npm run deploy`
-4. Start backend: `npm run backend:dev`
-5. Start frontend: `npm run frontend:dev`
+1. `npm run install:all`
+2. `npm run node`
+3. `npm run deploy`
+4. `npm run backend:dev`
+5. `npm run frontend:dev`
 
 ## 4.4 Demo Screenshots / Demo Video Link
 
-- Demo screenshots: [Insert screenshots]  
+- Demo screenshots: [Insert screenshots]
 - Demo video link: [Insert link]
 
 ---
@@ -463,7 +567,7 @@ Local mode is useful for offline demonstrations and faster iteration:
 
 ## Summary of Implementation
 
-BharatVote delivers a complete blockchain voting demo with privacy-preserving commit–reveal voting, Merkle-based eligibility, role-based election management, and public testnet deployment for demonstrations. The final product integrates Vercel, Render, and Sepolia via Alchemy RPC.
+BharatVote delivers a complete blockchain voting demo with privacy-preserving commit–reveal voting, Merkle-based eligibility, role-based election management, mock KYC for main elections, and public testnet deployment for demonstrations.
 
 ## Achievements
 
@@ -480,7 +584,7 @@ BharatVote delivers a complete blockchain voting demo with privacy-preserving co
 
 ## Future Enhancements
 
-- Add secure encryption for any off-chain identity data and integrate real KYC providers.
+- Integrate real KYC providers with encrypted data storage.
 - Add CI pipelines for frontend mocking and stable E2E tests.
 - Add on-chain governance for admin rotation and election configuration.
 - Add optional L2 deployment (e.g., Base/Arbitrum) for cost/performance.
@@ -489,14 +593,16 @@ BharatVote delivers a complete blockchain voting demo with privacy-preserving co
 
 # REFERENCES (IEEE / APA)
 
-1. Ethereum Foundation, “Ethereum Documentation,” https://ethereum.org/  
-2. Hardhat, “Hardhat Documentation,” https://hardhat.org/docs  
-3. OpenZeppelin, “OpenZeppelin Contracts,” https://docs.openzeppelin.com/contracts/  
-4. MetaMask, “MetaMask Documentation,” https://docs.metamask.io/  
-5. Ethers.js, “Ethers.js Documentation,” https://docs.ethers.org/  
-6. Alchemy, “Alchemy Docs,” https://docs.alchemy.com/  
-7. Vercel, “Vercel Docs,” https://vercel.com/docs  
-8. Render, “Render Docs,” https://render.com/docs  
+1. Ethereum Foundation, “Ethereum Documentation,” https://ethereum.org/
+2. Hardhat, “Hardhat Documentation,” https://hardhat.org/docs
+3. OpenZeppelin, “OpenZeppelin Contracts,” https://docs.openzeppelin.com/contracts/
+4. MetaMask, “MetaMask Documentation,” https://docs.metamask.io/
+5. Ethers.js, “Ethers.js Documentation,” https://docs.ethers.org/
+6. Alchemy, “Alchemy Docs,” https://docs.alchemy.com/
+7. Ankr, “Ankr Web3 API Docs,” https://www.ankr.com/docs/
+8. Vercel, “Vercel Docs,” https://vercel.com/docs
+9. Render, “Render Docs,” https://render.com/docs
+10. Upstash, “Upstash Docs,” https://upstash.com/docs
 
 ---
 
@@ -526,4 +632,3 @@ BharatVote delivers a complete blockchain voting demo with privacy-preserving co
 ## D. Demo Video Link
 
 [Paste link]
-

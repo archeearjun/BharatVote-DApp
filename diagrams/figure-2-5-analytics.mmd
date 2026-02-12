@@ -1,0 +1,7 @@
+flowchart TD
+  FE[Frontend Public Results] -->|GET /api/demo/analytics| BE[Backend]
+  BE -->|getLogs| RPC[Sepolia RPC]
+  RPC --> BE
+  BE -->|aggregate counts| STORE[Analytics Store (Upstash or file)]
+  STORE --> BE
+  BE --> FE

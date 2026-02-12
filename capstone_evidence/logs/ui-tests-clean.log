@@ -1,0 +1,253 @@
+
+ RUN  v3.2.4 C:/Users/arche/Desktop/BharatVote/frontend
+
+ ✓ src/utils/publicResultsEvents.test.ts (3 tests) 22ms
+ ✓ src/components/PrimaryButton.test.tsx (8 tests) 331ms
+stdout | src/test/AdminRoot.test.tsx > Admin merkle root helpers > fetches merkle root and calls setMerkleRoot
+DEBUG: Attempting to fetch candidates...
+DEBUG: Contract address: undefined
+
+stdout | src/test/AdminRoot.test.tsx > Admin merkle root helpers > fetches merkle root and calls setMerkleRoot
+DEBUG: Raw candidates from contract: []
+DEBUG: Mapped candidates: []
+
+ ✓ src/test/AdminRoot.test.tsx (1 test) 460ms
+   ✓ Admin merkle root helpers > fetches merkle root and calls setMerkleRoot  455ms
+stdout | src/KycPage.test.tsx > KycPage > handles successful KYC validation
+DEBUG KYC: Starting KYC validation for voter: VOTER1
+DEBUG KYC: Backend URL: http://localhost:3001
+DEBUG KYC: Account: 0x01bad59740664445Fd489315E14F4300639c253b
+
+stdout | src/KycPage.test.tsx > KycPage > handles successful KYC validation
+DEBUG KYC: Backend response status: 200
+
+stdout | src/KycPage.test.tsx > KycPage > handles successful KYC validation
+DEBUG KYC: Backend response data: {
+  eligible: true,
+  address: '0x01bad59740664445Fd489315E14F4300639c253b'
+}
+KYC Validation Details:
+- Voter ID: VOTER1
+- Expected Address: 0x01bad59740664445fd489315e14f4300639c253b
+- Connected Address: 0x01bad59740664445fd489315e14f4300639c253b
+- Addresses Match: true
+DEBUG KYC: KYC Validation successful: {
+  eligible: true,
+  address: '0x01bad59740664445Fd489315E14F4300639c253b'
+}
+DEBUG KYC: Showing OTP modal
+
+stdout | src/KycPage.test.tsx > KycPage > handles KYC validation failure for invalid voter ID
+DEBUG KYC: Starting KYC validation for voter: INVALID_VOTER
+DEBUG KYC: Backend URL: http://localhost:3001
+DEBUG KYC: Account: 0x01bad59740664445Fd489315E14F4300639c253b
+
+stdout | src/KycPage.test.tsx > KycPage > handles KYC validation failure for invalid voter ID
+DEBUG KYC: Backend response status: 200
+
+stderr | src/KycPage.test.tsx > KycPage > handles KYC validation failure for invalid voter ID
+DEBUG KYC: KYC validation error: Error: Voter ID not found in electoral rolls. Please check your Voter ID.
+    at handleSendOtp (C:\Users\arche\Desktop\BharatVote\frontend\src\KycPage.tsx:72:15)
+
+stdout | src/KycPage.test.tsx > KycPage > handles KYC validation failure for invalid voter ID
+DEBUG KYC: Backend response data: { eligible: false }
+
+stdout | src/KycPage.test.tsx > KycPage > handles address mismatch error
+DEBUG KYC: Starting KYC validation for voter: VOTER2
+DEBUG KYC: Backend URL: http://localhost:3001
+DEBUG KYC: Account: 0x01bad59740664445Fd489315E14F4300639c253b
+
+stdout | src/KycPage.test.tsx > KycPage > handles address mismatch error
+DEBUG KYC: Backend response status: 200
+
+stderr | src/KycPage.test.tsx > KycPage > handles address mismatch error
+DEBUG KYC: KYC validation error: Error: You are not eligible to vote with this wallet. Please ensure you are using the correct voter credentials and wallet.
+    at handleSendOtp (C:\Users\arche\Desktop\BharatVote\frontend\src\KycPage.tsx:90:15)
+
+stdout | src/KycPage.test.tsx > KycPage > handles address mismatch error
+DEBUG KYC: Backend response data: {
+  eligible: true,
+  address: '0x1234567890123456789012345678901234567890'
+}
+KYC Validation Details:
+- Voter ID: VOTER2
+- Expected Address: 0x1234567890123456789012345678901234567890
+- Connected Address: 0x01bad59740664445fd489315e14f4300639c253b
+- Addresses Match: false
+
+stdout | src/KycPage.test.tsx > KycPage > shows OTP modal after successful KYC
+DEBUG KYC: Starting KYC validation for voter: VOTER1
+DEBUG KYC: Backend URL: http://localhost:3001
+DEBUG KYC: Account: 0x01bad59740664445Fd489315E14F4300639c253b
+
+stdout | src/KycPage.test.tsx > KycPage > shows OTP modal after successful KYC
+DEBUG KYC: Backend response status: 200
+
+stdout | src/KycPage.test.tsx > KycPage > shows OTP modal after successful KYC
+DEBUG KYC: Backend response data: {
+  eligible: true,
+  address: '0x01bad59740664445Fd489315E14F4300639c253b'
+}
+KYC Validation Details:
+- Voter ID: VOTER1
+- Expected Address: 0x01bad59740664445fd489315e14f4300639c253b
+- Connected Address: 0x01bad59740664445fd489315e14f4300639c253b
+- Addresses Match: true
+DEBUG KYC: KYC Validation successful: {
+  eligible: true,
+  address: '0x01bad59740664445Fd489315E14F4300639c253b'
+}
+DEBUG KYC: Showing OTP modal
+
+stdout | src/KycPage.test.tsx > KycPage > handles OTP input correctly
+DEBUG KYC: Starting KYC validation for voter: VOTER1
+DEBUG KYC: Backend URL: http://localhost:3001
+DEBUG KYC: Account: 0x01bad59740664445Fd489315E14F4300639c253b
+
+stdout | src/KycPage.test.tsx > KycPage > handles OTP input correctly
+DEBUG KYC: Backend response status: 200
+
+stdout | src/KycPage.test.tsx > KycPage > handles OTP input correctly
+DEBUG KYC: Backend response data: {
+  eligible: true,
+  address: '0x01bad59740664445Fd489315E14F4300639c253b'
+}
+KYC Validation Details:
+- Voter ID: VOTER1
+- Expected Address: 0x01bad59740664445fd489315e14f4300639c253b
+- Connected Address: 0x01bad59740664445fd489315e14f4300639c253b
+- Addresses Match: true
+DEBUG KYC: KYC Validation successful: {
+  eligible: true,
+  address: '0x01bad59740664445Fd489315E14F4300639c253b'
+}
+DEBUG KYC: Showing OTP modal
+
+stdout | src/KycPage.test.tsx > KycPage > handles successful OTP verification
+DEBUG KYC: Starting KYC validation for voter: VOTER1
+DEBUG KYC: Backend URL: http://localhost:3001
+DEBUG KYC: Account: 0x01bad59740664445Fd489315E14F4300639c253b
+
+stdout | src/KycPage.test.tsx > KycPage > handles successful OTP verification
+DEBUG KYC: Backend response status: 200
+
+stdout | src/KycPage.test.tsx > KycPage > handles successful OTP verification
+DEBUG KYC: Backend response data: {
+  eligible: true,
+  address: '0x01bad59740664445Fd489315E14F4300639c253b'
+}
+KYC Validation Details:
+- Voter ID: VOTER1
+- Expected Address: 0x01bad59740664445fd489315e14f4300639c253b
+- Connected Address: 0x01bad59740664445fd489315e14f4300639c253b
+- Addresses Match: true
+DEBUG KYC: KYC Validation successful: {
+  eligible: true,
+  address: '0x01bad59740664445Fd489315E14F4300639c253b'
+}
+DEBUG KYC: Showing OTP modal
+
+stdout | src/KycPage.test.tsx > KycPage > handles successful OTP verification
+DEBUG KYC: OTP submit button clicked
+DEBUG KYC: Entered OTP: 123456
+DEBUG KYC: OTP length: 6
+DEBUG KYC: Voter ID: VOTER1
+DEBUG KYC: Expected OTP: 123456
+DEBUG KYC: OTP match: true
+DEBUG KYC: OTP verified successfully, showing face verification
+DEBUG FaceRecognition: Component mounted
+DEBUG FaceRecognition: isTestEnv: true
+DEBUG FaceRecognition: Main useEffect triggered
+DEBUG FaceRecognition: Test environment detected, auto-verifying
+
+stdout | src/KycPage.test.tsx > KycPage > handles successful OTP verification
+DEBUG KYC: Face verification completed, calling onVerified
+
+stdout | src/KycPage.test.tsx > KycPage > handles successful OTP verification
+DEBUG KYC: Calling onVerified with voterId: VOTER1
+
+stdout | src/KycPage.test.tsx > KycPage > handles incorrect OTP
+DEBUG KYC: Starting KYC validation for voter: VOTER1
+DEBUG KYC: Backend URL: http://localhost:3001
+DEBUG KYC: Account: 0x01bad59740664445Fd489315E14F4300639c253b
+
+stdout | src/KycPage.test.tsx > KycPage > handles incorrect OTP
+DEBUG KYC: Backend response status: 200
+
+stdout | src/KycPage.test.tsx > KycPage > handles incorrect OTP
+DEBUG KYC: Backend response data: {
+  eligible: true,
+  address: '0x01bad59740664445Fd489315E14F4300639c253b'
+}
+KYC Validation Details:
+- Voter ID: VOTER1
+- Expected Address: 0x01bad59740664445fd489315e14f4300639c253b
+- Connected Address: 0x01bad59740664445fd489315e14f4300639c253b
+- Addresses Match: true
+DEBUG KYC: KYC Validation successful: {
+  eligible: true,
+  address: '0x01bad59740664445Fd489315E14F4300639c253b'
+}
+DEBUG KYC: Showing OTP modal
+
+stdout | src/KycPage.test.tsx > KycPage > handles incorrect OTP
+DEBUG KYC: OTP submit button clicked
+DEBUG KYC: Entered OTP: 999999
+DEBUG KYC: OTP length: 6
+DEBUG KYC: Voter ID: VOTER1
+DEBUG KYC: Expected OTP: 123456
+DEBUG KYC: OTP match: false
+DEBUG KYC: OTP verification failed
+
+stdout | src/KycPage.test.tsx > KycPage > shows loading state during KYC validation
+DEBUG KYC: Starting KYC validation for voter: VOTER1
+DEBUG KYC: Backend URL: http://localhost:3001
+DEBUG KYC: Account: 0x01bad59740664445Fd489315E14F4300639c253b
+
+stdout | src/KycPage.test.tsx > KycPage > handles network errors gracefully
+DEBUG KYC: Backend response status: 200
+
+stdout | src/KycPage.test.tsx > KycPage > handles network errors gracefully
+DEBUG KYC: Backend response data: {
+  eligible: true,
+  address: '0x01bad59740664445Fd489315E14F4300639c253b'
+}
+KYC Validation Details:
+- Voter ID: VOTER1
+- Expected Address: 0x01bad59740664445fd489315e14f4300639c253b
+- Connected Address: 0x01bad59740664445fd489315e14f4300639c253b
+- Addresses Match: true
+DEBUG KYC: KYC Validation successful: {
+  eligible: true,
+  address: '0x01bad59740664445Fd489315E14F4300639c253b'
+}
+DEBUG KYC: Showing OTP modal
+
+stdout | src/KycPage.test.tsx > KycPage > handles network errors gracefully
+DEBUG KYC: Starting KYC validation for voter: VOTER1
+DEBUG KYC: Backend URL: http://localhost:3001
+DEBUG KYC: Account: 0x01bad59740664445Fd489315E14F4300639c253b
+
+stderr | src/KycPage.test.tsx > KycPage > handles network errors gracefully
+DEBUG KYC: KYC validation error: Error: Network error
+    at C:\Users\arche\Desktop\BharatVote\frontend\src\KycPage.test.tsx:303:47
+    at file:///C:/Users/arche/Desktop/BharatVote/frontend/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:155:11
+    at file:///C:/Users/arche/Desktop/BharatVote/frontend/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:752:26
+    at file:///C:/Users/arche/Desktop/BharatVote/frontend/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1897:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///C:/Users/arche/Desktop/BharatVote/frontend/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1863:10)
+    at runTest (file:///C:/Users/arche/Desktop/BharatVote/frontend/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1574:12)
+    at runSuite (file:///C:/Users/arche/Desktop/BharatVote/frontend/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1729:8)
+    at runSuite (file:///C:/Users/arche/Desktop/BharatVote/frontend/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1729:8)
+    at runFiles (file:///C:/Users/arche/Desktop/BharatVote/frontend/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1787:3)
+
+ ✓ src/KycPage.test.tsx (13 tests) 5020ms
+   ✓ KycPage > handles KYC validation failure for invalid voter ID  356ms
+   ✓ KycPage > handles successful OTP verification  2304ms
+   ✓ KycPage > handles incorrect OTP  685ms
+
+ Test Files  4 passed (4)
+      Tests  25 passed (25)
+   Start at  16:52:22
+   Duration  10.90s (transform 800ms, setup 6.05s, collect 2.92s, tests 5.83s, environment 4.97s, prepare 1.62s)
+

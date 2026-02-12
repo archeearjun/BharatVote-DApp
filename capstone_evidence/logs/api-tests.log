@@ -1,0 +1,42 @@
+
+> bharatvote@1.0.0 test:backend
+> cd backend && npm test
+
+
+> backend@1.0.0 test
+> jest
+
+PASS ./server.test.js (24.371 s)
+  BharatVote Backend API
+    KYC API
+      GET /api/kyc
+        √ should return eligible true for valid voter ID (71 ms)
+        √ should return eligible false for invalid voter ID (5 ms)
+        √ should return error for missing voter_id (7 ms)
+        √ should handle all test voter IDs correctly (11 ms)
+    Merkle Proof API
+      GET /api/merkle-proof
+        √ should return valid proof for eligible voter (8 ms)
+        √ should return error for missing voter_id (4 ms)
+        √ should return error for invalid voter ID (7 ms)
+        √ should generate different proofs for different voters (10 ms)
+        √ should handle all eligible voters (11 ms)
+    Merkle Root API
+      √ should return the merkle root (4 ms)
+    Error Handling
+      √ should handle invalid routes gracefully (7 ms)
+      √ should handle malformed requests (305 ms)
+    Security Tests
+      √ should handle SQL injection attempts in voter_id (3 ms)
+      √ should handle XSS attempts in voter_id (5 ms)
+      √ should handle very long voter_id strings (9 ms)
+    Performance Tests
+      √ should respond to KYC requests quickly (4 ms)
+      √ should respond to Merkle proof requests quickly (5 ms)
+      √ should handle concurrent requests (27 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       18 passed, 18 total
+Snapshots:   0 total
+Time:        26.628 s
+Ran all test suites.

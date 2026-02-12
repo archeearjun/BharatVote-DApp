@@ -1,0 +1,51 @@
+flowchart TD
+  %% Actors and core services
+  A[Admin] --> FE[Frontend DApp]
+  U[User/Voter] --> FE
+  FE -->|sign tx| MM[MetaMask Wallet]
+  FE -->|read-only calls| RPC[Sepolia RPC Provider]
+  MM --> RPC
+  RPC --> FACT[ElectionFactory Contract]
+  RPC --> ELEC[Election Contract]
+
+  %% Election creation and admin controls
+  FE -->|createElection(name)| FACT
+  FACT -->|ElectionCreated(address)| FE
+  FE -->|setMerkleRoot(root)| ELEC
+  FE -->|startCommit / startReveal / finish| ELEC
+
+  %% Admin voter list management (optional)
+  FE -->|/api/admin/voter-list (upload)| ADMINLIST[Backend /api/admin/voter-list]
+  ADMINLIST --> VOTERS[(eligibleVoters.json)]
+  ADMINLIST --> MERK[Merkle Tree Builder]
+  MERK --> ADMINLIST
+
+  %% KYC and eligibility (main election)
+  FE -->|/api/kyc?voter_id| KYC[Backend /api/kyc]
+  KYC --> KYCDB[(kyc-data.json)]
+  KYC -->|eligible + address| FE
+
+  %% Merkle proof flow
+  FE -->|/api/merkle-root| ROOT[Backend /api/merkle-root]
+  ROOT --> FE
+  FE -->|/api/merkle-proof/:address| PROOF[Backend /api/merkle-proof/:address]
+  PROOF --> FE
+  PROOF --> MERK
+  PROOF --> VOTERS
+
+  %% Voting
+  FE -->|commitVote(hash, proof)| ELEC
+  FE -->|revealVote(candidateId, salt)| ELEC
+  ELEC -->|events + tally (view)| FE
+
+  %% Demo onboarding (optional)
+  FE -->|/api/join (demo)| JOIN[Backend /api/join]
+  JOIN --> VOTERS
+  JOIN --> MERK
+  JOIN -->|sync merkleRoot (admin signer)| ELEC
+
+  %% Demo analytics (optional)
+  FE -->|/api/demo/analytics| ANALYTICS[Backend /api/demo/analytics]
+  ANALYTICS --> FE
+  ANALYTICS --> RPC
+  ANALYTICS --> STORE[(Demo Analytics Store)]

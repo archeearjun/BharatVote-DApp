@@ -1,0 +1,39 @@
+Capstone Rubrics
+Continuous / Day-to-Day Evaluation (Supervisor) – 20 Marks
+[TABLE]
+Criteria | Description | Marks
+Attendance & Regularity | Consistent participation, weekly check-ins | 5
+Task Progress & Timelines | Completion of assigned milestones on time | 5
+Ownership | Self-driven learning, problem solving | 5
+Communication & Reporting | Status updates, documentation, meetings | 5
+Total |  | 20
+[/TABLE]
+Implementation – 30 Marks
+[TABLE]
+Aspect | Marks
+Feature completeness | 10
+Functional correctness | 10
+Code quality & best practices | 5
+Appropriate tech stack usage | 5
+Total | 30
+[/TABLE]
+Testing, Validation & Results – 15 Marks
+Test cases & coverage – 5
+Result analysis – 5
+Performance / accuracy / reliability – 5
+Documentation (Capstone Phase Only) – 20 Marks
+[TABLE]
+Aspect | Marks
+Implementation & testing chapters | 7
+Results, screenshots, tables | 7
+Clarity, formatting, references | 6
+Total | 20
+[/TABLE]
+Final Presentation, Demo & Viva – 15 Marks
+[TABLE]
+Aspect | Marks
+Technical explanation | 5
+Live demo / execution | 5
+Q&A and confidence | 5
+Total | 15
+[/TABLE]

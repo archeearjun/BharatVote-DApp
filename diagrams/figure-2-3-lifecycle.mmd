@@ -1,0 +1,7 @@
+flowchart LR
+  C[Commit Phase] -->|admin startReveal()| R[Reveal Phase]
+  R -->|admin finishElection()| F[Finished]
+  F -->|admin resetElection()| C
+  C -.->|admin emergencyReset()| C
+  R -.->|admin emergencyReset()| C
+  F -.->|admin emergencyReset()| C

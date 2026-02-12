@@ -86,9 +86,9 @@ describe('KycPage', () => {
     fireEvent.click(sendButton)
 
     await waitFor(() => {
-      expect(fetch).toHaveBeenCalledWith(
-        expect.stringMatching(/\/api\/kyc\?voter_id=VOTER1$/)
-      )
+      const callUrl = (fetch as any).mock.calls?.[0]?.[0] as string
+      expect(callUrl).toContain('/api/kyc?voter_id=VOTER1')
+      expect(callUrl).toContain(`address=${mockProps.account}`)
     })
   })
 

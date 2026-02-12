@@ -1,0 +1,89 @@
+COVER PAGE
+Project Title
+Student Name(s) & Roll Number(s)
+Program: BSc Computer Science (Online Mode)
+Institution Name
+Academic Year
+Internal Supervisor Name
+Declaration
+I hereby declare that this capstone project titled “__________” is an original work carried out by me/us and has not been submitted to any other university or institution for the award of any degree.
+Abstract (200–300 words)
+Problem context (brief)
+Solution implemented
+Technologies used
+Outcomes and results
+Table of Contents
+List of Figures
+List of Tables
+List of Abbreviations (if any)
+CHAPTER 1: INTRODUCTION (Brief – 2 to 3 pages)
+Note: Problem identification and system design were completed as part of the Study Project. (Use from the previous submission and add if any changes to it)
+Overview of the project
+Problem Statement & Motivation
+Objectives of the capstone
+Scope of implementation
+Organization of the report
+CHAPTER 2: IMPLEMENTATION DETAILS
+2.1 System Architecture & Design
+High-level architecture diagram
+Data flow diagram
+Component interaction
+2.2 Technology Stack
+Programming languages
+Frameworks / libraries
+Tools and platforms
+2.3 System Modules
+Module-wise description
+Functional flow
+2.4 Key Algorithms / Logic
+Pseudocode / explanations
+2.5 Screenshots / Code Snippets
+Output screenshots
+Important code sections
+CHAPTER 3: TESTING, VALIDATION & RESULTS
+3.1 Test Plan
+Testing strategy
+Tools used
+3.2 Test Cases
+[TABLE]
+Test Case ID | Description | Input | Expected Output | Status
+[/TABLE]
+3.3 Results & Analysis
+Observations
+Performance / accuracy metrics (if applicable)
+CHAPTER 4: EXECUTION / DEPLOYMENT DETAILS
+Execution environment
+Deployment steps (local / cloud)
+Demo screenshots
+Demo video link
+CHAPTER 5: PROJECT EXECUTION EVIDENCE
+5.1 Version Control Evidence
+GitHub repository link
+Commit history screenshot
+5.2 Weekly Progress Summary
+[TABLE]
+Week | Task Planned | Task Completed | Supervisor Remark
+[/TABLE]
+5.3 Supervisor Interaction Summary
+Review dates
+Key feedback received
+CHAPTER 6: CONCLUSION & FUTURE WORK
+Summary of implementation
+Achievements
+Limitations
+Future enhancements
+REFERENCES
+IEEE / APA format
+Online resources clearly cited
+APPENDIX
+A. User Manual
+B. Installation Guide
+C. Source Code Link (GitHub)
+D. Demo Video Link
+FORMATTING GUIDELINES
+Font: Times New Roman
+Size: 12 (Text), 14 (Headings)
+Line Spacing: 1.5
+Margin: 1 inch (all sides)
+Page Numbers: Bottom-center
+File Format: PDF
