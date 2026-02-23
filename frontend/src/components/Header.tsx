@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useI18n } from '../i18n';
 import { getExpectedChainId } from '@/utils/chain';
 import { 
@@ -121,7 +122,11 @@ const Header: React.FC<HeaderProps> = ({
       <div className="max-w-7xl mx-auto px-4 h-full">
         <div className="flex items-center justify-between h-full">
           {/* Left: Logo and title */}
-          <div className="flex items-center space-x-3">
+          <Link
+            to="/"
+            className="flex items-center space-x-3 rounded-xl px-1 py-1 -ml-1 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 transition-colors"
+            aria-label="Go to BharatVote landing page"
+          >
             <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center shadow-sm">
               <Shield className="w-5 h-5 text-white" />
             </div>
@@ -143,7 +148,7 @@ const Header: React.FC<HeaderProps> = ({
                 BV
               </h1>
             </div>
-          </div>
+          </Link>
 
           {/* Center: Phase badge */}
           {account && (
