@@ -518,6 +518,7 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
   const allTimeTotalRevealedVotes = useMemo(() => {
     return Array.from(analyticsCandidateVotes.values()).reduce((sum, value) => sum + value, 0);
   }, [analyticsCandidateVotes]);
+  const allTimeVotesCast = allTimeRevealed ?? allTimeTotalRevealedVotes;
 
   return (
     <div className="card-premium p-6 space-y-4">
@@ -585,9 +586,9 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
           <p className="text-3xl font-bold text-slate-900 mt-1">{candidates.length}</p>
         </div>
         <div className="p-4 rounded-lg bg-slate-50 border border-slate-200">
-          <p className="text-xs uppercase tracking-wide text-slate-600">{mode === 'allTime' ? 'Votes Cast (All-Time)' : 'Votes Revealed (Current)'}</p>
+          <p className="text-xs uppercase tracking-wide text-slate-600">{mode === 'allTime' ? 'Votes Cast (All-Time Revealed)' : 'Votes Revealed (Current)'}</p>
           <p className="text-3xl font-bold text-slate-900 mt-1">
-            {mode === 'allTime' ? (allTimeCommitted ?? '-') : totalVotes}
+            {mode === 'allTime' ? allTimeVotesCast : totalVotes}
           </p>
         </div>
         <div className="p-4 rounded-lg bg-slate-50 border border-slate-200">

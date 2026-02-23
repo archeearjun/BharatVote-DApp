@@ -134,7 +134,7 @@ const Tally: React.FC<TallyProps> = ({ contract, phase, refreshTrigger, eligible
           <IconButton 
             onClick={fetchResults} 
             disabled={isLoading}
-            className="text-blue-600 hover:bg-blue-50"
+            className="text-slate-700 hover:bg-slate-100"
           >
             <RefreshIcon />
           </IconButton>
@@ -149,14 +149,14 @@ const Tally: React.FC<TallyProps> = ({ contract, phase, refreshTrigger, eligible
             <p className="text-2xl font-semibold text-slate-900 mt-1">{eligibleCount ?? '—'}</p>
           </div>
         )}
-        <div className="p-4 rounded-lg bg-blue-50 border border-blue-100">
-          <p className="text-xs uppercase tracking-wide text-blue-600">Votes Cast</p>
-          <p className="text-2xl font-semibold text-blue-700 mt-1">{totalVotes}</p>
+        <div className="p-4 rounded-lg bg-slate-50 border border-slate-100">
+          <p className="text-xs uppercase tracking-wide text-slate-600">Votes Cast</p>
+          <p className="text-2xl font-semibold text-slate-900 mt-1">{totalVotes}</p>
         </div>
         {showEligibility ? (
-          <div className="p-4 rounded-lg bg-green-50 border border-green-100">
-            <p className="text-xs uppercase tracking-wide text-green-600">Completion</p>
-            <p className="text-2xl font-semibold text-green-700 mt-1">{completionPct}</p>
+          <div className="p-4 rounded-lg bg-slate-50 border border-slate-100">
+            <p className="text-xs uppercase tracking-wide text-slate-600">Completion</p>
+            <p className="text-2xl font-semibold text-slate-900 mt-1">{completionPct}</p>
           </div>
         ) : (
           <div className="p-4 rounded-lg bg-slate-50 border border-slate-100">
@@ -210,12 +210,12 @@ const Tally: React.FC<TallyProps> = ({ contract, phase, refreshTrigger, eligible
               <Step key={phaseItem.id} completed={phase > phaseItem.id}>
                 <StepLabel
                   StepIconComponent={() => getPhaseIcon(phaseItem.id)}
-                  className={phase === phaseItem.id ? 'text-blue-600' : ''}
+                  className={phase === phaseItem.id ? 'text-slate-900' : ''}
                 >
                   <div className="text-center">
                     <Typography 
                       variant="body2" 
-                      className={`font-medium ${phase === phaseItem.id ? 'text-blue-600' : 'text-gray-500'}`}
+                      className={`font-medium ${phase === phaseItem.id ? 'text-slate-900' : 'text-gray-500'}`}
                     >
                       {phaseItem.label}
                     </Typography>
@@ -248,29 +248,29 @@ const Tally: React.FC<TallyProps> = ({ contract, phase, refreshTrigger, eligible
             </Typography>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <Typography variant="h4" className="text-blue-600 font-bold">
+              <div className="text-center p-4 bg-slate-50 border border-slate-100 rounded-lg">
+                <Typography variant="h4" className="text-slate-900 font-bold">
                   {candidates.length}
                 </Typography>
-                <Typography variant="body2" className="text-blue-700">
+                <Typography variant="body2" className="text-slate-600">
                   {t('tally.candidates')}
                 </Typography>
               </div>
               
-              <div className="text-center p-4 bg-green-50 rounded-lg">
-                <Typography variant="h4" className="text-green-600 font-bold">
+              <div className="text-center p-4 bg-slate-50 border border-slate-100 rounded-lg">
+                <Typography variant="h4" className="text-slate-900 font-bold">
                   {totalVotes}
                 </Typography>
-                <Typography variant="body2" className="text-green-700">
+                <Typography variant="body2" className="text-slate-600">
                   {t('tally.totalVotes')}
                 </Typography>
               </div>
               
-              <div className="text-center p-4 bg-purple-50 rounded-lg">
-                <Typography variant="h4" className="text-purple-600 font-bold">
+              <div className="text-center p-4 bg-slate-50 border border-slate-100 rounded-lg">
+                <Typography variant="h4" className="text-slate-900 font-bold">
                   {phase === 2 ? t('tally.final') : t('tally.live')}
                 </Typography>
-                <Typography variant="body2" className="text-purple-700">
+                <Typography variant="body2" className="text-slate-600">
                   {t('tally.status')}
                 </Typography>
               </div>
@@ -402,11 +402,11 @@ const Tally: React.FC<TallyProps> = ({ contract, phase, refreshTrigger, eligible
         <Card className="shadow-sm border border-gray-100">
           <CardContent className="p-6">
             <div className="text-center py-8">
-              <InfoIcon className="w-16 h-16 text-blue-400 mx-auto mb-4" />
-              <Typography variant="h6" className="text-blue-600 mb-2">
+              <InfoIcon className="w-16 h-16 text-slate-500 mx-auto mb-4" />
+              <Typography variant="h6" className="text-slate-900 mb-2">
                 {t('tally.votingInProgress')}
               </Typography>
-              <Typography variant="body2" className="text-blue-700">
+              <Typography variant="body2" className="text-slate-600">
                 {t('tally.commitPhaseActive')}
               </Typography>
             </div>
