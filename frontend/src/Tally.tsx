@@ -100,8 +100,8 @@ const Tally: React.FC<TallyProps> = ({ contract, phase, refreshTrigger, eligible
 
   const getPhaseIcon = (phaseId: number) => {
     const status = getPhaseStatus(phaseId);
-    if (status === 'completed') return <CheckIcon color="success" />;
-    if (status === 'active') return <TrendingIcon color="primary" />;
+    if (status === 'completed') return <CheckIcon sx={{ color: '#1e293b' }} />;
+    if (status === 'active') return <TrendingIcon sx={{ color: '#1e293b' }} />;
     return <InfoIcon color="disabled" />;
   };
 
@@ -331,8 +331,13 @@ const Tally: React.FC<TallyProps> = ({ contract, phase, refreshTrigger, eligible
                         <Chip 
                           label={`#${candidate.id}`} 
                           size="small" 
-                          color="primary" 
-                          variant="outlined" 
+                          variant="outlined"
+                          sx={{
+                            borderColor: '#cbd5e1',
+                            color: '#334155',
+                            backgroundColor: '#f8fafc',
+                            fontWeight: 600,
+                          }}
                         />
                         <Typography variant="body1" className="font-medium">
                           {candidate.name}
@@ -340,8 +345,14 @@ const Tally: React.FC<TallyProps> = ({ contract, phase, refreshTrigger, eligible
                             <Chip 
                               label={t('tally.winner')} 
                               size="small" 
-                              color="success" 
-                              className="ml-2" 
+                              variant="outlined"
+                              className="ml-2"
+                              sx={{
+                                borderColor: '#cbd5e1',
+                                color: '#0f172a',
+                                backgroundColor: '#f8fafc',
+                                fontWeight: 700,
+                              }}
                             />
                           )}
                         </Typography>
@@ -363,7 +374,7 @@ const Tally: React.FC<TallyProps> = ({ contract, phase, refreshTrigger, eligible
                       sx={{
                         backgroundColor: '#e5e7eb',
                         '& .MuiLinearProgress-bar': {
-                          backgroundColor: isWinner ? '#10b981' : '#3b82f6',
+                          backgroundColor: '#1e293b',
                         }
                       }}
                     />
