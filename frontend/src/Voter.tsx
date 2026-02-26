@@ -11,7 +11,9 @@ import {
   X,
   Shuffle,
   Loader2,
-  Sparkles
+  Sparkles,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { ethers } from 'ethers';
 import { BACKEND_URL } from './constants';
@@ -55,6 +57,7 @@ const Voter: React.FC<VoterProps> = ({
   const [voteHash, setVoteHash] = useState<string | null>(null);
   const [selectedCandidateId, setSelectedCandidateId] = useState<number | null>(null);
   const [salt, setSalt] = useState('');
+  const [isSaltVisible, setIsSaltVisible] = useState(false);
   const [isCommitting, setIsCommitting] = useState(false);
   const [isRevealing, setIsRevealing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -194,7 +197,7 @@ const Voter: React.FC<VoterProps> = ({
   const handleCommitVote = async () => {
     console.log('DEBUG handleCommitVote: Starting vote commitment');
     console.log('DEBUG handleCommitVote: selectedCandidateId:', selectedCandidateId);
-    console.log('DEBUG handleCommitVote: salt:', salt);
+    console.log('DEBUG handleCommitVote: saltLength:', salt.trim().length);
     console.log('DEBUG handleCommitVote: contract available:', !!contract);
     console.log('DEBUG handleCommitVote: voterId:', voterId);
     console.log('DEBUG handleCommitVote: account:', account);
@@ -327,11 +330,16 @@ const Voter: React.FC<VoterProps> = ({
     if (phase === 1) {
       setSelectedCandidateId(null);
       setSalt('');
+      setIsSaltVisible(false);
       // Close commit modal if it's still open
       setShowCommitModal(false);
       // Check vote status when entering reveal phase
       checkVoteStatus();
     }
+  }, [phase]);
+
+  useEffect(() => {
+    setIsSaltVisible(false);
   }, [phase]);
 
   const handleRevealVote = async () => {
@@ -346,7 +354,7 @@ const Voter: React.FC<VoterProps> = ({
     try {
       console.log('DEBUG handleRevealVote: Starting vote reveal');
       console.log('DEBUG handleRevealVote: selectedCandidateId:', selectedCandidateId);
-      console.log('DEBUG handleRevealVote: salt:', salt);
+      console.log('DEBUG handleRevealVote: saltLength:', salt.trim().length);
       console.log('DEBUG handleRevealVote: contract available:', !!contract);
       
       // Check if user has committed a vote
@@ -410,6 +418,22 @@ const Voter: React.FC<VoterProps> = ({
   const handleNewSalt = () => {
     setSalt(generateSalt());
   };
+
+  const toggleSaltVisibility = () => {
+    setIsSaltVisible((prev) => !prev);
+  };
+
+  const preventSaltClipboard = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+  };
+
+  const preventSaltDragDrop = (e: React.DragEvent<HTMLInputElement>) => {
+    e.preventDefault();
+  };
+
+  const preventSaltContextMenu = (e: React.MouseEvent<HTMLInputElement>) => {
+    e.preventDefault();
+  };
   
   // Make the action buttons clickable as soon as inputs are present; we surface errors if prerequisites are missing
   const canCommit =
@@ -444,7 +468,7 @@ const Voter: React.FC<VoterProps> = ({
   console.log('DEBUG canReveal calculation:', {
     selectedCandidateId,
     saltTrimmed: !!salt.trim(),
-    saltValue: salt,
+    saltLength: salt.trim().length,
     isRevealing,
     hasVoted,
     hasRevealed,
@@ -461,7 +485,6 @@ const Voter: React.FC<VoterProps> = ({
     isEligible,
     candidates: candidates.length,
     selectedCandidateId,
-    salt: salt.trim(),
     saltLength: salt.trim().length,
     canCommit,
     canReveal,
@@ -478,7 +501,7 @@ const Voter: React.FC<VoterProps> = ({
       hasRevealed,
       phase,
       selectedCandidateId,
-      salt: salt.trim(),
+      saltLength: salt.trim().length,
       canReveal
     });
   }, [hasVoted, hasRevealed, phase, selectedCandidateId, salt, canReveal]);
@@ -759,13 +782,31 @@ const Voter: React.FC<VoterProps> = ({
             <div>
               <label className="block text-sm font-medium text-slate-900 mb-4">Security Password</label>
               <div className="space-y-3">
-                <input
-                  type="text"
-                  placeholder="Enter a memorable phrase for vote security"
-                  value={salt}
-                  onChange={(e) => setSalt(e.target.value)}
-                  className="input-base"
-                />
+                <div className="relative">
+                  <input
+                    type={isSaltVisible ? "text" : "password"}
+                    placeholder="Enter a memorable phrase for vote security"
+                    value={salt}
+                    onChange={(e) => setSalt(e.target.value)}
+                    onCopy={preventSaltClipboard}
+                    onPaste={preventSaltClipboard}
+                    onCut={preventSaltClipboard}
+                    onDrop={preventSaltDragDrop}
+                    onContextMenu={preventSaltContextMenu}
+                    autoComplete="new-password"
+                    spellCheck={false}
+                    className="input-base pr-11"
+                  />
+                  <button
+                    type="button"
+                    onClick={toggleSaltVisibility}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700"
+                    aria-label={isSaltVisible ? "Hide password" : "Show password"}
+                    title={isSaltVisible ? "Hide password" : "Show password"}
+                  >
+                    {isSaltVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
                 <p className="text-xs text-slate-500">
                   Any phrase works. You must use the exact same one during reveal.
                 </p>
@@ -850,13 +891,31 @@ const Voter: React.FC<VoterProps> = ({
             {/* Salt Input */}
             <div className="order-1 lg:order-2">
               <label className="block text-sm font-medium text-slate-900 mb-4">{t('voter.yourSalt')}</label>
-              <input
-                type="text"
-                placeholder={t('voter.enterExactSalt')}
-                value={salt}
-                onChange={(e) => setSalt(e.target.value)}
-                className="input-base"
-              />
+              <div className="relative">
+                <input
+                  type={isSaltVisible ? "text" : "password"}
+                  placeholder={t('voter.enterExactSalt')}
+                  value={salt}
+                  onChange={(e) => setSalt(e.target.value)}
+                  onCopy={preventSaltClipboard}
+                  onPaste={preventSaltClipboard}
+                  onCut={preventSaltClipboard}
+                  onDrop={preventSaltDragDrop}
+                  onContextMenu={preventSaltContextMenu}
+                  autoComplete="new-password"
+                  spellCheck={false}
+                  className="input-base pr-11"
+                />
+                <button
+                  type="button"
+                  onClick={toggleSaltVisibility}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700"
+                  aria-label={isSaltVisible ? "Hide password" : "Show password"}
+                  title={isSaltVisible ? "Hide password" : "Show password"}
+                >
+                  {isSaltVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
               <p className="text-xs text-slate-500 mt-3">
                 Enter the exact same password you used during the commit phase.
               </p>
@@ -1012,7 +1071,7 @@ const Voter: React.FC<VoterProps> = ({
                 onClick={() => {
                   console.log('DEBUG: Reveal button clicked!');
                   console.log('DEBUG: selectedCandidateId:', selectedCandidateId);
-                  console.log('DEBUG: salt:', salt);
+                  console.log('DEBUG: saltLength:', salt.trim().length);
                   console.log('DEBUG: canReveal:', canReveal);
                   console.log('DEBUG: contract available:', !!contract);
                   console.log('DEBUG: phase:', phase);
