@@ -67,23 +67,6 @@ const Voter: React.FC<VoterProps> = ({
   const [isEligible, setIsEligible] = useState(false);
   const [isFetchingProof, setIsFetchingProof] = useState(false);
 
-  // Validate wallet/account presence early
-  if (!account) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-            </svg>
-          </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Wallet Not Connected</h3>
-          <p className="text-sm text-gray-600 mb-4">Please connect your wallet to continue.</p>
-        </div>
-      </div>
-    );
-  }
-
   const phases = [
     { id: 0, label: t('voter.commit'), description: t('voter.submitEncryptedVote'), icon: Lock },
     { id: 1, label: t('voter.reveal'), description: t('voter.revealActualVote'), icon: Unlock },
@@ -260,8 +243,9 @@ const Voter: React.FC<VoterProps> = ({
       }
       const proofData = await resp.json();
       const proof = Array.isArray(proofData) ? proofData : proofData.proof;
-      if (!proof || !Array.isArray(proof) || proof.length === 0) {
-        throw new Error('Empty Merkle proof from backend.');
+      // Note: an empty proof is valid for a single-leaf Merkle tree.
+      if (!Array.isArray(proof)) {
+        throw new Error('Invalid Merkle proof payload from backend.');
       }
 
       // Preflight eligibility check: verify the backend proof matches the contract's merkleRoot.
@@ -515,6 +499,22 @@ const Voter: React.FC<VoterProps> = ({
     }
     handleCommitVote();
   };
+
+  if (!account) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Wallet Not Connected</h3>
+          <p className="text-sm text-gray-600 mb-4">Please connect your wallet to continue.</p>
+        </div>
+      </div>
+    );
+  }
 
   // Error boundary - if there's a critical error, show it
   if (!voterId) {

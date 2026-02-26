@@ -40,25 +40,35 @@
     "merkletreejs": "^0.5.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^7.6.3",
-    "vite": "^5.0.0"
+    "react-router-dom": "^7.13.1",
+    "vite": "^5.4.21"
+  },
+  "overrides": {
+    "node-fetch": "^2.6.7",
+    "rollup": "^4.59.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.3",
     "@testing-library/jest-dom": "^6.4.6",
     "@testing-library/react": "^14.3.1",
     "@testing-library/user-event": "^14.5.2",
     "@types/node": "^20.19.0",
     "@types/react": "^18.3.23",
     "@types/react-dom": "^18.3.7",
-    "@typescript-eslint/eslint-plugin": "^7.1.0",
-    "@typescript-eslint/parser": "^7.1.0",
+    "@typescript-eslint/eslint-plugin": "^8.56.1",
+    "@typescript-eslint/parser": "^8.56.1",
     "@vitest/coverage-v8": "^3.2.4",
     "@vitest/ui": "^3.2.4",
     "autoprefixer": "^10.4.21",
+    "eslint": "^9.39.3",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^17.3.0",
     "jsdom": "^24.1.0",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.0",
     "typescript": "^5.8.3",
+    "typescript-eslint": "^8.56.1",
     "vite-plugin-node-polyfills": "^0.24.0",
     "vitest": "^3.2.4"
   }
