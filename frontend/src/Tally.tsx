@@ -278,17 +278,17 @@ const Tally: React.FC<TallyProps> = ({ contract, phase, refreshTrigger, eligible
 
             {/* Winner Highlight */}
             {phase === 2 && getWinner() && (
-              <div className="mb-6 p-4 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg border border-yellow-200">
+              <div className="mb-6 p-4 bg-slate-50 rounded-lg border border-slate-200">
                 <div className="flex items-center justify-center space-x-3">
-                  <CheckIcon className="w-8 h-8 text-yellow-600" />
+                  <CheckIcon className="w-8 h-8 text-slate-700" />
                   <div className="text-center">
-                    <Typography variant="h6" className="text-yellow-800 font-semibold">
+                    <Typography variant="h6" className="text-slate-900 font-semibold">
                       {t('tally.electionWinner')}
                     </Typography>
-                    <Typography variant="h5" className="text-yellow-700 font-bold">
+                    <Typography variant="h5" className="text-slate-900 font-bold">
                       {getWinner()?.name}
                     </Typography>
-                    <Typography variant="body2" className="text-yellow-600">
+                    <Typography variant="body2" className="text-slate-600">
                       {t('tally.withVotes')}: {getWinner()?.voteCount} ({formatPercentage(getWinner()?.voteCount || 0)})
                     </Typography>
                   </div>
