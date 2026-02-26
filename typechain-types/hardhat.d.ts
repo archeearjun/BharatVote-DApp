@@ -34,10 +34,6 @@ declare module "hardhat/types/runtime" {
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.BharatVote__factory>;
     getContractFactory(
-      name: "BharatVoteWithIPFS",
-      signerOrOptions?: ethers.Signer | FactoryOptions
-    ): Promise<Contracts.BharatVoteWithIPFS__factory>;
-    getContractFactory(
       name: "ElectionFactory",
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.ElectionFactory__factory>;
@@ -45,10 +41,6 @@ declare module "hardhat/types/runtime" {
       name: "IBharatVote",
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.IBharatVote__factory>;
-    getContractFactory(
-      name: "Lock",
-      signerOrOptions?: ethers.Signer | FactoryOptions
-    ): Promise<Contracts.Lock__factory>;
 
     getContractAt(
       name: "Clones",
@@ -76,11 +68,6 @@ declare module "hardhat/types/runtime" {
       signer?: ethers.Signer
     ): Promise<Contracts.BharatVote>;
     getContractAt(
-      name: "BharatVoteWithIPFS",
-      address: string | ethers.Addressable,
-      signer?: ethers.Signer
-    ): Promise<Contracts.BharatVoteWithIPFS>;
-    getContractAt(
       name: "ElectionFactory",
       address: string | ethers.Addressable,
       signer?: ethers.Signer
@@ -90,11 +77,6 @@ declare module "hardhat/types/runtime" {
       address: string | ethers.Addressable,
       signer?: ethers.Signer
     ): Promise<Contracts.IBharatVote>;
-    getContractAt(
-      name: "Lock",
-      address: string | ethers.Addressable,
-      signer?: ethers.Signer
-    ): Promise<Contracts.Lock>;
 
     deployContract(
       name: "Clones",
@@ -117,10 +99,6 @@ declare module "hardhat/types/runtime" {
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.BharatVote>;
     deployContract(
-      name: "BharatVoteWithIPFS",
-      signerOrOptions?: ethers.Signer | DeployContractOptions
-    ): Promise<Contracts.BharatVoteWithIPFS>;
-    deployContract(
       name: "ElectionFactory",
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.ElectionFactory>;
@@ -128,10 +106,6 @@ declare module "hardhat/types/runtime" {
       name: "IBharatVote",
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.IBharatVote>;
-    deployContract(
-      name: "Lock",
-      signerOrOptions?: ethers.Signer | DeployContractOptions
-    ): Promise<Contracts.Lock>;
 
     deployContract(
       name: "Clones",
@@ -159,11 +133,6 @@ declare module "hardhat/types/runtime" {
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.BharatVote>;
     deployContract(
-      name: "BharatVoteWithIPFS",
-      args: any[],
-      signerOrOptions?: ethers.Signer | DeployContractOptions
-    ): Promise<Contracts.BharatVoteWithIPFS>;
-    deployContract(
       name: "ElectionFactory",
       args: any[],
       signerOrOptions?: ethers.Signer | DeployContractOptions
@@ -173,11 +142,6 @@ declare module "hardhat/types/runtime" {
       args: any[],
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.IBharatVote>;
-    deployContract(
-      name: "Lock",
-      args: any[],
-      signerOrOptions?: ethers.Signer | DeployContractOptions
-    ): Promise<Contracts.Lock>;
 
     // default types
     getContractFactory(

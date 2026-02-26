@@ -3,5 +3,3 @@
 /* eslint-disable */
 export * as electionFactorySol from "./ElectionFactory.sol";
 export { BharatVote__factory } from "./BharatVote__factory";
-export { BharatVoteWithIPFS__factory } from "./BharatVoteWithIPFS__factory";
-export { Lock__factory } from "./Lock__factory";

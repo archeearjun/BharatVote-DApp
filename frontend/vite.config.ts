@@ -16,7 +16,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
-      '@typechain': path.resolve(__dirname, 'src/typechain-types'),
+      '@typechain': path.resolve(__dirname, '../typechain-types'),
+      'ethers': path.resolve(__dirname, 'node_modules/ethers'),
     },
   },
   server: {

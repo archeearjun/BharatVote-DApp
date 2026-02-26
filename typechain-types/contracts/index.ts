@@ -4,5 +4,3 @@
 import type * as electionFactorySol from "./ElectionFactory.sol";
 export type { electionFactorySol };
 export type { BharatVote } from "./BharatVote";
-export type { BharatVoteWithIPFS } from "./BharatVoteWithIPFS";
-export type { Lock } from "./Lock";

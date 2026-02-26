@@ -1,5 +1,5 @@
 import type { BrowserProvider } from "ethers";
-import type { BharatVote } from "@typechain/BharatVote.sol/BharatVote";
+import type { BharatVote } from "@typechain/contracts/BharatVote";
 
 export interface WalletState {
   provider: BrowserProvider | null;

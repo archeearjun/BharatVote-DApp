@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { ethers } from "ethers";
 import { PHASE_LABELS, ERROR_MESSAGES, COMMIT_PHASE, REVEAL_PHASE, FINISH_PHASE, CANDIDATE_MESSAGES, SUCCESS_MESSAGES, BACKEND_URL } from "./constants";
 import { useI18n } from './i18n';
-import type { BharatVote } from "@typechain/BharatVote.sol/BharatVote";
+import type { BharatVote } from "@typechain/contracts/BharatVote";
 import { getCandidateLabel, setCandidateLabels } from './utils/candidateLabels';
 import type { Candidate } from "./types/candidates";
 import { 
