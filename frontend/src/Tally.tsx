@@ -92,6 +92,17 @@ const Tally: React.FC<TallyProps> = ({ contract, phase, refreshTrigger, eligible
     );
   };
 
+  const getTopCandidates = () => {
+    if (candidates.length === 0 || totalVotes === 0) return [] as Candidate[];
+    const maxVotes = Math.max(...candidates.map((candidate) => candidate.voteCount));
+    return candidates.filter((candidate) => candidate.voteCount === maxVotes);
+  };
+
+  const topCandidates = getTopCandidates();
+  const winner = topCandidates.length === 1 ? topCandidates[0] : null;
+  const isDraw = phase === 2 && topCandidates.length > 1;
+  const topVoteCount = topCandidates.length > 0 ? topCandidates[0].voteCount : 0;
+
   const getPhaseStatus = (phaseId: number) => {
     if (phaseId < phase) return 'completed';
     if (phaseId === phase) return 'active';
@@ -277,7 +288,7 @@ const Tally: React.FC<TallyProps> = ({ contract, phase, refreshTrigger, eligible
             </div>
 
             {/* Winner Highlight */}
-            {phase === 2 && getWinner() && (
+            {phase === 2 && winner && (
               <div className="mb-6 p-4 bg-slate-50 rounded-lg border border-slate-200">
                 <div className="flex items-center justify-center space-x-3">
                   <CheckIcon className="w-8 h-8 text-slate-700" />
@@ -286,10 +297,29 @@ const Tally: React.FC<TallyProps> = ({ contract, phase, refreshTrigger, eligible
                       {t('tally.electionWinner')}
                     </Typography>
                     <Typography variant="h5" className="text-slate-900 font-bold">
-                      {getWinner()?.name}
+                      {winner.name}
                     </Typography>
                     <Typography variant="body2" className="text-slate-600">
-                      {t('tally.withVotes')}: {getWinner()?.voteCount} ({formatPercentage(getWinner()?.voteCount || 0)})
+                      {t('tally.withVotes')}: {winner.voteCount} ({formatPercentage(winner.voteCount)})
+                    </Typography>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {isDraw && (
+              <div className="mb-6 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                <div className="flex items-center justify-center space-x-3">
+                  <InfoIcon className="w-8 h-8 text-slate-700" />
+                  <div className="text-center">
+                    <Typography variant="h6" className="text-slate-900 font-semibold">
+                      {t('tally.electionDraw')}
+                    </Typography>
+                    <Typography variant="h5" className="text-slate-900 font-bold">
+                      {topCandidates.map((candidate) => candidate.name).join(' & ')}
+                    </Typography>
+                    <Typography variant="body2" className="text-slate-600">
+                      {t('tally.tiedAt')}: {topVoteCount} ({formatPercentage(topVoteCount)})
                     </Typography>
                   </div>
                 </div>
@@ -322,7 +352,8 @@ const Tally: React.FC<TallyProps> = ({ contract, phase, refreshTrigger, eligible
             <div className="space-y-4">
               {candidates.map((candidate) => {
                 const percentage = formatPercentage(candidate.voteCount);
-                const isWinner = phase === 2 && getWinner()?.id === candidate.id;
+                const isWinner = phase === 2 && !isDraw && winner?.id === candidate.id;
+                const isDrawLeader = phase === 2 && isDraw && candidate.voteCount === topVoteCount;
                 
                 return (
                   <div key={candidate.id} className="space-y-2">
@@ -345,6 +376,20 @@ const Tally: React.FC<TallyProps> = ({ contract, phase, refreshTrigger, eligible
                             <Chip 
                               label={t('tally.winner')} 
                               size="small" 
+                              variant="outlined"
+                              className="ml-2"
+                              sx={{
+                                borderColor: '#cbd5e1',
+                                color: '#0f172a',
+                                backgroundColor: '#f8fafc',
+                                fontWeight: 700,
+                              }}
+                            />
+                          )}
+                          {isDrawLeader && (
+                            <Chip
+                              label={t('tally.draw')}
+                              size="small"
                               variant="outlined"
                               className="ml-2"
                               sx={{
