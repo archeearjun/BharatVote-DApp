@@ -62,8 +62,9 @@ const Tally: React.FC<TallyProps> = ({ contract, phase, refreshTrigger, eligible
     
     try {
       const fetchedCandidates = await contract.getCandidates();
+      const activeCandidates = fetchedCandidates.filter((candidate: any) => Boolean(candidate.isActive));
       const candidatesWithVotes = await Promise.all(
-        fetchedCandidates.map(async (candidate: any) => {
+        activeCandidates.map(async (candidate: any) => {
           // Contract exposes getVotes(uint256) -> uint256
           const raw = await contract.getVotes(candidate.id);
           const voteCount = typeof raw === 'bigint' ? Number(raw) : Number(raw || 0);

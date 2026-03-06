@@ -163,6 +163,18 @@ const Header: React.FC<HeaderProps> = ({
 
           {/* Right: Account info, admin status, and language */}
           <div className="flex items-center space-x-3">
+            <div className="hidden xl:flex items-center space-x-2 text-xs">
+              <Link to="/learn" className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-slate-600 hover:bg-slate-50">
+                Key Terms
+              </Link>
+              <Link to="/guide/main-election" className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-slate-600 hover:bg-slate-50">
+                Main Guide
+              </Link>
+              <Link to="/blog" className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-slate-600 hover:bg-slate-50">
+                Blog
+              </Link>
+            </div>
+
             {/* Network and root status pills */}
             {account && (
               <div className="hidden lg:flex items-center space-x-2">

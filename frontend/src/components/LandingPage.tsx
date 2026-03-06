@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ethers } from "ethers";
 import { ArrowRight, Shield, Sparkles, Users } from "lucide-react";
 import CreateElection from "./CreateElection";
@@ -95,6 +95,18 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-gradient-subtle font-sans md:flex md:items-center">
       <MainContainer className="space-y-6" paddingYClassName="py-10 md:py-0">
+        <div className="card p-3 bg-white border-slate-200">
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="font-medium text-slate-700">Explore:</span>
+            <Link to="/about" className="btn-ghost !px-3 !py-1.5 text-xs">About</Link>
+            <Link to="/learn" className="btn-ghost !px-3 !py-1.5 text-xs">Key Terms</Link>
+            <Link to="/guide/main-election" className="btn-ghost !px-3 !py-1.5 text-xs">Main Guide</Link>
+            <Link to="/guide/demo-election" className="btn-ghost !px-3 !py-1.5 text-xs">Demo Guide</Link>
+            <Link to="/blog" className="btn-ghost !px-3 !py-1.5 text-xs">Blog</Link>
+            <Link to="/faq" className="btn-ghost !px-3 !py-1.5 text-xs">FAQ</Link>
+          </div>
+        </div>
+
         <div className="text-center">
           <h1 className="text-2xl sm:text-3xl font-semibold text-slate-900 tracking-tight">
             BharatVote

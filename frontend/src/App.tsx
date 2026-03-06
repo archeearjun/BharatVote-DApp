@@ -26,6 +26,13 @@ import StepWizard from './components/StepWizard';
 import PublicResults from './components/PublicResults';
 import LandingPage from "./components/LandingPage";
 import { getChainConfig, getExpectedChainId } from "@/utils/chain";
+import AboutPage from "./pages/AboutPage";
+import LearnPage from "./pages/LearnPage";
+import MainElectionGuidePage from "./pages/MainElectionGuidePage";
+import DemoElectionGuidePage from "./pages/DemoElectionGuidePage";
+import BlogIndexPage from "./pages/BlogIndexPage";
+import BlogPostPage from "./pages/BlogPostPage";
+import FaqPage from "./pages/FaqPage";
 
 const AdminPanel = lazy(() => import('./Admin'));
 const Voter = lazy(() => import('./Voter'));
@@ -1028,6 +1035,13 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
+      <Route path="/about" element={<AboutPage />} />
+      <Route path="/learn" element={<LearnPage />} />
+      <Route path="/guide/main-election" element={<MainElectionGuidePage />} />
+      <Route path="/guide/demo-election" element={<DemoElectionGuidePage />} />
+      <Route path="/blog" element={<BlogIndexPage />} />
+      <Route path="/blog/:slug" element={<BlogPostPage />} />
+      <Route path="/faq" element={<FaqPage />} />
       <Route path="/election/:address" element={<ElectionRoute />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
