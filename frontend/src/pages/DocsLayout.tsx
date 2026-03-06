@@ -22,26 +22,28 @@ export default function DocsLayout({ title, description, children }: DocsLayoutP
     <div className="min-h-screen bg-gradient-subtle font-sans">
       <header className="border-b border-slate-200 bg-white/95 backdrop-blur">
         <MainContainer className="!space-y-4" paddingYClassName="py-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <NavLink to="/" className="text-lg font-semibold text-slate-900 hover:text-slate-700">
               BharatVote
             </NavLink>
-            <nav className="flex flex-wrap gap-2">
-              {links.map((link) => (
-                <NavLink
-                  key={link.to}
-                  to={link.to}
-                  className={({ isActive }) =>
-                    `rounded-lg px-3 py-1.5 text-sm transition-colors ${
-                      isActive
-                        ? "bg-slate-900 text-white"
-                        : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                    }`
-                  }
-                >
-                  {link.label}
-                </NavLink>
-              ))}
+            <nav className="min-w-0">
+              <div className="flex gap-2 overflow-x-auto whitespace-nowrap pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                {links.map((link) => (
+                  <NavLink
+                    key={link.to}
+                    to={link.to}
+                    className={({ isActive }) =>
+                      `shrink-0 rounded-lg px-3 py-1.5 text-sm transition-colors ${
+                        isActive
+                          ? "bg-slate-900 text-white"
+                          : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                      }`
+                    }
+                  >
+                    {link.label}
+                  </NavLink>
+                ))}
+              </div>
             </nav>
           </div>
         </MainContainer>
@@ -57,4 +59,3 @@ export default function DocsLayout({ title, description, children }: DocsLayoutP
     </div>
   );
 }
-
