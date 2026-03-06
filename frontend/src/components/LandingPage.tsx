@@ -95,22 +95,6 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-gradient-subtle font-sans md:flex md:items-center">
       <MainContainer className="space-y-6" paddingYClassName="py-10 md:py-0">
-        <div className="card p-3 bg-white border-slate-200">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Explore</span>
-            <div className="min-w-0 flex-1">
-              <div className="flex gap-2 overflow-x-auto whitespace-nowrap pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-                <Link to="/about" className="btn-ghost !px-3 !py-1.5 !text-xs shrink-0">About</Link>
-                <Link to="/learn" className="btn-ghost !px-3 !py-1.5 !text-xs shrink-0">Key Terms</Link>
-                <Link to="/guide/main-election" className="btn-ghost !px-3 !py-1.5 !text-xs shrink-0">Main Guide</Link>
-                <Link to="/guide/demo-election" className="btn-ghost !px-3 !py-1.5 !text-xs shrink-0">Demo Guide</Link>
-                <Link to="/blog" className="btn-ghost !px-3 !py-1.5 !text-xs shrink-0">Blog</Link>
-                <Link to="/faq" className="btn-ghost !px-3 !py-1.5 !text-xs shrink-0">FAQ</Link>
-              </div>
-            </div>
-          </div>
-        </div>
-
         <div className="text-center">
           <h1 className="text-2xl sm:text-3xl font-semibold text-slate-900 tracking-tight">
             BharatVote
@@ -118,6 +102,18 @@ export default function LandingPage() {
           <p className="text-sm sm:text-base text-slate-600 mt-2">
             Create or join a Sepolia election in seconds.
           </p>
+        </div>
+
+        <div className="flex justify-center">
+          <div className="inline-flex max-w-full flex-wrap items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white/90 px-3 py-2 shadow-sm">
+            <span className="px-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Explore</span>
+            <Link to="/about" className="rounded-lg px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100">About</Link>
+            <Link to="/learn" className="rounded-lg px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100">Key Terms</Link>
+            <Link to="/guide/main-election" className="rounded-lg px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100">Main Guide</Link>
+            <Link to="/guide/demo-election" className="rounded-lg px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100">Demo Guide</Link>
+            <Link to="/blog" className="rounded-lg px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100">Blog</Link>
+            <Link to="/faq" className="rounded-lg px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100">FAQ</Link>
+          </div>
         </div>
 
         <div className="card p-4 bg-slate-50 border-slate-200 text-sm text-slate-700">
