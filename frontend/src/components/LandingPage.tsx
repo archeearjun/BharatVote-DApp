@@ -93,8 +93,8 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-subtle font-sans md:flex md:items-center">
-      <MainContainer className="space-y-6" paddingYClassName="py-10 md:py-0">
+    <div className="min-h-screen bg-gradient-subtle font-sans">
+      <MainContainer className="space-y-6" paddingYClassName="py-8 md:py-10">
         <div className="text-center">
           <h1 className="text-2xl sm:text-3xl font-semibold text-slate-900 tracking-tight">
             BharatVote
@@ -122,9 +122,9 @@ export default function LandingPage() {
           <span className="font-semibold text-slate-900">Main:</span> Requires mock KYC verification.
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
           {/* Left: Admin */}
-          <div className="card-premium p-6 h-full flex flex-col">
+          <div className="card-premium p-6">
             <div className="flex items-start gap-4 mb-6">
               <div className="w-12 h-12 bg-slate-900 rounded-xl flex items-center justify-center shadow-sm">
                 <Shield className="w-6 h-6 text-white" />
@@ -139,13 +139,11 @@ export default function LandingPage() {
                 </p>
               </div>
             </div>
-            <div className="mt-auto">
-              <CreateElection />
-            </div>
+            <CreateElection />
           </div>
 
           {/* Right: Voter */}
-          <div className="card-premium p-6 h-full">
+          <div className="card-premium p-6">
             <div className="flex items-start gap-4 mb-6">
               <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center shadow-sm">
                 <Users className="w-6 h-6 text-slate-700" />
