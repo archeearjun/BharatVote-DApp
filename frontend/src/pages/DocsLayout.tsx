@@ -126,6 +126,7 @@ function ActionLink({ action, className = "" }: { action: DocsAction; className?
         className={classes}
       >
         <span>{action.label}</span>
+        <span className="sr-only">(opens in new tab)</span>
         {icon}
       </a>
     );
@@ -154,6 +155,7 @@ function FooterTextLink({ action }: { action: DocsAction }) {
         className={baseClassName}
       >
         {action.label}
+        <span className="sr-only"> (opens in new tab)</span>
       </a>
     );
   }

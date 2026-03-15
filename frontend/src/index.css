@@ -154,6 +154,11 @@
   to { transform: scale(1); opacity: 1; }
 }
 
+@keyframes barFill {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
 .animate-fade-in {
   animation: fadeIn 0.5s ease-out;
 }
@@ -164,4 +169,9 @@
 
 .animate-scale-in {
   animation: scaleIn 0.2s ease-out;
+}
+
+.animate-bar-fill {
+  transform-origin: left;
+  animation: barFill 0.6s ease-out both;
 }

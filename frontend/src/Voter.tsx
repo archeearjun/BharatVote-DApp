@@ -11,6 +11,7 @@ import {
   AlertTriangle,
   X,
   Shuffle,
+  Download,
   Loader2,
   Sparkles,
   Eye,
@@ -443,6 +444,40 @@ const Voter: React.FC<VoterProps> = ({
     setSalt(generateSalt());
   };
 
+  const handleDownloadRecoveryFile = useCallback(() => {
+    if (selectedCandidateId === null || !salt.trim()) {
+      setError('Select a candidate and enter your password before downloading recovery details.');
+      return;
+    }
+
+    const safeElectionLabel = electionAddress
+      ? electionAddress.toLowerCase().replace(/[^a-z0-9]/g, '').slice(-8)
+      : 'election';
+    const filename = `bharatvote-recovery-${safeElectionLabel}.txt`;
+    const fileContents = [
+      'BharatVote Recovery File',
+      `Exported: ${new Date().toISOString()}`,
+      `Election: ${electionAddress || 'N/A'}`,
+      `Wallet: ${account}`,
+      `Candidate ID: ${selectedCandidateId}`,
+      `Password: ${salt.trim()}`,
+      `Commit Hash: ${voteHash || 'Pending until commit transaction confirms'}`,
+      '',
+      'Keep this file private. You need the exact same password and candidate ID during reveal.',
+    ].join('\n');
+
+    const blob = new Blob([fileContents], { type: 'text/plain;charset=utf-8' });
+    const downloadUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(downloadUrl);
+    setSuccess('Recovery file downloaded. Keep it private until you complete reveal.');
+  }, [account, electionAddress, salt, selectedCandidateId, voteHash]);
+
   const toggleSaltVisibility = () => {
     setIsSaltVisible((prev) => !prev);
   };
@@ -841,6 +876,16 @@ const Voter: React.FC<VoterProps> = ({
                   <Shuffle className="w-4 h-4" />
                   Generate Random Password
                 </button>
+                <button
+                  type="button"
+                  onClick={handleDownloadRecoveryFile}
+                  disabled={selectedCandidateId === null || !salt.trim()}
+                  className="btn-secondary text-sm"
+                  title="Download a private recovery file for reveal"
+                >
+                  <Download className="w-4 h-4" />
+                  Download Recovery File
+                </button>
               </div>
               <div className="mt-4 p-4 bg-warning-50 border border-warning-200 rounded-xl">
                 <div className="flex items-start gap-3">
@@ -947,6 +992,16 @@ const Voter: React.FC<VoterProps> = ({
                   Your commit recovery details are available in this browser for this election.
                 </p>
               )}
+              <button
+                type="button"
+                onClick={handleDownloadRecoveryFile}
+                disabled={selectedCandidateId === null || !salt.trim()}
+                className="btn-secondary mt-3 text-sm"
+                title="Download your recovery details"
+              >
+                <Download className="w-4 h-4" />
+                Download Recovery File
+              </button>
             </div>
 
             {/* Candidate Selection */}

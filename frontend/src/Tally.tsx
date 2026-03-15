@@ -269,7 +269,7 @@ const Tally: React.FC<TallyProps> = ({ contract, phase, refreshTrigger, eligible
           )}
 
           <div className="space-y-4">
-            {candidates.map((candidate) => {
+            {candidates.map((candidate, index) => {
               const percentage = formatPercentage(candidate.voteCount);
               const isWinnerCard = phase === 2 && !isDraw && winner?.id === candidate.id;
               const isDrawLeader = phase === 2 && isDraw && candidate.voteCount === topVoteCount;
@@ -295,8 +295,11 @@ const Tally: React.FC<TallyProps> = ({ contract, phase, refreshTrigger, eligible
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-slate-100">
                     <div
-                      className="h-2 rounded-full bg-slate-900 transition-all"
-                      style={{ width: totalVotes > 0 ? `${(candidate.voteCount / totalVotes) * 100}%` : '0%' }}
+                      className="h-2 rounded-full bg-slate-900 transition-all animate-bar-fill"
+                      style={{
+                        width: totalVotes > 0 ? `${(candidate.voteCount / totalVotes) * 100}%` : '0%',
+                        animationDelay: `${index * 80}ms`,
+                      }}
                     />
                   </div>
                 </div>

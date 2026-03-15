@@ -165,6 +165,7 @@ export default function AboutPage() {
             className="btn-primary mt-6 inline-flex"
           >
             Watch Demo Video
+            <span className="sr-only">(opens in new tab)</span>
           </a>
         </article>
 
@@ -181,6 +182,7 @@ export default function AboutPage() {
             className="btn-secondary mt-6 inline-flex"
           >
             LinkedIn Profile
+            <span className="sr-only">(opens in new tab)</span>
           </a>
         </article>
       </section>

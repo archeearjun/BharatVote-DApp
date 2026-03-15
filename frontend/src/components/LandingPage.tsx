@@ -117,9 +117,9 @@ export default function LandingPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
           {/* Left: Admin */}
-          <div className="card-premium p-6">
+          <div className="card-premium group p-6 md:hover:-translate-y-1">
             <div className="flex items-start gap-4 mb-6">
-              <div className="w-12 h-12 bg-slate-900 rounded-xl flex items-center justify-center shadow-sm">
+              <div className="w-12 h-12 bg-slate-900 rounded-xl flex items-center justify-center shadow-sm transition-transform duration-300 group-hover:scale-105">
                 <Shield className="w-6 h-6 text-white" />
               </div>
               <div>
@@ -136,9 +136,9 @@ export default function LandingPage() {
           </div>
 
           {/* Right: Voter */}
-          <div className="card-premium p-6">
+          <div className="card-premium group p-6 md:hover:-translate-y-1">
             <div className="flex items-start gap-4 mb-6">
-              <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center shadow-sm">
+              <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center shadow-sm transition-transform duration-300 group-hover:scale-105">
                 <Users className="w-6 h-6 text-slate-700" />
               </div>
               <div>
