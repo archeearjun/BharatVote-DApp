@@ -48,7 +48,7 @@ export default function DemoElectionGuidePage() {
     <DocsLayout
       eyebrow="Fast Onboarding"
       title="Demo Election Guide"
-      description="This guide now mirrors the TensorFlow-style organization more closely: first explain what makes demo mode different, then present the flow as compact operational cards with clear state changes."
+      description="This guide first explains what makes demo mode different, then presents the flow as compact operational cards with clear state changes."
       heroActions={[
         { label: "Open FAQ", to: "/faq", variant: "primary" },
         { label: "Read Key Terms", to: "/learn", variant: "secondary" },

@@ -49,7 +49,7 @@ export default function AboutPage() {
         },
       ]}
       heroAsideTitle="What this page covers"
-      heroAsideDescription="The structure borrows the TensorFlow idea of guiding people through context first, then system breakdown, then evidence and next actions."
+      heroAsideDescription="This page moves from project context to system breakdown, then to proof points and next actions."
       heroAsideItems={[
         {
           label: "Builder",
@@ -75,7 +75,7 @@ export default function AboutPage() {
       <DocsSectionIntro
         eyebrow="System View"
         title="How BharatVote is organized"
-        description="Instead of presenting the project as one big block, the page now breaks it into the same kind of guided modules seen on TensorFlow: overview, architecture, principles, and supporting proof points."
+        description="Instead of presenting the project as one big block, the page breaks it into guided modules: overview, architecture, principles, and supporting proof points."
       />
 
       <section className="grid gap-4 lg:grid-cols-3">

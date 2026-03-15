@@ -425,8 +425,7 @@ export default function DocsLayout({
           <div>
             <p className="text-base font-semibold text-slate-900">BharatVote Docs</p>
             <p className="mt-3 max-w-sm text-sm leading-7 text-slate-600">
-              These pages now follow a stronger content rhythm inspired by TensorFlow’s site organization:
-              lead with context, split complex ideas into guided blocks, and end each page with clear next steps.
+              These pages lead with context, break complex ideas into guided sections, and keep the next step close to the content.
             </p>
           </div>
 

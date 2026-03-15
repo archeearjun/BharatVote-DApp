@@ -80,7 +80,7 @@ export default function MainElectionGuidePage() {
       <DocsSplitSection
         eyebrow="Preparation"
         title="Set the election up correctly before voting starts"
-        description="The page now uses a TensorFlow-like split section here: one side explains the logic, the other side isolates the exact readiness checklist so the operator sees both context and action at once."
+        description="This split section puts the logic on one side and the readiness checklist on the other, so the operator sees both context and action at once."
         bullets={[
           {
             title: "Use MetaMask on Sepolia",

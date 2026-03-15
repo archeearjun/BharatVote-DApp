@@ -88,7 +88,7 @@ export default function LearnPage() {
       <DocsSplitSection
         eyebrow="Orientation"
         title="Start with the concepts that shape every page"
-        description="TensorFlow’s site works because it frames information before it dives into examples. This glossary now does the same: it tells you what to read, then presents each idea in a compact, scannable unit."
+        description="This glossary frames the concepts first, then presents each idea in a compact, scannable unit."
         bullets={[
           {
             title: "Understand the voting lifecycle",
