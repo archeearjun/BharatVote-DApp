@@ -27,18 +27,13 @@ const StepWizard: React.FC<StepWizardProps> = ({ steps, currentStep, lockedReaso
           {steps.map((step, idx) => {
             const status = idx < clampedStep ? 'complete' : idx === clampedStep ? 'current' : 'upcoming';
             const isLocked = Boolean(lockedReason) && idx > clampedStep;
+            const leftConnectorClass =
+              idx > 0 && idx <= clampedStep ? 'bg-green-500' : 'bg-slate-200';
+            const rightConnectorClass =
+              idx < clampedStep ? 'bg-green-500' : 'bg-slate-200';
 
             return (
               <li key={step.id} className="relative">
-                {idx < steps.length - 1 && (
-                  <div
-                    className={`absolute left-[calc(50%+1.5rem)] right-[-1.25rem] top-5 h-px ${
-                      idx < clampedStep ? 'bg-green-500' : 'bg-slate-200'
-                    }`}
-                    aria-hidden="true"
-                  />
-                )}
-
                 <div
                   className={`relative flex flex-col items-center rounded-2xl px-3 py-2 text-center transition-colors ${
                     status === 'current'
@@ -48,8 +43,23 @@ const StepWizard: React.FC<StepWizardProps> = ({ steps, currentStep, lockedReaso
                         : 'bg-transparent'
                   }`}
                 >
+                  <div className="relative flex h-10 w-full items-center justify-center">
+                    {idx > 0 && (
+                      <div
+                        className={`absolute left-[-0.75rem] right-1/2 top-1/2 h-px -translate-y-1/2 ${leftConnectorClass}`}
+                        aria-hidden="true"
+                      />
+                    )}
+
+                    {idx < steps.length - 1 && (
+                      <div
+                        className={`absolute left-1/2 right-[-0.75rem] top-1/2 h-px -translate-y-1/2 ${rightConnectorClass}`}
+                        aria-hidden="true"
+                      />
+                    )}
+
                   <div
-                    className={`flex h-10 w-10 items-center justify-center rounded-full border text-sm font-semibold ${
+                    className={`relative z-10 flex h-10 w-10 items-center justify-center rounded-full border text-sm font-semibold ${
                       status === 'complete'
                         ? 'border-green-600 bg-green-600 text-white'
                         : status === 'current'
@@ -59,6 +69,7 @@ const StepWizard: React.FC<StepWizardProps> = ({ steps, currentStep, lockedReaso
                     aria-hidden="true"
                   >
                     {status === 'complete' ? <Check className="h-4 w-4" /> : idx + 1}
+                  </div>
                   </div>
 
                   <p
