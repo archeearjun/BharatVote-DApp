@@ -5,22 +5,19 @@ import MainContainer from './components/MainContainer';
 import Header from './components/Header';
 import Toast from './components/Toast';
 import { 
+  BACKEND_URL,
   COMMIT_PHASE
 } from "./constants"; // Application-wide constants.
 // Removed global App.css to avoid legacy global overrides that broke layout
 import useWallet from "./useWallet"; // Custom hook for wallet connection and contract interaction.
 import KycPage from "./KycPage";
-import { Typography } from '@mui/material'; // Added for Typography
 import { useI18n } from './i18n';
 import { 
   Shield, 
   Wallet, 
   AlertTriangle, 
   RefreshCw, 
-  BarChart3,
-  CheckCircle,
-  Clock,
-  Users
+  BarChart3
 } from 'lucide-react';
 import StepWizard from './components/StepWizard';
 import PublicResults from './components/PublicResults';
@@ -44,8 +41,7 @@ const Tally = lazy(() => import('./Tally'));
  * Conditionally renders Admin, Voter, or Tally components based on the current state.
  */
 function ElectionUI({ electionAddress }: { electionAddress: string }) {
-  // Destructure state and functions from the custom useWallet hook.
-  const { connect, isConnected, isLoading, account, contract, error, chainId, provider } = useWallet(electionAddress);
+  const { connect, isConnected, isLoading, account, contract, error, chainId } = useWallet(electionAddress);
   // KYC verification state (for non-admin voters)
   const [isKycVerified, setIsKycVerified] = useState(false);
   const [verifiedVoterId, setVerifiedVoterId] = useState<string | null>(null);
@@ -64,7 +60,7 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
   const [tallyRefreshKey, setTallyRefreshKey] = useState<number>(0);
   const [candidates, setCandidates] = useState<any[]>([]);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-  const { t } = useI18n();
+  const { t, lang, setLang } = useI18n();
   const [pendingTx, setPendingTx] = useState<string | null>(null);
   const [hasUserCommitted, setHasUserCommitted] = useState(false);
   const [hasUserRevealed, setHasUserRevealed] = useState(false);
@@ -97,96 +93,52 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
   // Persist KYC verification per account so refresh does not force re-verification
   useEffect(() => {
     if (!account) {
-      console.log('DEBUG KYC Persistence: No account, skipping check');
       return;
     }
     const key = `bv_kyc_${account.toLowerCase()}`;
     const fromStorage = localStorage.getItem(key);
     const storedVoterId = localStorage.getItem(`${key}_id`);
-    console.log('DEBUG KYC Persistence: Checking for account:', account);
-    console.log('DEBUG KYC Persistence: Key:', key);
-    console.log('DEBUG KYC Persistence: Value from storage:', fromStorage);
-    console.log('DEBUG KYC Persistence: Current isKycVerified:', isKycVerified);
     
     if (fromStorage === '1') {
-      console.log('DEBUG KYC Persistence: Found existing KYC verification, setting to true');
       setIsKycVerified(true);
       setVerifiedVoterId(storedVoterId || account);
-    } else {
-      console.log('DEBUG KYC Persistence: No existing KYC verification found');
     }
   }, [account]);
 
   // Additional effect to persist KYC state when phase changes (prevent re-KYC)
   useEffect(() => {
-    console.log('DEBUG KYC Phase Check: Running phase change check');
-    console.log('DEBUG KYC Phase Check: account:', account);
-    console.log('DEBUG KYC Phase Check: isAdmin:', isAdmin);
-    console.log('DEBUG KYC Phase Check: phase:', phase);
-    console.log('DEBUG KYC Phase Check: isKycVerified:', isKycVerified);
-    
     if (!account || isAdmin) {
-      console.log('DEBUG KYC Phase Check: Skipping - no account or is admin');
       return;
     }
     
     const key = `bv_kyc_${account.toLowerCase()}`;
     const fromStorage = localStorage.getItem(key);
     const storedVoterId = localStorage.getItem(`${key}_id`);
-    console.log('DEBUG KYC Phase Check: Storage value:', fromStorage);
     
-    // If KYC was verified before but state was reset, restore it
     if (fromStorage === '1' && !isKycVerified) {
-      console.log('DEBUG KYC Phase Check: Restoring KYC verification after phase change');
       setIsKycVerified(true);
       setVerifiedVoterId(storedVoterId || account);
-    } else if (fromStorage === '1' && isKycVerified) {
-      console.log('DEBUG KYC Phase Check: KYC already verified in state, no action needed');
-    } else if (!fromStorage) {
-      console.log('DEBUG KYC Phase Check: No KYC verification in storage');
     }
   }, [account, phase, isAdmin, isKycVerified]);
 
-  // Debug logs for current wallet and contract states.
-  // These provide insights into the application's connection status.
-  console.log('DEBUG APP: isConnected', isConnected);
-  console.log('DEBUG APP: isLoading', isLoading);
-  console.log('DEBUG APP: account', account);
-  console.log('DEBUG APP: contract', contract);
-  console.log('DEBUG APP: error', error);
-  console.log('DEBUG APP: chainId', chainId);
-  console.log('DEBUG APP: isAdmin', isAdmin);
-  console.log('DEBUG APP: isAdminCheckComplete', isAdminCheckComplete);
-
-  
-
   const fetchCandidates = async () => {
     if (!contract) {
-      console.log('DEBUG App: No contract available, cannot fetch candidates');
       setCandidates([]);
       return;
     }
     
     try {
-      console.log('DEBUG App: Attempting to fetch candidates...');
       const fetchedCandidates = await contract.getCandidates();
-      console.log('DEBUG App: Fetched candidates:', fetchedCandidates);
       setCandidates(fetchedCandidates || []);
     } catch (err: any) {
-      console.error('DEBUG App: Error fetching candidates:', err);
-      
-      // Try fallback with candidateCount and manual fetching
       try {
         const count = await contract.candidateCount();
-        console.log('DEBUG App: Candidate count fallback:', Number(count));
         
         if (Number(count) === 0) {
-          console.log('DEBUG App: No candidates exist');
           setCandidates([]);
           return;
         }
         
-        // Try to fetch candidates manually by ID
         const candidatesList = [];
         for (let i = 0; i < Number(count); i++) {
           try {
@@ -197,16 +149,12 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
               voteCount: Number(candidate.voteCount),
               isActive: true
             });
-          } catch (candidateErr) {
-            console.error(`Failed to fetch candidate ${i}:`, candidateErr);
-          }
+          } catch {}
         }
         
-        console.log('DEBUG App: Manual fetch resulted in:', candidatesList);
         setCandidates(candidatesList);
         
-      } catch (countErr) {
-        console.error('DEBUG App: Candidate count fallback also failed:', countErr);
+      } catch {
         setCandidates([]);
       }
     }
@@ -227,7 +175,7 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
           setBackendMerkleRoot(data.merkleRoot);
         }
       } catch (err) {
-        console.warn('DEBUG: Failed to fetch backend merkle root', err);
+        console.warn('Failed to fetch backend merkle root', err);
       }
     };
     fetchBackendRoot();
@@ -249,7 +197,7 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
           setBackendAllowlistCount(data.count);
         }
       } catch (err) {
-        console.warn('DEBUG: Failed to fetch allowlist summary', err);
+        console.warn('Failed to fetch allowlist summary', err);
       }
     };
     fetchAllowlistSummary();
@@ -263,7 +211,7 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
         const root = await contract.merkleRoot();
         setContractMerkleRoot(root);
       } catch (err) {
-        console.warn('DEBUG: Failed to read contract merkle root', err);
+        console.warn('Failed to read contract merkle root', err);
       }
     };
     readContractRoot();
@@ -281,7 +229,7 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
         const n = await contract.name();
         if (!cancelled) setElectionName(n);
       } catch (err) {
-        console.warn('DEBUG: Failed to read election name', err);
+        console.warn('Failed to read election name', err);
         if (!cancelled) setElectionName(null);
       }
     };
@@ -334,7 +282,7 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
 
   /**
    * Effect hook to initialize application data and set up event listeners.
-   * Runs when `isConnected`, `contract`, `account`, or `provider` change.
+   * Runs when wallet or contract state changes.
    */
   useEffect(() => {
     const init = async () => {
@@ -354,54 +302,10 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
         }
 
         // Proceed only if wallet is connected, contract and account are available.
-        if (isConnected && contract && account && provider) {
-          // Force admin status refresh immediately after contract loads.
+        if (isConnected && contract && account) {
           setIsAdminCheckComplete(false);
-          console.log('DEBUG: Attempting to fetch admin address...');
-          console.log('DEBUG: Contract address:', contract.target);
-          console.log('DEBUG: Provider:', provider);
-          console.log('DEBUG: Account:', account);
-          
-          // Test basic provider communication by getting block number.
-          try {
-            console.log('DEBUG: Attempting to get block number...');
-            const blockNumber = await provider.getBlockNumber();
-            console.log('DEBUG: Current Block Number:', blockNumber);
-          } catch (blockErr) {
-            console.error('DEBUG: Error getting block number:', blockErr);
-            // Log error but continue execution to check admin fetch behavior.
-          }
-
-          // Check network
-          try {
-            const network = await provider.getNetwork();
-            console.log('DEBUG: Current Network Chain ID:', network.chainId);
-            console.log('DEBUG: Expected Chain ID:', expectedChainId);
-            console.log('DEBUG: Network Match:', Number(network.chainId) === Number(expectedChainId));
-            
-            if (Number(network.chainId) !== Number(expectedChainId)) {
-              console.warn('DEBUG: WARNING - Connected to wrong network! Expected:', expectedChainId, 'but got:', network.chainId);
-            }
-          } catch (networkErr) {
-            console.error('DEBUG: Error getting network:', networkErr);
-          }
-
-          // Check if contract exists and is accessible
-          try {
-            const contractCode = await provider.getCode(contract.target as string);
-            console.log('DEBUG: Contract code at address:', contract.target);
-            console.log('DEBUG: Contract code length:', contractCode.length);
-            console.log('DEBUG: Contract exists:', contractCode !== '0x');
-            
-            if (contractCode === '0x') {
-              console.error('DEBUG: ERROR - No contract found at address:', contract.target);
-            }
-          } catch (contractCheckErr) {
-            console.error('DEBUG: Error checking contract existence:', contractCheckErr);
-          }
 
           try {
-            // Admin check must compare case-insensitively.
             const contractAdmin = await contract.admin();
             const currentAccount = account;
 
@@ -418,46 +322,33 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
 
             setIsAdmin(finalAdminStatus);
             setIsAdminCheckComplete(true);
-
-            console.log('DEBUG: Connected Account:', currentAccount);
-            console.log('DEBUG: Contract Admin Address:', contractAdmin);
-            console.log('DEBUG: Is Admin (Contract Check):', isCurrentAccountAdmin);
-            console.log('DEBUG: Is Admin (Known Address Check):', isKnownAdmin);
-            console.log('DEBUG: Final Admin Status:', finalAdminStatus);
           } catch (adminCheckError) {
-            console.error('DEBUG: Error checking admin status:', adminCheckError);
+            console.error('Failed to check admin status', adminCheckError);
             setIsAdmin(false);
             setIsAdminCheckComplete(true);
           }
 
-          // Fetch the current election phase from the contract.
           const currentPhase = await contract.phase();
-          console.log('DEBUG APP EFFECT: Phase fetched from contract:', currentPhase);
-          setPhase(Number(currentPhase)); // Update the phase state.
+          setPhase(Number(currentPhase));
 
-          // Fetch candidates
           await fetchCandidates();
 
-          // Listen for contract events that affect candidate list and phase
           if (contract.on) {
             contract.on('PhaseChanged', async (newPhase: bigint) => {
-              console.log('DEBUG APP EVENT: PhaseChanged event - newPhase:', newPhase);
-              setPhase(Number(newPhase)); // Update phase when a change event is received.
+              setPhase(Number(newPhase));
               setVoterRefreshSignal((prev) => prev + 1);
 
               try {
                 const root = await contract.merkleRoot();
                 setContractMerkleRoot(root);
-                console.log('DEBUG: Contract Merkle Root:', root);
               } catch {}
             });
 
-            // Candidate list changes
             const refreshCandidates = async () => {
               try {
                 await fetchCandidates();
               } catch (e) {
-                console.warn('DEBUG APP EVENT: refreshCandidates failed', e);
+                console.warn('Failed to refresh candidates after contract event', e);
               }
             };
             contract.on('CandidateAdded', refreshCandidates);
@@ -514,9 +405,8 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
         try { contract.removeAllListeners('ElectionReset'); } catch {}
       }
       try { (window as any).__bv_cleanup_phase?.(); } catch {}
-      // Wallet event listeners are managed by the useWallet hook.
     };
-  }, [isConnected, contract, account, provider]); // Dependencies: re-run effect if these values change.
+  }, [isConnected, contract, account]);
 
   // Enable Enter/Space key to trigger connect on the connect screen
   useEffect(() => {
@@ -646,33 +536,6 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
               <p className="text-sm text-slate-600">Secure Digital Voting Platform</p>
             </div>
 
-            {/* Language Selector */}
-            <div className="mb-8">
-              <p className="text-xs font-medium text-slate-700 mb-3 uppercase tracking-wide">Select Language</p>
-              <div className="flex space-x-1 bg-slate-100 rounded-xl p-1">
-                {[
-                  { code: 'en', name: 'EN' },
-                  { code: 'hi', name: 'हिं' },
-                  { code: 'ta', name: 'தமிழ்' }
-                ].map((lang) => (
-                  <button
-                    key={lang.code}
-                    onClick={() => {
-                      localStorage.setItem('lang', lang.code);
-                      window.location.reload();
-                    }}
-                    className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
-                      localStorage.getItem('lang') === lang.code
-                        ? 'bg-white text-slate-900 shadow-sm'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    {lang.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             {/* Connection Content */}
             <div className="mb-8">
               <h2 className="text-lg font-semibold text-slate-900 mb-2">
@@ -721,6 +584,30 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
               </button>
             )}
 
+            {/* Language Selector */}
+            <div className="mb-6">
+              <p className="text-xs font-medium text-slate-700 mb-3 uppercase tracking-wide">Language</p>
+              <div className="flex space-x-1 bg-slate-100 rounded-xl p-1">
+                {[
+                  { code: 'en', name: 'EN' },
+                  { code: 'hi', name: 'हिं' },
+                  { code: 'ta', name: 'தமிழ்' }
+                ].map((languageOption) => (
+                  <button
+                    key={languageOption.code}
+                    onClick={() => setLang(languageOption.code as 'en' | 'hi' | 'ta')}
+                    className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+                      lang === languageOption.code
+                        ? 'bg-white text-slate-900 shadow-sm'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    {languageOption.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Security Note */}
             <div className="space-y-3">
               <div className="flex items-center justify-center gap-2 text-xs text-slate-500">
@@ -761,44 +648,24 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
     );
   }
 
-  // If user is not admin and hasn't passed KYC yet, show the mock KYC portal
-  console.log('DEBUG APP Render Decision: isAdmin:', isAdmin, 'isKycVerified:', isKycVerified);
-  console.log('DEBUG APP Render Decision: Should show KYC?', !isAdmin && !isKycVerified);
-  
   if (!isAdmin && !isKycVerified) {
-    console.log('DEBUG APP: Rendering KYC page');
     return (
       <KycPage
         account={account}
         electionAddress={electionAddress}
         onVerified={(voterId: string) => {
-          console.log('DEBUG: KYC verification completed for voterId:', voterId);
           setIsKycVerified(true);
           setVerifiedVoterId(voterId);
           
-          // Persist KYC verification to localStorage
           if (account) {
             const key = `bv_kyc_${account.toLowerCase()}`;
             localStorage.setItem(key, '1');
-            console.log('DEBUG: KYC verification persisted to localStorage with key:', key);
+            localStorage.setItem(`${key}_id`, voterId);
           }
         }}
       />
     );
   }
-  
-  console.log('DEBUG APP: Rendering main app (voter or admin interface)');
-
-  // Debug log for the current phase value, visible in the console.
-  console.log('DEBUG APP HEADER: Current phase value:', phase);
-  console.log('DEBUG APP STATE:', {
-    isConnected,
-    account: account?.slice(0, 10) + '...',
-    contract: !!contract,
-    isAdmin,
-    isKycVerified,
-    isAdminCheckComplete
-  });
 
   // Main application render.
   return (
@@ -870,7 +737,7 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
                 className="btn-secondary inline-flex items-center gap-2"
               >
                 <BarChart3 className="w-4 h-4" />
-                {adminTallyOpen ? 'Hide Tally' : 'Show Tally'}
+                {adminTallyOpen ? 'Hide Results Dashboard' : 'Open Results Dashboard'}
               </button>
               {adminTallyOpen && (
                 <Suspense fallback={
@@ -986,13 +853,13 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
         <div className="mt-8 card-premium p-5">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <h3 className="text-base font-semibold text-slate-900">Public Results (Read-only)</h3>
+              <h3 className="text-base font-semibold text-slate-900">Public Results</h3>
               <p className="text-sm text-slate-600">
-                View the live tally without connecting a wallet.
+                Open the read-only results view for this election.
               </p>
               {!canShowPublicResults && !isDemoElection && (
-                <p className="text-xs text-slate-500 mt-2">
-                  Results unlock after you reveal your vote or when the election finishes.
+                <p className="mt-2 text-sm text-slate-500">
+                  This view unlocks after you reveal your vote or when the election finishes.
                 </p>
               )}
             </div>
@@ -1005,7 +872,7 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
               className={`btn-secondary inline-flex items-center gap-2 ${!canShowPublicResults && !isDemoElection ? 'opacity-60 cursor-not-allowed' : ''}`}
               disabled={!canShowPublicResults && !isDemoElection}
             >
-              {showPublicResults ? 'Hide Results' : 'View Results'}
+              {showPublicResults ? 'Hide Results' : !canShowPublicResults && !isDemoElection ? 'Locked Until Reveal' : 'View Results'}
             </button>
           </div>
 

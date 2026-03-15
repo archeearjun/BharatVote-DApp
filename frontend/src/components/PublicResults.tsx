@@ -524,9 +524,9 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
     <div className="card-premium p-6 space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-slate-900">Public Live Results</h2>
+          <h2 className="text-lg font-semibold text-slate-900">Public Results</h2>
           <p className="text-sm text-slate-600">
-            Read-only view, no wallet required. Auto-refresh every 15s.
+            Read-only results view with automatic refresh every 15 seconds.
           </p>
           <p className="text-xs text-slate-500 mt-1">Data source: {dataSourceLabel}</p>
         </div>
@@ -538,14 +538,14 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
                 onClick={() => setMode('allTime')}
                 className={`px-3 py-2 text-sm ${mode === 'allTime' ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-50'}`}
               >
-                Live Tally (All-Time)
+                All-Time Results
               </button>
               <button
                 type="button"
                 onClick={() => setMode('current')}
                 className={`px-3 py-2 text-sm ${mode === 'current' ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-50'}`}
               >
-                Tally (Current Run)
+                Current Round
               </button>
             </div>
           )}
@@ -633,7 +633,7 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
         <div className="flex items-center gap-2 mb-3">
           <Users className="w-4 h-4 text-slate-500" />
           <span className="text-sm font-semibold text-slate-800">
-            {mode === 'allTime' ? 'Live Tally (All-Time Reveals)' : 'Live Vote Counts'}
+            {mode === 'allTime' ? 'All-Time Revealed Votes' : 'Current Vote Counts'}
           </span>
           {lastUpdated && (
             <span className="text-xs text-slate-500 inline-flex items-center gap-1 ml-auto">

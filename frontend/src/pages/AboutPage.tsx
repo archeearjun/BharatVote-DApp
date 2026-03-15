@@ -11,7 +11,7 @@ const systemLayers = [
     label: "Backend Layer",
     title: "Off-chain services handle operational weight",
     description:
-      "The backend computes allowlist proofs, supports mock KYC, powers demo joins, and helps with analytics without becoming the source of truth for vote correctness.",
+      "The backend computes allowlist proofs, supports the verification workflow, powers demo joins, and helps with analytics without becoming the source of truth for vote correctness.",
   },
   {
     label: "Frontend Layer",
@@ -125,7 +125,7 @@ export default function AboutPage() {
           },
           {
             title: "Operational helpers stay off chain",
-            description: "Proof generation, uploads, demo joins, and mock KYC can be operational services without owning the tally.",
+            description: "Proof generation, uploads, demo joins, and verification services can be operational layers without owning the tally.",
           },
           {
             title: "Every audience gets a clearer path",

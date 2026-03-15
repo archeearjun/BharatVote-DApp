@@ -9,15 +9,15 @@ const faqs = [
   },
   {
     category: "Eligibility",
-    question: "Why is there a Sync Now button for Merkle root?",
+    question: "Why is there a Sync to Contract button for the Merkle root?",
     answer:
       "Eligible voter addresses are uploaded and processed off chain. The final Merkle root must be explicitly written on chain so contract eligibility verification uses the latest list.",
   },
   {
-    category: "Prototype Scope",
-    question: "Is KYC fully production-grade in this prototype?",
+    category: "Verification Scope",
+    question: "Is KYC fully production-grade in the current release?",
     answer:
-      "No. KYC and face steps are mock or performative here. Final vote eligibility is still enforced on chain using Merkle proof verification during commit.",
+      "Not yet. The current release uses a simplified verification flow for onboarding, while final vote eligibility is still enforced on chain through Merkle proof verification during commit.",
   },
   {
     category: "Modes",
@@ -38,7 +38,7 @@ export default function FaqPage() {
     <DocsLayout
       eyebrow="Help Center"
       title="Frequently Asked Questions"
-      description="Find direct answers to the most common questions about architecture, eligibility, prototype scope, and election operations."
+      description="Find direct answers to the most common questions about architecture, eligibility, verification scope, and election operations."
       heroActions={[
         { label: "Open Main Guide", to: "/guide/main-election", variant: "primary" },
         { label: "Read the Blog", to: "/blog", variant: "secondary" },
@@ -54,7 +54,7 @@ export default function FaqPage() {
         {
           label: "Scope",
           value: "Architecture + operations",
-          description: "Covers what the system does, why specific buttons exist, and where the prototype draws its boundaries.",
+          description: "Covers what the system does, why specific buttons exist, and where the current release draws its boundaries.",
         },
         {
           label: "Best pair",
@@ -70,15 +70,15 @@ export default function FaqPage() {
       <DocsSplitSection
         eyebrow="Read First"
         title="Most questions come from three pressure points"
-        description="In practice, people usually want clarity on one of three things: what is actually enforced on chain, what the prototype intentionally simplifies, and how the demo flow differs from the main election flow."
+        description="In practice, people usually want clarity on one of three things: what is actually enforced on chain, what the current release intentionally simplifies, and how the demo flow differs from the main election flow."
         bullets={[
           {
             title: "Trust model",
             description: "Which parts of the system are enforced on chain, and which parts are helpers around the workflow?",
           },
           {
-            title: "Prototype honesty",
-            description: "What is production-grade and what is still a simulated or mock step?",
+            title: "Release boundaries",
+            description: "What is already hardened and what is still a simplified step in the current flow?",
           },
           {
             title: "Operational flow",

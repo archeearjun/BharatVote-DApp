@@ -42,7 +42,7 @@ describe("Admin merkle root helpers", () => {
       />
     );
 
-    const syncButton = await screen.findByRole('button', { name: /Sync Now/i });
+    const syncButton = await screen.findByRole('button', { name: /Sync to Contract/i });
     await waitFor(() => expect(syncButton).not.toBeDisabled());
     fireEvent.click(syncButton);
 

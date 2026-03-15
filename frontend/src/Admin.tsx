@@ -90,24 +90,13 @@ export default function Admin({
     
     try {
       setState(prev => ({ ...prev, loading: true }));
-      
-      // Add extra debugging and retry logic for getCandidates
-      console.log('DEBUG: Attempting to fetch candidates...');
-      console.log('DEBUG: Contract address:', (contract as any)?.target || (contract as any)?.address);
-      
-      // Try with explicit gas limit to avoid estimation issues
       const fetchedCandidates = await contract.getCandidates();
-      console.log('DEBUG: Raw candidates from contract:', fetchedCandidates);
-      
-      // Handle case where candidates might be empty array
       const mappedCandidates = Array.isArray(fetchedCandidates) ? 
         fetchedCandidates.map((c: { id: BigInt; name: string; isActive: boolean }) => ({
           id: Number(c.id),
           name: c.name,
           isActive: c.isActive
         })) : [];
-        
-      console.log('DEBUG: Mapped candidates:', mappedCandidates);
       
       setState(prev => ({
         ...prev,
@@ -116,9 +105,6 @@ export default function Admin({
         error: null
       }));
     } catch (err: any) {
-      console.error('DEBUG: Error fetching candidates:', err);
-      
-      // Enhanced error handling for CALL_EXCEPTION
       let errorMessage: string = CANDIDATE_MESSAGES.ERRORS.FETCH_FAILED;
       
       if (err.code === 'CALL_EXCEPTION') {
@@ -129,13 +115,9 @@ export default function Admin({
         errorMessage = "Network error - ensure Hardhat node is running on localhost:8545";
       }
       
-      // Try to get candidate count as fallback to verify contract is working
       try {
-        console.log('DEBUG: Trying candidateCount as fallback...');
         const count = await contract.candidateCount();
-        console.log('DEBUG: Candidate count:', count);
         if (Number(count) === 0) {
-          // No candidates is not an error state, just empty
           setState(prev => ({
             ...prev,
             candidates: [],
@@ -144,9 +126,7 @@ export default function Admin({
           }));
           return;
         }
-      } catch (countErr) {
-        console.error('DEBUG: Candidate count also failed:', countErr);
-      }
+      } catch {}
       
       const message = err instanceof Error ? errorMessage : CANDIDATE_MESSAGES.ERRORS.FETCH_FAILED;
       setState(prev => ({ ...prev, error: message, loading: false }));
@@ -207,33 +187,25 @@ export default function Admin({
 
   // Helper to extract meaningful revert messages (custom errors, revert reasons)
   const extractErrorMessage = (err: any): string => {
-    console.error('Full error object:', err);
-    
-    // Ethers v6 custom error fields
     if (err.errorName) {
       const args = err.errorArgs || [];
       return `${err.errorName}(${args.join(',')})`;
     }
-    // Standard revert string
     if (err.reason) {
       return err.reason;
     }
-    // Check for specific JSON-RPC errors
     if (err.code === 'UNKNOWN_ERROR' && err.error?.message?.includes('Internal JSON-RPC error')) {
       return "Network error: Please ensure your local Hardhat node is running and the contract is deployed";
     }
     if (err.code === -32603) {
       return "JSON-RPC error: Check network connection and contract deployment";
     }
-    // Check for gas-related errors
     if (err.message?.includes('gas')) {
       return `Gas error: ${err.message}`;
     }
-    // Check for contract call errors
     if (err.message?.includes('call revert exception')) {
       return "Contract call failed: Check if you're in the correct phase and have admin privileges";
     }
-    // Fallback to generic message
     return err.message || ERROR_MESSAGES.TRANSACTION_FAILED;
   };
 
@@ -374,29 +346,17 @@ export default function Admin({
     setState(prev => ({ ...prev, loading: true, error: null, success: null }));
 
     try {
-      // Add gas estimation and better error handling
-      console.log('DEBUG: Starting election reset...');
-      console.log('DEBUG: Current phase:', phase);
-      console.log('DEBUG: Contract address:', (contract as any)?.target || (contract as any)?.address);
-      
-      // Estimate gas first to catch early errors
       let gasEstimate;
       try {
         gasEstimate = await contract.resetElection.estimateGas();
-        console.log('DEBUG: Gas estimate for resetElection:', gasEstimate.toString());
       } catch (gasError: any) {
-        console.error('DEBUG: Gas estimation failed:', gasError);
         throw new Error(`Gas estimation failed: ${gasError.reason || gasError.message}`);
       }
 
-      // Execute the transaction with explicit gas limit
       const tx = await contract.resetElection({
-        gasLimit: Math.floor(Number(gasEstimate) * 1.2) // Add 20% buffer
+        gasLimit: Math.floor(Number(gasEstimate) * 1.2)
       });
-      
-      console.log('DEBUG: Transaction submitted:', tx.hash);
-      const receipt = await tx.wait();
-      console.log('DEBUG: Transaction confirmed:', receipt?.hash || 'No hash available');
+      await tx.wait();
       
       setState(prev => ({
         ...prev,
@@ -405,7 +365,6 @@ export default function Admin({
       await fetchCandidates();
       onPhaseChange?.();
     } catch (err: any) {
-      console.error('DEBUG: Reset election error:', err);
       const message = extractErrorMessage(err);
       setState(prev => ({ ...prev, error: message }));
       onError?.(message);
@@ -423,27 +382,17 @@ export default function Admin({
     setState(prev => ({ ...prev, loading: true, error: null, success: null }));
 
     try {
-      console.log('DEBUG: Starting emergency reset...');
-      console.log('DEBUG: Current phase:', phase);
-      
-      // Estimate gas first to catch early errors
       let gasEstimate;
       try {
         gasEstimate = await contract.emergencyReset.estimateGas();
-        console.log('DEBUG: Gas estimate for emergencyReset:', gasEstimate.toString());
       } catch (gasError: any) {
-        console.error('DEBUG: Gas estimation failed:', gasError);
         throw new Error(`Gas estimation failed: ${gasError.reason || gasError.message}`);
       }
 
-      // Execute the transaction with explicit gas limit
       const tx = await contract.emergencyReset({
-        gasLimit: Math.floor(Number(gasEstimate) * 1.2) // Add 20% buffer
+        gasLimit: Math.floor(Number(gasEstimate) * 1.2)
       });
-      
-      console.log('DEBUG: Emergency reset transaction submitted:', tx.hash);
-      const receipt = await tx.wait();
-      console.log('DEBUG: Emergency reset transaction confirmed:', receipt?.hash || 'No hash available');
+      await tx.wait();
       
       setState(prev => ({
         ...prev,
@@ -452,7 +401,6 @@ export default function Admin({
       await fetchCandidates();
       onPhaseChange?.();
     } catch (err: any) {
-      console.error('DEBUG: Emergency reset error:', err);
       const message = extractErrorMessage(err);
       setState(prev => ({ ...prev, error: message }));
       onError?.(message);
@@ -502,8 +450,8 @@ export default function Admin({
 
   const PhaseIcon = getPhaseIcon(phase);
 
-  const parseAllowlistAddresses = useCallback((raw: string): string[] => {
-    if (!raw) return [];
+  const parseAllowlistEntries = useCallback((raw: string): { valid: string[]; invalid: string[] } => {
+    if (!raw) return { valid: [], invalid: [] };
     let list: string[] = [];
     try {
       const maybeJson = JSON.parse(raw);
@@ -515,13 +463,27 @@ export default function Admin({
     } catch {
       list = raw.split(/[\s,;]+/).map((entry) => entry.trim()).filter(Boolean);
     }
-    const normalized = list
-      .filter((addr) => ethers.isAddress(addr))
-      .map((addr) => ethers.getAddress(addr));
-    return Array.from(new Set(normalized));
+    const uniqueValid: string[] = [];
+    const invalid: string[] = [];
+    const seen = new Set<string>();
+
+    list.forEach((entry) => {
+      if (!ethers.isAddress(entry)) {
+        invalid.push(entry);
+        return;
+      }
+      const normalized = ethers.getAddress(entry);
+      if (seen.has(normalized)) {
+        return;
+      }
+      seen.add(normalized);
+      uniqueValid.push(normalized);
+    });
+
+    return { valid: uniqueValid, invalid };
   }, []);
 
-  const allowlistPreview = useMemo(() => parseAllowlistAddresses(allowlistInput), [allowlistInput, parseAllowlistAddresses]);
+  const allowlistPreview = useMemo(() => parseAllowlistEntries(allowlistInput), [allowlistInput, parseAllowlistEntries]);
 
   const fetchAllowlistSummary = useCallback(async () => {
     if (!electionAddress || !ethers.isAddress(electionAddress)) return;
@@ -608,8 +570,8 @@ export default function Admin({
       return;
     }
 
-    const parsed = parseAllowlistAddresses(allowlistInput);
-    if (!parsed.length) {
+    const parsed = parseAllowlistEntries(allowlistInput);
+    if (!parsed.valid.length) {
       setAllowlistError('Paste a list of valid wallet addresses first.');
       return;
     }
@@ -621,24 +583,24 @@ export default function Admin({
       const resp = await fetch(`${BACKEND_URL}/api/admin/voter-list`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ electionAddress, addresses: parsed }),
+        body: JSON.stringify({ electionAddress, addresses: parsed.valid }),
       });
       if (!resp.ok) {
         const message = await resp.text();
         throw new Error(message || `Upload failed (${resp.status})`);
       }
       const data = await resp.json();
-      setAllowlistCount(data?.count ?? parsed.length);
+      setAllowlistCount(data?.count ?? parsed.valid.length);
       setAllowlistRoot(data?.merkleRoot || null);
-      setAllowlistSuccess(`Uploaded ${data?.count ?? parsed.length} eligible voters.`);
-      onAllowlistUpdated?.({ count: data?.count ?? parsed.length, merkleRoot: data?.merkleRoot });
+      setAllowlistSuccess(`Prepared ${data?.count ?? parsed.valid.length} eligible voter${(data?.count ?? parsed.valid.length) === 1 ? '' : 's'}.`);
+      onAllowlistUpdated?.({ count: data?.count ?? parsed.valid.length, merkleRoot: data?.merkleRoot });
       await fetchAllowlistSummary();
     } catch (err: any) {
       setAllowlistError(err?.message || 'Failed to upload allowlist');
     } finally {
       setAllowlistLoading(false);
     }
-  }, [allowlistInput, electionAddress, fetchAllowlistSummary, isDemoElection, onAllowlistUpdated, parseAllowlistAddresses]);
+  }, [allowlistInput, electionAddress, fetchAllowlistSummary, isDemoElection, onAllowlistUpdated, parseAllowlistEntries]);
 
   const handleAllowlistFile = async (file: File | null) => {
     if (!file) return;
@@ -717,17 +679,17 @@ export default function Admin({
             <div className="flex items-start gap-3">
               <AlertTriangle className="w-5 h-5 text-warning-700 mt-0.5" />
               <div>
-                <p className="text-sm font-semibold text-warning-900">Voter list updated</p>
-                <p className="text-sm text-warning-800 mt-1">Sync now to update eligibility on-chain.</p>
+                <p className="text-sm font-semibold text-warning-900">Eligibility list changed</p>
+                <p className="text-sm text-warning-800 mt-1">Sync the latest voter list to the contract before voting continues.</p>
               </div>
             </div>
             <button
               onClick={handleUpdateMerkleRoot}
               disabled={state.loading || state.merkleLoading}
               className="btn-warning w-full sm:w-auto"
-              title="Sync backend voter list to chain"
+              title="Sync the prepared voter list to the election contract"
             >
-              {state.loading || state.merkleLoading ? <div className="spinner" /> : 'Sync Now'}
+              {state.loading || state.merkleLoading ? <div className="spinner" /> : 'Sync to Contract'}
             </button>
           </div>
         </div>
@@ -746,9 +708,13 @@ export default function Admin({
               <Users className="w-5 h-5 text-slate-700" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-slate-900">Eligible Voters</h2>
-              <p className="text-sm text-slate-600">Upload wallet addresses allowed to vote in this election.</p>
+              <h2 className="text-lg font-semibold text-slate-900">Prepare Voter List</h2>
+              <p className="text-sm text-slate-600">Upload, review, and prepare the wallet addresses allowed to vote in this election.</p>
             </div>
+          </div>
+
+          <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+            Accepted formats: one address per line, comma-separated text, `.txt`, `.csv`, or `.json`. Uploading prepares the list on the backend; syncing writes the active eligibility root on-chain.
           </div>
 
           {allowlistError && (
@@ -770,8 +736,15 @@ export default function Admin({
                 className="input-base min-h-[180px]"
                 placeholder="Paste wallet addresses here (one per line or comma-separated)."
               />
-              <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                <span>Preview: {allowlistPreview.length} valid address{allowlistPreview.length === 1 ? '' : 'es'}</span>
+              <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500">
+                <span>
+                  Ready to upload: {allowlistPreview.valid.length} valid address{allowlistPreview.valid.length === 1 ? '' : 'es'}
+                </span>
+                {allowlistPreview.invalid.length > 0 && (
+                  <span className="rounded-full bg-amber-50 px-3 py-1 text-amber-800">
+                    {allowlistPreview.invalid.length} invalid entr{allowlistPreview.invalid.length === 1 ? 'y' : 'ies'} ignored
+                  </span>
+                )}
                 <label className="inline-flex items-center gap-2 cursor-pointer text-slate-600 hover:text-slate-800">
                   <input
                     type="file"
@@ -782,24 +755,29 @@ export default function Admin({
                   Upload file
                 </label>
               </div>
+              {allowlistPreview.invalid.length > 0 && (
+                <p className="text-sm text-amber-700">
+                  Check formatting before upload. Example invalid input: <span className="font-mono">{allowlistPreview.invalid[0]}</span>
+                </p>
+              )}
             </div>
 
             <div className="space-y-4">
               <div className="p-4 rounded-xl border border-slate-200 bg-slate-50">
-                <p className="text-xs uppercase tracking-wide text-slate-500 mb-1">Current count</p>
+                <p className="text-xs uppercase tracking-wide text-slate-500 mb-1">Prepared voters</p>
                 <p className="text-lg font-semibold text-slate-900">{allowlistCount ?? '—'}</p>
               </div>
               <div className="p-4 rounded-xl border border-slate-200 bg-slate-50">
-                <p className="text-xs uppercase tracking-wide text-slate-500 mb-1">Backend Merkle Root</p>
+                <p className="text-xs uppercase tracking-wide text-slate-500 mb-1">Prepared eligibility root</p>
                 <p className="text-xs text-slate-700 break-all">{allowlistRoot || backendMerkleRoot || '—'}</p>
               </div>
               <button
                 type="button"
                 onClick={handleAllowlistUpload}
-                disabled={allowlistLoading || allowlistPreview.length === 0}
+                disabled={allowlistLoading || allowlistPreview.valid.length === 0}
                 className="btn-primary w-full"
               >
-                {allowlistLoading ? <div className="spinner" /> : 'Upload Eligible Voters'}
+                {allowlistLoading ? <div className="spinner" /> : 'Upload and Prepare List'}
               </button>
             </div>
           </div>
@@ -814,17 +792,17 @@ export default function Admin({
               <Play className="w-5 h-5 text-slate-700" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-slate-900">Action Center</h2>
-              <p className="text-sm text-slate-600">Move the election forward</p>
+              <h2 className="text-lg font-semibold text-slate-900">Election Controls</h2>
+              <p className="text-sm text-slate-600">Advance the election phase and manage maintenance actions.</p>
             </div>
           </div>
           <button
             onClick={() => setSettingsOpen(v => !v)}
-            className="btn-ghost text-xs"
+            className="btn-ghost text-sm"
             type="button"
           >
             <Settings className="w-4 h-4" />
-            Settings
+            Maintenance
           </button>
         </div>
 
@@ -846,10 +824,16 @@ export default function Admin({
         <div className="mt-3 text-sm text-slate-600">
           Current status: <span className="font-medium text-slate-900">{PHASE_LABELS[phase as keyof typeof PHASE_LABELS]}</span>
         </div>
+        <p className="mt-2 text-sm text-slate-500">
+          Use the primary action above for normal phase changes. Open maintenance only for resets or recovery actions.
+        </p>
 
         {settingsOpen && (
           <div className="mt-4 p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-3">
-            <div className="text-xs font-semibold text-slate-700">Danger zone</div>
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-600">Maintenance tools</div>
+              <p className="mt-1 text-sm text-slate-500">These actions are for recovery, cleanup, or the start of a new run.</p>
+            </div>
 
             <div className="flex flex-col sm:flex-row gap-3">
               <button
@@ -893,14 +877,16 @@ export default function Admin({
               </button>
             </div>
 
-            <button
-              onClick={runDiagnostics}
-              className="btn-ghost text-xs"
-              type="button"
-            >
-              <Settings className="w-3 h-3" />
-              Run Diagnostics (Check Console)
-            </button>
+            {import.meta.env.DEV && (
+              <button
+                onClick={runDiagnostics}
+                className="btn-ghost text-sm"
+                type="button"
+              >
+                <Settings className="w-4 h-4" />
+                Run Diagnostics
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -965,11 +951,11 @@ export default function Admin({
             </div>
             <div>
               <h2 className="text-lg font-semibold text-slate-900">{t('admin.addCandidate')}</h2>
-              <p className="text-sm text-slate-600">Add new candidates to the election</p>
+              <p className="text-sm text-slate-600">Add candidates before you move past the commit phase.</p>
             </div>
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row">
             <div className="flex-1">
               <input
                 type="text"
@@ -980,13 +966,13 @@ export default function Admin({
                 className="input-base"
               />
               {phase !== COMMIT_PHASE && (
-                <p className="text-xs text-slate-500 mt-2">{t('admin.commitOnlyAdd')}</p>
+                <p className="mt-2 text-sm text-slate-500">{t('admin.commitOnlyAdd')}</p>
               )}
             </div>
             <button
               onClick={handleAddCandidate}
               disabled={state.loading || !state.candidateName.trim() || phase !== COMMIT_PHASE}
-              className="btn-primary px-6"
+              className="btn-primary px-6 sm:self-start"
             >
               {state.loading ? (
                 <div className="spinner" />
@@ -1008,7 +994,7 @@ export default function Admin({
           <div>
             <h3 className="text-sm font-medium text-slate-900 mb-1">Troubleshooting</h3>
             <p className="text-sm text-slate-600">
-              If something fails, check the console and verify your wallet network.
+              If an action fails, verify the connected wallet, Sepolia network, and the eligibility sync state before retrying.
             </p>
           </div>
         </div>

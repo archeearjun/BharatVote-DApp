@@ -68,9 +68,7 @@ export default function useWallet(electionAddress?: string) {
   }, [requiredChainId]);
 
   const attachElectionContract = useCallback(async (provider: ethers.BrowserProvider, electionAddress: string) => {
-    // Verify bytecode exists at the address to avoid BAD_DATA from calls
     const code = await provider.getCode(electionAddress);
-    console.log('DEBUG useWallet: Code length at address:', code?.length);
     if (!code || code === '0x') {
       throw new Error(CONTRACT_ERRORS.NO_CONTRACT_FOUND);
     }
@@ -96,7 +94,6 @@ export default function useWallet(electionAddress?: string) {
 
   const connect = useCallback(async (targetElectionAddress?: string) => {
     if (isConnecting.current) {
-      console.log('DEBUG useWallet: Connection already in progress');
       return null;
     }
 
@@ -108,23 +105,18 @@ export default function useWallet(electionAddress?: string) {
     try {
       isConnecting.current = true;
       setState((prev: WalletState) => ({ ...prev, isLoading: true, error: null }));
-      console.log('DEBUG useWallet: Requesting Ethereum accounts...');
 
       let provider = new ethers.BrowserProvider(window.ethereum);
-      console.log('DEBUG useWallet: Provider created.', provider);
 
       const accounts = await provider.send("eth_requestAccounts", []);
       if (!accounts.length) {
         handleError(new Error(WALLET_ERRORS.NO_ACCOUNTS), WALLET_ERRORS.NO_ACCOUNTS);
         return null;
       }
-      console.log('DEBUG useWallet: Accounts obtained:', accounts);
 
       let network = await provider.getNetwork();
-      console.log('DEBUG useWallet: Network obtained:', network);
 
       if (!checkNetwork(network.chainId)) {
-        console.log('DEBUG useWallet: Switching network...');
         try {
           await window.ethereum.request({
             method: "wallet_switchEthereumChain",
@@ -164,18 +156,12 @@ export default function useWallet(electionAddress?: string) {
           return null;
         }
       }
-      console.log('DEBUG useWallet: Network is correct.');
-
-      const signer = await provider.getSigner();
-      console.log('DEBUG useWallet: Signer obtained.', signer);
 
       const addressToAttach = targetElectionAddress || electionAddress;
       let contract: WalletState["contract"] = null;
       if (addressToAttach) {
-        console.log('DEBUG useWallet: Election address:', addressToAttach);
         try {
           contract = await attachElectionContract(provider, addressToAttach);
-          console.log('DEBUG useWallet: Election contract instance created.', contract);
         } catch (contractErr) {
           handleError(contractErr, CONTRACT_ERRORS.NO_CONTRACT_FOUND);
           return null;
@@ -191,7 +177,6 @@ export default function useWallet(electionAddress?: string) {
         isLoading: false,
         chainId: Number(network.chainId),
       });
-      console.log('DEBUG useWallet: Wallet state updated.');
 
       return { provider, account: accounts[0], chainId: Number(network.chainId) };
 
@@ -221,7 +206,7 @@ export default function useWallet(electionAddress?: string) {
           try {
             contract = await attachElectionContract(provider, electionAddress);
           } catch (contractErr) {
-            console.error("DEBUG useWallet: Auto-attach failed:", contractErr);
+            console.error("Auto-attach failed:", contractErr);
           }
         }
 
@@ -236,7 +221,7 @@ export default function useWallet(electionAddress?: string) {
           error: wrongNetwork ? WALLET_ERRORS.WRONG_NETWORK : null,
         }));
       } catch (err) {
-        console.error("DEBUG useWallet: Auto-connect failed:", err);
+        console.error("Auto-connect failed:", err);
       }
     })();
   }, [attachElectionContract, checkNetwork, electionAddress, requiredChainId]);
@@ -261,7 +246,6 @@ export default function useWallet(electionAddress?: string) {
 
   useEffect(() => {
     const handleAccountsChanged = (accounts: string[]) => {
-      console.log('DEBUG useWallet: accountsChanged event:', accounts);
       if (accounts.length > 0) {
         setState((prev: WalletState) => ({
           ...prev,
@@ -281,7 +265,6 @@ export default function useWallet(electionAddress?: string) {
     };
 
     const handleChainChanged = (chainId: string) => {
-      console.log('DEBUG useWallet: chainChanged event:', chainId);
       window.location.reload();
     };
 

@@ -40,7 +40,7 @@ describe('KycPage', () => {
     expect(screen.getByText('BharatVote')).toBeInTheDocument()
     expect(screen.getByText('Voter Verification')).toBeInTheDocument()
     expect(screen.getByLabelText(/voter id/i)).toBeInTheDocument()
-    expect(screen.getByText('Send OTP')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /continue to otp/i })).toBeInTheDocument()
   })
 
   it('shows progress steps', () => {
@@ -52,16 +52,18 @@ describe('KycPage', () => {
     expect(screen.queryByText('Complete')).not.toBeInTheDocument()
   })
 
-  it('shows tabs for different KYC options', () => {
+  it('shows the verification overview', () => {
     renderWithI18n(<KycPage {...mockProps} />)
     
-    expect(screen.getByText('Voter ID KYC')).toBeInTheDocument()
-    expect(screen.getByText('Address Update')).toBeInTheDocument()
+    expect(screen.getByText('Connected wallet')).toBeInTheDocument()
+    expect(screen.getByText('1. Verify voter ID')).toBeInTheDocument()
+    expect(screen.getByText('2. Confirm OTP')).toBeInTheDocument()
+    expect(screen.getByText('3. Complete face check')).toBeInTheDocument()
   })
 
   it('validates voter ID input', async () => {
     renderWithI18n(<KycPage {...mockProps} />)
-    const sendButton = screen.getByRole('button', { name: /send otp/i })
+    const sendButton = screen.getByRole('button', { name: /continue to otp/i })
     
     fireEvent.click(sendButton)
     
@@ -82,7 +84,7 @@ describe('KycPage', () => {
     const voterIdInput = screen.getByLabelText(/voter id/i)
     await user.type(voterIdInput, 'VOTER1')
     
-    const sendButton = screen.getByText('Send OTP')
+    const sendButton = screen.getByRole('button', { name: /continue to otp/i })
     fireEvent.click(sendButton)
 
     await waitFor(() => {
@@ -104,7 +106,7 @@ describe('KycPage', () => {
     const voterIdInput = screen.getByLabelText(/voter id/i)
     await user.type(voterIdInput, 'INVALID_VOTER')
     
-    const sendButton = screen.getByText('Send OTP')
+    const sendButton = screen.getByRole('button', { name: /continue to otp/i })
     fireEvent.click(sendButton)
 
     await waitFor(() => {
@@ -125,11 +127,11 @@ describe('KycPage', () => {
     const voterIdInput = screen.getByLabelText(/voter id/i)
     await user.type(voterIdInput, 'VOTER2')
     
-    const sendButton = screen.getByText('Send OTP')
+    const sendButton = screen.getByRole('button', { name: /continue to otp/i })
     fireEvent.click(sendButton)
 
     await waitFor(() => {
-      expect(screen.getByText(/not eligible to vote with this wallet/i)).toBeInTheDocument()
+      expect(screen.getByText(/does not match the verified voter record/i)).toBeInTheDocument()
     })
   })
 
@@ -146,7 +148,7 @@ describe('KycPage', () => {
     const voterIdInput = screen.getByLabelText(/voter id/i)
     await user.type(voterIdInput, 'VOTER1')
     
-    const sendButton = screen.getByText('Send OTP')
+    const sendButton = screen.getByRole('button', { name: /continue to otp/i })
     fireEvent.click(sendButton)
 
     await waitFor(() => {
@@ -168,7 +170,7 @@ describe('KycPage', () => {
     const voterIdInput = screen.getByLabelText(/voter id/i)
     await user.type(voterIdInput, 'VOTER1')
     
-    const sendButton = screen.getByText('Send OTP')
+    const sendButton = screen.getByRole('button', { name: /continue to otp/i })
     fireEvent.click(sendButton)
 
     await waitFor(() => {
@@ -197,7 +199,7 @@ describe('KycPage', () => {
     const voterIdInput = screen.getByLabelText(/voter id/i)
     await user.type(voterIdInput, 'VOTER1')
     
-    const sendButton = screen.getByText('Send OTP')
+    const sendButton = screen.getByRole('button', { name: /continue to otp/i })
     fireEvent.click(sendButton)
 
     await waitFor(() => {
@@ -244,7 +246,7 @@ describe('KycPage', () => {
     const voterIdInput = screen.getByLabelText(/voter id/i)
     await user.type(voterIdInput, 'VOTER1')
     
-    const sendButton = screen.getByText('Send OTP')
+    const sendButton = screen.getByRole('button', { name: /continue to otp/i })
     fireEvent.click(sendButton)
 
     await waitFor(() => {
@@ -267,7 +269,7 @@ describe('KycPage', () => {
     fireEvent.click(verifyButton)
 
     await waitFor(() => {
-      expect(screen.getByText(/otp verification failed/i)).toBeInTheDocument()
+      expect(screen.getByText(/otp code did not match/i)).toBeInTheDocument()
     })
   })
 
@@ -290,7 +292,7 @@ describe('KycPage', () => {
     const voterIdInput = screen.getByLabelText(/voter id/i)
     await user.type(voterIdInput, 'VOTER1')
     
-    const sendButton = screen.getByRole('button', { name: /send otp/i })
+    const sendButton = screen.getByRole('button', { name: /continue to otp/i })
     fireEvent.click(sendButton)
 
     // Should show loading state
@@ -307,7 +309,7 @@ describe('KycPage', () => {
     const voterIdInput = screen.getByLabelText(/voter id/i)
     await user.type(voterIdInput, 'VOTER1')
     
-    const sendButton = screen.getByText('Send OTP')
+    const sendButton = screen.getByRole('button', { name: /continue to otp/i })
     fireEvent.click(sendButton)
 
     await waitFor(() => {

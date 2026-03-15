@@ -35,13 +35,13 @@ const terms = [
     category: "Architecture",
     term: "Off-Chain Services",
     meaning:
-      "Backend endpoints for allowlist upload, proof generation, demo scheduler, analytics, and mock KYC workflow.",
+      "Backend endpoints for allowlist upload, proof generation, demo scheduler, analytics, and the guided verification workflow.",
   },
   {
     category: "Modes",
     term: "Main Election",
     meaning:
-      "Admin-managed election with allowlist upload and mock KYC gate for voter onboarding.",
+      "Admin-managed election with allowlist upload and a guided verification gate for voter onboarding.",
   },
   {
     category: "Modes",

@@ -90,7 +90,7 @@ export const BLOG_POSTS: BlogPost[] = [
       {
         heading: "Main Election",
         paragraphs: [
-          "Main election includes mock KYC gate and admin-managed allowlist upload for each election address.",
+          "Main election includes a guided verification gate and admin-managed allowlist upload for each election address.",
           "Voters go through verification flow before reaching the voter panel."
         ]
       },
@@ -115,4 +115,3 @@ export const BLOG_POSTS: BlogPost[] = [
 export function getBlogPostBySlug(slug: string): BlogPost | undefined {
   return BLOG_POSTS.find((post) => post.slug === slug);
 }
-

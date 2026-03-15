@@ -10,7 +10,6 @@ import {
 import { 
   Languages,
   Shield,
-  CheckCircle,
   User,
   Clock,
   Eye,
@@ -80,23 +79,24 @@ const Header: React.FC<HeaderProps> = ({
   const phaseInfo = getPhaseInfo();
   const chainMatch = expectedChainId !== undefined && chainId !== null && Number(chainId) === Number(expectedChainId);
   const merkleAligned = backendMerkleRoot && contractMerkleRoot && backendMerkleRoot.toLowerCase() === contractMerkleRoot.toLowerCase();
+  const showSyncStatus = Boolean(account) && !isDemoElection && Boolean(backendMerkleRoot || contractMerkleRoot);
 
   const modeBadge = (() => {
     if (!account) return null;
     if (isDemoElection) {
-      return { label: 'Demo Mode', icon: Sparkles, className: 'bg-slate-50 text-slate-700 border-slate-200' };
+      return { label: 'Demo', icon: Sparkles, className: 'bg-slate-50 text-slate-700 border-slate-200' };
     }
     if (isAdmin) {
-      return { label: 'Admin Mode', icon: Shield, className: 'bg-slate-900 text-white border-slate-900' };
+      return { label: 'Admin', icon: Shield, className: 'bg-slate-900 text-white border-slate-900' };
     }
-    return { label: 'Voter Mode', icon: User, className: 'bg-slate-50 text-slate-700 border-slate-200' };
+    return { label: 'Voter', icon: User, className: 'bg-slate-50 text-slate-700 border-slate-200' };
   })();
 
   const getNetworkLabel = (id?: number | null) => {
     if (id === null || id === undefined) return 'Network';
     switch (Number(id)) {
       case 11155111:
-        return 'Sepolia Testnet';
+        return 'Sepolia';
       case 31337:
         return 'Localhost';
       default:
@@ -118,28 +118,28 @@ const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="bg-white border-b border-slate-200 h-16 shadow-sm sticky top-0 z-40">
-      <div className="max-w-7xl mx-auto px-4 h-full">
-        <div className="flex items-center justify-between h-full">
+    <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/95 shadow-sm backdrop-blur">
+      <div className="max-w-7xl mx-auto px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           {/* Left: Logo and title */}
           <Link
             to="/"
-            className="flex items-center space-x-3 rounded-xl px-1 py-1 -ml-1 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 transition-colors"
+            className="flex min-w-0 items-center gap-3 rounded-xl px-1 py-1 -ml-1 transition-colors hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300"
             aria-label="Go to BharatVote landing page"
           >
             <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center shadow-sm">
               <Shield className="w-5 h-5 text-white" />
             </div>
-            <div className="hidden sm:block min-w-0">
+            <div className="hidden min-w-0 sm:block">
               <h1 className="text-lg font-semibold text-slate-900 tracking-tight leading-tight truncate">
                 {t('app.title')}
               </h1>
               {electionName && (
-                <p className="text-sm text-slate-500 truncate max-w-[32ch]" title={electionName}>
+                <p className="max-w-[30ch] truncate text-sm text-slate-500" title={electionName}>
                   · {electionName}
                 </p>
               )}
-              <p className="text-xs text-slate-500 leading-tight">
+              <p className="text-sm text-slate-500 leading-tight xl:text-xs">
                 {t('app.subtitle')}
               </p>
             </div>
@@ -150,95 +150,78 @@ const Header: React.FC<HeaderProps> = ({
             </div>
           </Link>
 
-          {/* Center: Phase badge */}
-          {account && (
-            <div className="hidden md:flex items-center">
-              <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full ${phaseInfo.bgColor} border border-current/20`}>
-                <div className={`w-2 h-2 rounded-full ${phaseInfo.dotColor} animate-pulse`} />
-                <phaseInfo.icon className="w-4 h-4" />
-                <span className="text-sm font-medium">{phaseInfo.label}</span>
-              </div>
-            </div>
-          )}
-
           {/* Right: Account info, admin status, and language */}
-          <div className="flex items-center space-x-3">
-            <div className="hidden 2xl:flex items-center space-x-2 text-xs">
-              <Link to="/learn" className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-slate-600 hover:bg-slate-50">
-                Key Terms
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <div className="hidden xl:flex items-center gap-2 text-sm">
+              <Link to="/about" className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-600 hover:bg-slate-50">
+                Docs
               </Link>
-              <Link to="/guide/main-election" className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-slate-600 hover:bg-slate-50">
-                Main Guide
-              </Link>
-              <Link to="/blog" className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-slate-600 hover:bg-slate-50">
-                Blog
+              <Link to="/faq" className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-600 hover:bg-slate-50">
+                FAQ
               </Link>
             </div>
 
             {/* Network and root status pills */}
             {account && (
-              <div className="hidden lg:flex items-center space-x-2">
+              <div className="hidden lg:flex items-center gap-2">
+                <div className={`inline-flex items-center gap-2 rounded-full border border-current/20 px-3 py-2 ${phaseInfo.bgColor}`}>
+                  <div className={`h-2 w-2 rounded-full ${phaseInfo.dotColor} animate-pulse`} />
+                  <phaseInfo.icon className="w-4 h-4" />
+                  <span className="text-sm font-medium">{phaseInfo.label}</span>
+                </div>
                 {modeBadge && (
-                  <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border ${modeBadge.className}`}>
-                    <modeBadge.icon className="w-3 h-3" />
+                  <div className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-sm ${modeBadge.className}`}>
+                    <modeBadge.icon className="w-4 h-4" />
                     <span>{modeBadge.label}</span>
                   </div>
                 )}
-                <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border ${chainMatch ? 'bg-success-50 text-success-700 border-success-200' : 'bg-warning-50 text-warning-700 border-warning-200'}`}>
-                  <div className={`w-1.5 h-1.5 rounded-full ${chainMatch ? 'bg-success-500' : 'bg-warning-500'}`} />
-                  <span>{chainMatch ? `🟢 ${getNetworkLabel(expectedChainId)}` : `Wrong network (${getNetworkLabel(chainId)})`}</span>
+                <div className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-sm ${chainMatch ? 'bg-success-50 text-success-700 border-success-200' : 'bg-warning-50 text-warning-700 border-warning-200'}`}>
+                  <div className={`h-2 w-2 rounded-full ${chainMatch ? 'bg-success-500' : 'bg-warning-500'}`} />
+                  <span>{chainMatch ? getNetworkLabel(expectedChainId) : `Wrong network: ${getNetworkLabel(chainId)}`}</span>
                 </div>
-                <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border ${merkleAligned ? 'bg-success-50 text-success-700 border-success-200' : 'bg-warning-50 text-warning-700 border-warning-200'}`}>
-                  <div className={`w-1.5 h-1.5 rounded-full ${merkleAligned ? 'bg-success-500' : 'bg-warning-500'}`} />
-                  <span>{merkleAligned ? '✅ System Synced' : '⚠️ Needs Sync'}</span>
-                </div>
+                {showSyncStatus && (
+                  <div className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-sm ${merkleAligned ? 'bg-success-50 text-success-700 border-success-200' : 'bg-warning-50 text-warning-700 border-warning-200'}`}>
+                    <div className={`h-2 w-2 rounded-full ${merkleAligned ? 'bg-success-500' : 'bg-warning-500'}`} />
+                    <span>{merkleAligned ? 'Eligibility synced' : 'Sync required'}</span>
+                  </div>
+                )}
               </div>
             )}
 
             {/* Phase Badge (Mobile) */}
             {account && (
-              <div className="md:hidden">
-                <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full ${phaseInfo.bgColor} border border-current/20`}>
+              <div className="lg:hidden">
+                <div className={`inline-flex items-center gap-1.5 rounded-full border border-current/20 px-3 py-2 ${phaseInfo.bgColor}`}>
                   <div className={`w-1.5 h-1.5 rounded-full ${phaseInfo.dotColor}`} />
-                  <span className="text-xs font-medium">{phaseInfo.label}</span>
+                  <span className="text-sm font-medium">{phaseInfo.label}</span>
                 </div>
               </div>
             )}
 
             {/* Account Info */}
             {account && (
-              <div className="flex items-center space-x-3">
-                {/* Wallet Connection Status */}
-                <div className="hidden sm:flex items-center space-x-2 bg-success-50 text-success-700 px-3 py-1.5 rounded-full border border-success-200">
-                  <CheckCircle className="w-3 h-3" />
-                  <span className="text-xs font-medium">
-                    {t('header.connectedToMetaMask')}
-                  </span>
+              <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${generateIdenticon(account)} shadow-sm`}>
+                  <User className="w-4 h-4 text-white" />
                 </div>
-
-                {/* Account Address */}
-                <div className="flex items-center space-x-2 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200">
-                  <span className="font-mono text-sm text-slate-700 hidden sm:inline">
+                <div className="min-w-0">
+                  <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Wallet
+                  </div>
+                  <div className="font-mono text-sm text-slate-700 hidden sm:inline">
                     {shortenAddress(account)}
-                  </span>
-                  <span className="font-mono text-xs text-slate-700 sm:hidden">
+                  </div>
+                  <div className="font-mono text-xs text-slate-700 sm:hidden">
                     {account.slice(0, 4)}…{account.slice(-2)}
-                  </span>
-                  
-                  {/* Admin Badge */}
-                  {isAdmin && (
-                    <Tooltip title={t('header.administratorAccount')}>
-                      <div className="flex items-center">
-                        <Shield className="w-4 h-4 text-slate-900" />
-                      </div>
-                    </Tooltip>
-                  )}
-                  
-                  {/* Account Avatar */}
-                  <div className={`w-7 h-7 ${generateIdenticon(account)} rounded-lg flex items-center justify-center shadow-sm`}>
-                    <User className="w-4 h-4 text-white" />
                   </div>
                 </div>
+                {isAdmin && (
+                  <Tooltip title={t('header.administratorAccount')}>
+                    <div className="flex items-center">
+                      <Shield className="w-4 h-4 text-slate-900" />
+                    </div>
+                  </Tooltip>
+                )}
               </div>
             )}
 
@@ -246,9 +229,11 @@ const Header: React.FC<HeaderProps> = ({
             <div className="flex items-center">
               <button
                 onClick={(e) => setLanguageAnchor(e.currentTarget)}
-                className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
+                className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
+                aria-label="Choose language"
               >
                 <Languages className="w-5 h-5" />
+                <span className="hidden xl:inline text-sm font-medium">Language</span>
               </button>
               
               <Menu

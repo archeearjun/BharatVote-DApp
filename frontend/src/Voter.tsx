@@ -48,12 +48,6 @@ const Voter: React.FC<VoterProps> = ({
   onStatusChange,
 }) => {
   const { t } = useI18n();
-  console.log('DEBUG Voter: Component rendered with props:');
-  console.log('DEBUG Voter: voterId:', voterId);
-  console.log('DEBUG Voter: contract available:', !!contract);
-  console.log('DEBUG Voter: phase:', phase);
-  console.log('DEBUG Voter: Received candidates:', candidates);
-  console.log('DEBUG Voter: Candidates length:', candidates.length);
   const [hasVoted, setHasVoted] = useState(false);
   const [hasRevealed, setHasRevealed] = useState(false);
   const [voteHash, setVoteHash] = useState<string | null>(null);
@@ -101,11 +95,11 @@ const Voter: React.FC<VoterProps> = ({
           setIsEligible(true);
         } else {
           setIsEligible(false);
-        }
-      } catch (err) {
-        console.error('DEBUG Voter: eligibility check failed', err);
-        setIsEligible(false);
       }
+    } catch (err) {
+      console.warn('Failed to check voter eligibility', err);
+      setIsEligible(false);
+    }
     };
 
     checkEligibility();
@@ -114,41 +108,25 @@ const Voter: React.FC<VoterProps> = ({
 
   const checkVoteStatus = async () => {
     if (!contract || !account) {
-      console.log('DEBUG checkVoteStatus: Early return - contract:', !!contract, 'account:', !!account);
       return;
     }
     try {
-      console.log('DEBUG checkVoteStatus: Checking status for voter:', account);
-      console.log('DEBUG checkVoteStatus: Contract available:', !!contract);
-      console.log('DEBUG checkVoteStatus: Account:', account);
-      console.log('DEBUG checkVoteStatus: Contract methods available:', Object.keys(contract));
-      console.log('DEBUG checkVoteStatus: getVoterStatus method available:', typeof contract.getVoterStatus);
-      
       const [committed, revealed] = await contract.getVoterStatus(account);
-      console.log('DEBUG checkVoteStatus: Contract returned - committed:', committed, 'revealed:', revealed);
-      console.log('DEBUG checkVoteStatus: Types - committed:', typeof committed, 'revealed:', typeof revealed);
       
       setHasVoted(committed);
       setHasRevealed(revealed);
-      console.log('DEBUG checkVoteStatus: State updated - hasVoted:', committed, 'hasRevealed:', revealed);
       onStatusChange?.({ committed, revealed });
 
-      // Privacy: no local persistence used
-
-      // Hydrate locally stored commit hash from chain so reveal comparisons are accurate even after refresh
       try {
         const onchainCommit: string = await contract.commits(account);
-        console.log('DEBUG checkVoteStatus: On-chain commit hash:', onchainCommit);
         if (onchainCommit && onchainCommit !== '0x' && onchainCommit !== '0x0000000000000000000000000000000000000000000000000000000000000000') {
           setVoteHash(onchainCommit);
         }
       } catch (innerErr) {
-        console.warn('DEBUG checkVoteStatus: Failed to read on-chain commit hash:', innerErr);
+        console.warn('Failed to read on-chain commit hash', innerErr);
       }
     } catch (err) {
-      console.error('Error checking vote status:', err);
-      console.error('Error details:', err);
-      console.error('Error stack:', err instanceof Error ? err.stack : 'No stack trace');
+      console.warn('Failed to refresh vote status', err);
     }
   };
 
@@ -182,19 +160,11 @@ const Voter: React.FC<VoterProps> = ({
   };
 
   const handleCommitVote = async () => {
-    console.log('DEBUG handleCommitVote: Starting vote commitment');
-    console.log('DEBUG handleCommitVote: selectedCandidateId:', selectedCandidateId);
-    console.log('DEBUG handleCommitVote: saltLength:', salt.trim().length);
-    console.log('DEBUG handleCommitVote: contract available:', !!contract);
-    console.log('DEBUG handleCommitVote: voterId:', voterId);
-    console.log('DEBUG handleCommitVote: account:', account);
-    
     if (selectedCandidateId === null || !salt.trim()) {
       setError('Select a candidate and enter a salt (secret phrase) before committing.');
       return;
     }
     if (!contract) {
-      console.log('DEBUG handleCommitVote: No contract available');
       setError('Wallet not connected or contract unavailable');
       return;
     }
@@ -208,9 +178,7 @@ const Voter: React.FC<VoterProps> = ({
     setError(null);
 
     try {
-      console.log('DEBUG handleCommitVote: Calling hashVote...');
       const { commitHash } = await hashVote(selectedCandidateId, salt.trim());
-      console.log('DEBUG handleCommitVote: hashVote completed, commitHash:', commitHash);
 
       // Demo mode: ensure the backend has registered this voter (so they become eligible on-chain).
       if (isDemoElection) {
@@ -223,8 +191,6 @@ const Voter: React.FC<VoterProps> = ({
         } catch {}
       }
 
-      // Fetch Merkle proof from backend using verified voterId
-      console.log('DEBUG handleCommitVote: Fetching Merkle proof from backend...');
       const proofUrl = new URL(`${BACKEND_URL}/api/merkle-proof/${encodeURIComponent(account)}`);
       if (electionAddress) {
         proofUrl.searchParams.set('electionAddress', electionAddress);
@@ -265,15 +231,8 @@ const Voter: React.FC<VoterProps> = ({
         if (e instanceof Error) throw e;
       }
 
-      console.log('DEBUG: Committing vote with hash:', commitHash);
-      console.log('DEBUG: Merkle proof:', proof);
-      console.log('DEBUG: Voter Address:', account);
-
-      console.log('DEBUG handleCommitVote: Calling contract.commitVote...');
       const tx = await contract.commitVote(commitHash, proof);
-      console.log('DEBUG handleCommitVote: Transaction sent, waiting for confirmation...');
       await tx.wait();
-      console.log('DEBUG handleCommitVote: Transaction confirmed!');
 
       setVoteHash(commitHash);
       setHasVoted(true);
@@ -288,7 +247,6 @@ const Voter: React.FC<VoterProps> = ({
 
       setTimeout(() => setSuccess(null), 5000);
     } catch (err: any) {
-      console.error('DEBUG: Vote commitment error:', err);
       let msg = err?.reason || err?.message || 'Failed to commit vote';
       
       // Better error messages for common issues
@@ -358,12 +316,6 @@ const Voter: React.FC<VoterProps> = ({
     setError(null);
 
     try {
-      console.log('DEBUG handleRevealVote: Starting vote reveal');
-      console.log('DEBUG handleRevealVote: selectedCandidateId:', selectedCandidateId);
-      console.log('DEBUG handleRevealVote: saltLength:', salt.trim().length);
-      console.log('DEBUG handleRevealVote: contract available:', !!contract);
-      
-      // Check if user has committed a vote
       if (!hasVoted) {
         throw new Error('You must commit a vote before revealing. Please go back to the commit phase and commit your vote first.');
       }
@@ -373,37 +325,25 @@ const Voter: React.FC<VoterProps> = ({
         throw new Error('You have already revealed your vote. You cannot reveal again.');
       }
 
-      // Always fetch latest on-chain committed hash for this voter to avoid stale local state
       let storedHash = voteHash;
       try {
         const onchainCommit: string = await contract.commits(account);
-        console.log('DEBUG handleRevealVote: On-chain stored commit hash:', onchainCommit);
         if (onchainCommit) storedHash = onchainCommit;
       } catch (readErr) {
-        console.warn('DEBUG handleRevealVote: Failed to read on-chain commit hash:', readErr);
+        console.warn('Failed to read on-chain commit hash before reveal', readErr);
       }
 
-      // Verify the commit hash matches what we're trying to reveal
       const { commitHash: expectedCommitHash } = await hashVote(selectedCandidateId, salt.trim());
-      console.log('DEBUG handleRevealVote: Expected commit hash:', expectedCommitHash);
-      console.log('DEBUG handleRevealVote: Stored vote hash (local/on-chain):', storedHash);
       
       if (!storedHash || expectedCommitHash.toLowerCase() !== storedHash.toLowerCase()) {
         throw new Error('Hash mismatch! The candidate and salt combination does not match your committed vote. Please ensure you are using the same candidate and salt from the commit phase.');
       }
 
-      // Reveal for the selected candidate id
       const candidateId = BigInt(selectedCandidateId);
       const bytes32Salt = ethers.keccak256(ethers.toUtf8Bytes(salt.trim()));
-      
-      console.log('DEBUG handleRevealVote: Calling contract.revealVote with:');
-      console.log('DEBUG handleRevealVote: - candidateId:', candidateId.toString());
-      console.log('DEBUG handleRevealVote: - bytes32Salt:', bytes32Salt);
-      
+
       const tx = await contract.revealVote(candidateId, bytes32Salt);
-      console.log('DEBUG handleRevealVote: Transaction sent, waiting for confirmation...');
       await tx.wait();
-      console.log('DEBUG handleRevealVote: Transaction confirmed!');
       
       setSuccess('Vote revealed successfully! Your vote has been counted.');
       onRevealSuccess();
@@ -413,7 +353,6 @@ const Voter: React.FC<VoterProps> = ({
       
       setTimeout(() => setSuccess(null), 5000);
     } catch (err: any) {
-      console.error('DEBUG: Vote reveal error:', err);
       const msg = err?.reason || err?.message || 'Failed to reveal vote';
       setError(msg);
     } finally {
@@ -439,6 +378,32 @@ const Voter: React.FC<VoterProps> = ({
 
   const preventSaltContextMenu = (e: React.MouseEvent<HTMLInputElement>) => {
     e.preventDefault();
+  };
+
+  const moveCandidateSelection = (currentId: number, direction: 1 | -1) => {
+    const ids = candidates.map((candidate: any) => Number(candidate.id)).filter((id: number) => Number.isFinite(id));
+    if (!ids.length) return;
+    const currentIndex = ids.indexOf(currentId);
+    const safeIndex = currentIndex >= 0 ? currentIndex : 0;
+    const nextIndex = (safeIndex + direction + ids.length) % ids.length;
+    setSelectedCandidateId(ids[nextIndex]);
+  };
+
+  const handleCandidateKeyDown = (e: React.KeyboardEvent, candidateId: number) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      setSelectedCandidateId(candidateId);
+      return;
+    }
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      moveCandidateSelection(candidateId, 1);
+      return;
+    }
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      moveCandidateSelection(candidateId, -1);
+    }
   };
   
   // Make the action buttons clickable as soon as inputs are present; we surface errors if prerequisites are missing
@@ -470,61 +435,14 @@ const Voter: React.FC<VoterProps> = ({
     return null;
   })();
 
-  // Debug logging for canReveal calculation
-  console.log('DEBUG canReveal calculation:', {
-    selectedCandidateId,
-    saltTrimmed: !!salt.trim(),
-    saltLength: salt.trim().length,
-    isRevealing,
-    hasVoted,
-    hasRevealed,
-    phase,
-    phaseCheck: phase === 1,
-    canReveal
-  });
-
-  // Debug logging for render
-  console.log('DEBUG Voter Render:', {
-    voterId,
-    phase,
-    hasVoted,
-    isEligible,
-    candidates: candidates.length,
-    selectedCandidateId,
-    saltLength: salt.trim().length,
-    canCommit,
-    canReveal,
-    isCommitting,
-    contract: !!contract,
-    contractMethods: contract ? Object.keys(contract) : 'No contract',
-    revealVoteMethod: contract?.revealVote ? 'Available' : 'Not available'
-  });
-
-  // Add useEffect to log state changes
-  useEffect(() => {
-    console.log('DEBUG State change detected:', {
-      hasVoted,
-      hasRevealed,
-      phase,
-      selectedCandidateId,
-      saltLength: salt.trim().length,
-      canReveal
-    });
-  }, [hasVoted, hasRevealed, phase, selectedCandidateId, salt, canReveal]);
-
-  // Add click handler debugging
   const handleCommitClick = () => {
-    console.log('DEBUG: Commit button clicked!');
-    if (!canCommit) {
-      console.log('DEBUG: Button disabled, cannot commit');
-      return;
-    }
+    if (!canCommit) return;
     handleCommitVote();
   };
 
   if (!account) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-subtle flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -541,7 +459,7 @@ const Voter: React.FC<VoterProps> = ({
   // Error boundary - if there's a critical error, show it
   if (!voterId) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-subtle flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -550,9 +468,6 @@ const Voter: React.FC<VoterProps> = ({
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Voter ID Not Available</h3>
           <p className="text-sm text-gray-600 mb-4">Please complete KYC verification first.</p>
-          <div className="text-xs text-gray-500">
-            Debug: voterId = {JSON.stringify(voterId)}
-          </div>
         </div>
       </div>
     );
@@ -560,7 +475,7 @@ const Voter: React.FC<VoterProps> = ({
 
   if (!contract) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-subtle flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -569,9 +484,6 @@ const Voter: React.FC<VoterProps> = ({
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Contract Not Available</h3>
           <p className="text-sm text-gray-600 mb-4">Please connect your wallet and ensure the contract is deployed.</p>
-          <div className="text-xs text-gray-500">
-            Debug: contract = {JSON.stringify(contract)}
-          </div>
         </div>
       </div>
     );
@@ -713,15 +625,17 @@ const Voter: React.FC<VoterProps> = ({
                     
                     const handleSelect = (e: React.MouseEvent | React.KeyboardEvent) => {
                       e.preventDefault();
-                      console.log('DEBUG Commit: Candidate selected:', c.name, 'ID:', candidateId);
                       setSelectedCandidateId(candidateId);
                     };
                     
                     const handleKeyDown = (e: React.KeyboardEvent) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        handleSelect(e);
-                      }
+                      handleCandidateKeyDown(e, candidateId);
                     };
+
+                    const isFocusable =
+                      selectedCandidateId === null
+                        ? candidateId === Number(candidates[0]?.id)
+                        : isSelected;
                     
                     return (
                       <div
@@ -729,7 +643,7 @@ const Voter: React.FC<VoterProps> = ({
                         role="radio"
                         aria-checked={isSelected}
                         aria-labelledby={`candidate-commit-${candidateId}-name`}
-                        tabIndex={0}
+                        tabIndex={isFocusable ? 0 : -1}
                         onClick={handleSelect}
                         onKeyDown={handleKeyDown}
                         className={`
@@ -884,7 +798,7 @@ const Voter: React.FC<VoterProps> = ({
               </span>
             </button>
             {!canCommit && commitDisabledReason && (
-              <p className="mt-2 text-xs text-slate-500">{commitDisabledReason}</p>
+              <p className="mt-2 text-sm text-slate-500">{commitDisabledReason}</p>
             )}
           </div>
         </div>
@@ -970,15 +884,17 @@ const Voter: React.FC<VoterProps> = ({
                     
                     const handleSelect = (e: React.MouseEvent | React.KeyboardEvent) => {
                       e.preventDefault();
-                      console.log('DEBUG Reveal: Candidate selected:', c.name, 'ID:', candidateId);
                       setSelectedCandidateId(candidateId);
                     };
                     
                     const handleKeyDown = (e: React.KeyboardEvent) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        handleSelect(e);
-                      }
+                      handleCandidateKeyDown(e, candidateId);
                     };
+
+                    const isFocusable =
+                      selectedCandidateId === null
+                        ? candidateId === Number(candidates[0]?.id)
+                        : isSelected;
                     
                     return (
                       <div
@@ -986,7 +902,7 @@ const Voter: React.FC<VoterProps> = ({
                         role="radio"
                         aria-checked={isSelected}
                         aria-labelledby={`candidate-${candidateId}-name`}
-                        tabIndex={0}
+                        tabIndex={isFocusable ? 0 : -1}
                         onClick={handleSelect}
                         onKeyDown={handleKeyDown}
                         className={`
@@ -994,9 +910,9 @@ const Voter: React.FC<VoterProps> = ({
                           min-h-[56px] p-4 rounded-2xl
                           cursor-pointer
                           transition-all duration-150 ease-out
-                          focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500
+                          focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-slate-500
                           ${isSelected 
-                            ? 'bg-blue-50/70 ring-2 ring-blue-500 shadow-sm' 
+                            ? 'bg-slate-50 ring-2 ring-slate-900 shadow-sm' 
                             : 'bg-white border border-slate-200 hover:border-slate-300 hover:shadow-md active:scale-[0.98]'
                           }
                         `}
@@ -1014,7 +930,7 @@ const Voter: React.FC<VoterProps> = ({
                             font-semibold text-sm
                             transition-colors duration-150
                             ${isSelected 
-                              ? 'bg-blue-500 text-white' 
+                              ? 'bg-slate-900 text-white' 
                               : 'bg-slate-100 text-slate-700 group-hover:bg-slate-200'
                             }
                           `}>
@@ -1038,10 +954,10 @@ const Voter: React.FC<VoterProps> = ({
                           <div className="flex-shrink-0">
                             {isSelected ? (
                               <div className="flex items-center gap-2">
-                                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-900 text-white">
                                   Selected
                                 </span>
-                                <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center animate-in fade-in zoom-in duration-150">
+                                <div className="w-6 h-6 rounded-full bg-slate-900 flex items-center justify-center animate-in fade-in zoom-in duration-150">
                                   <CheckCircle className="w-5 h-5 text-white" />
                                 </div>
                               </div>
@@ -1091,27 +1007,8 @@ const Voter: React.FC<VoterProps> = ({
                 disabled={!canReveal}
                 title={canReveal ? undefined : revealDisabledReason || undefined}
                 onClick={() => {
-                  console.log('DEBUG: Reveal button clicked!');
-                  console.log('DEBUG: selectedCandidateId:', selectedCandidateId);
-                  console.log('DEBUG: saltLength:', salt.trim().length);
-                  console.log('DEBUG: canReveal:', canReveal);
-                  console.log('DEBUG: contract available:', !!contract);
-                  console.log('DEBUG: phase:', phase);
-                  console.log('DEBUG: hasVoted:', hasVoted);
-                  console.log('DEBUG: hasRevealed:', hasRevealed);
-                  console.log('DEBUG: isRevealing:', isRevealing);
                   if (canReveal) {
-                    console.log('DEBUG: Reveal button enabled, calling handleRevealVote');
                     handleRevealVote();
-                  } else {
-                    console.log('DEBUG: Reveal button disabled, cannot reveal');
-                    console.log('DEBUG: Breaking down canReveal conditions:');
-                    console.log('DEBUG: - selectedCandidateId !== null:', selectedCandidateId !== null);
-                    console.log('DEBUG: - !!salt.trim():', !!salt.trim());
-                    console.log('DEBUG: - !isRevealing:', !isRevealing);
-                    console.log('DEBUG: - hasVoted:', hasVoted);
-                    console.log('DEBUG: - !hasRevealed:', !hasRevealed);
-                    console.log('DEBUG: - phase === 1:', phase === 1);
                   }
                 }}
                 className="btn-warning w-full sm:w-auto px-8"

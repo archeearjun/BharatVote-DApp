@@ -84,7 +84,7 @@ export default function DemoElectionGuidePage() {
         bullets={[
           {
             title: "Faster entry",
-            description: "Users join through a dedicated backend endpoint instead of the mock KYC sequence.",
+            description: "Users join through a dedicated backend endpoint instead of the main-election verification sequence.",
           },
           {
             title: "Same core vote logic",

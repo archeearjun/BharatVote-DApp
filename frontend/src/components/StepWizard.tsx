@@ -1,6 +1,4 @@
 import React from 'react';
-import { Box, Step, StepLabel, Stepper } from '@mui/material';
-import type { StepIconProps } from '@mui/material/StepIcon';
 import { Check } from 'lucide-react';
 
 interface WizardStep {
@@ -15,54 +13,86 @@ interface StepWizardProps {
   lockedReason?: string;
 }
 
-const StepIcon = ({ active, completed, icon }: StepIconProps) => {
-  const base = 'w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold';
-  if (completed) {
-    return (
-      <div className={`${base} bg-green-600 text-white`}>
-        <Check className="w-4 h-4" />
-      </div>
-    );
-  }
-  if (active) {
-    return <div className={`${base} bg-slate-900 text-white`}>{icon}</div>;
-  }
-  return <div className={`${base} bg-slate-200 text-slate-700`}>{icon}</div>;
-};
-
 const StepWizard: React.FC<StepWizardProps> = ({ steps, currentStep, lockedReason }) => {
+  const clampedStep = Math.min(Math.max(currentStep, 0), Math.max(steps.length - 1, 0));
+
   return (
-    <div className="w-full bg-white rounded-xl border border-slate-200 px-4 py-3">
-      <Box sx={{ width: '100%' }}>
-        <Stepper
-          activeStep={Math.min(Math.max(currentStep, 0), Math.max(steps.length - 1, 0))}
-          alternativeLabel
-          sx={{
-            '& .MuiStepConnector-line': { borderColor: 'rgb(203 213 225)' },
-            '& .MuiStepLabel-label': { fontSize: '0.75rem', marginTop: '6px', color: 'rgb(51 65 85)' },
-            '& .MuiStepLabel-label.Mui-active': { color: 'rgb(15 23 42)', fontWeight: 600 },
-            '& .MuiStepLabel-label.Mui-completed': { color: 'rgb(21 128 61)', fontWeight: 600 },
-          }}
+    <div className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-5 shadow-sm">
+      <div className="overflow-x-auto">
+        <ol
+          className="grid min-w-[640px] gap-3"
+          style={{ gridTemplateColumns: `repeat(${Math.max(steps.length, 1)}, minmax(0, 1fr))` }}
+          aria-label="Election progress"
         >
           {steps.map((step, idx) => {
-            const isLocked = Boolean(lockedReason) && idx > currentStep;
+            const status = idx < clampedStep ? 'complete' : idx === clampedStep ? 'current' : 'upcoming';
+            const isLocked = Boolean(lockedReason) && idx > clampedStep;
+
             return (
-              <Step key={step.id} completed={idx < currentStep} disabled={isLocked}>
-                <StepLabel StepIconComponent={StepIcon}>
-                  <span className="block leading-tight">{step.title}</span>
+              <li key={step.id} className="relative">
+                {idx < steps.length - 1 && (
+                  <div
+                    className={`absolute left-[calc(50%+1.5rem)] right-[-1.25rem] top-5 h-px ${
+                      idx < clampedStep ? 'bg-green-500' : 'bg-slate-200'
+                    }`}
+                    aria-hidden="true"
+                  />
+                )}
+
+                <div
+                  className={`relative flex flex-col items-center rounded-2xl px-3 py-2 text-center transition-colors ${
+                    status === 'current'
+                      ? 'bg-slate-50'
+                      : status === 'complete'
+                        ? 'bg-green-50'
+                        : 'bg-transparent'
+                  }`}
+                >
+                  <div
+                    className={`flex h-10 w-10 items-center justify-center rounded-full border text-sm font-semibold ${
+                      status === 'complete'
+                        ? 'border-green-600 bg-green-600 text-white'
+                        : status === 'current'
+                          ? 'border-slate-900 bg-slate-900 text-white'
+                          : 'border-slate-200 bg-slate-100 text-slate-700'
+                    }`}
+                    aria-hidden="true"
+                  >
+                    {status === 'complete' ? <Check className="h-4 w-4" /> : idx + 1}
+                  </div>
+
+                  <p
+                    className={`mt-3 text-sm font-semibold ${
+                      status === 'complete'
+                        ? 'text-green-700'
+                        : status === 'current'
+                          ? 'text-slate-900'
+                          : 'text-slate-700'
+                    }`}
+                  >
+                    {step.title}
+                  </p>
+
                   {step.description && (
-                    <span className="block text-[11px] font-normal text-slate-500 mt-0.5">
+                    <p className="mt-1 hidden text-sm leading-5 text-slate-500 md:block">
                       {step.description}
+                    </p>
+                  )}
+
+                  {isLocked && (
+                    <span className="mt-2 text-xs font-medium uppercase tracking-wide text-slate-400">
+                      Locked
                     </span>
                   )}
-                </StepLabel>
-              </Step>
+                </div>
+              </li>
             );
           })}
-        </Stepper>
-      </Box>
+        </ol>
+      </div>
+
       {lockedReason && (
-        <div className="mt-2 text-xs text-amber-700">
+        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           {lockedReason}
         </div>
       )}

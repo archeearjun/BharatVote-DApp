@@ -19,7 +19,7 @@ const steps = [
   {
     phase: "Eligibility",
     title: "Sync the Merkle root on chain",
-    detail: "Use Sync Now so the contract reads the latest eligibility root before voters begin committing.",
+    detail: "Use Sync to Contract so the election reads the latest eligibility root before voters begin committing.",
   },
   {
     phase: "Commit",
@@ -54,7 +54,7 @@ export default function MainElectionGuidePage() {
         { label: "Open FAQ", to: "/faq", variant: "secondary" },
       ]}
       heroAsideTitle="Main mode at a glance"
-      heroAsideDescription="Main election mode is the stricter path. It assumes an admin-managed allowlist, explicit Merkle-root sync, and a mock KYC gate before voters enter the election UI."
+      heroAsideDescription="Main election mode is the stricter path. It assumes an admin-managed allowlist, explicit Merkle-root sync, and a guided verification gate before voters enter the election UI."
       heroAsideItems={[
         {
           label: "Actors",
@@ -88,7 +88,7 @@ export default function MainElectionGuidePage() {
           },
           {
             title: "Keep the backend available",
-            description: "Allowlist upload, proof generation, and mock KYC support all depend on the backend layer being reachable.",
+            description: "Allowlist upload, proof generation, and verification support all depend on the backend layer being reachable.",
           },
           {
             title: "Prepare a clean voter list",
