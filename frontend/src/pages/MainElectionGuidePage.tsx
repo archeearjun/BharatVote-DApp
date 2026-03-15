@@ -1,53 +1,140 @@
-import DocsLayout from "./DocsLayout";
+import DocsLayout, { DocsSectionIntro, DocsSplitSection } from "./DocsLayout";
 
 const steps = [
-  "Open BharatVote and click Create Election.",
-  "Connect MetaMask and confirm election creation transaction.",
-  "After routing to the election address, add candidates from Admin panel.",
-  "Upload eligible voter addresses using TXT, CSV, JSON, or pasted text.",
-  "Sync backend Merkle root on chain with Sync Now action.",
-  "Move to commit phase and let eligible voters commit hash with Merkle proof.",
-  "Move to reveal phase and let voters reveal with exact same candidate and password.",
-  "Finish election and open tally plus public results."
+  {
+    phase: "Setup",
+    title: "Create the election contract",
+    detail: "Open BharatVote, choose Create Election, connect MetaMask, and confirm the deployment transaction on Sepolia.",
+  },
+  {
+    phase: "Setup",
+    title: "Add candidates in the admin panel",
+    detail: "After the app routes to the new election address, configure the candidate list before opening voting.",
+  },
+  {
+    phase: "Eligibility",
+    title: "Upload the voter allowlist",
+    detail: "Import eligible addresses using TXT, CSV, JSON, or pasted text so the backend can build the Merkle tree.",
+  },
+  {
+    phase: "Eligibility",
+    title: "Sync the Merkle root on chain",
+    detail: "Use Sync Now so the contract reads the latest eligibility root before voters begin committing.",
+  },
+  {
+    phase: "Commit",
+    title: "Open commit phase",
+    detail: "Eligible voters submit hash commitments with their Merkle proofs while the underlying choice stays private.",
+  },
+  {
+    phase: "Reveal",
+    title: "Open reveal phase",
+    detail: "Voters reveal the exact same candidate and password that produced their earlier commitment hash.",
+  },
+  {
+    phase: "Results",
+    title: "Finish the election",
+    detail: "Close the election and review tally output plus the public read-only results view.",
+  },
+  {
+    phase: "Review",
+    title: "Check any proof mismatch immediately",
+    detail: "If commit fails, verify that the uploaded allowlist, generated proofs, and synced Merkle root all correspond to the same election address.",
+  },
 ];
 
 export default function MainElectionGuidePage() {
   return (
     <DocsLayout
+      eyebrow="Operator Guide"
       title="Main Election Guide"
-      description="A full step-by-step operating guide for admin and voters in main election mode."
+      description="This page now follows a more deliberate product-doc pattern: preparation first, execution second, and troubleshooting kept adjacent to the flow instead of buried at the end."
+      heroActions={[
+        { label: "Read Key Terms", to: "/learn", variant: "primary" },
+        { label: "Open FAQ", to: "/faq", variant: "secondary" },
+      ]}
+      heroAsideTitle="Main mode at a glance"
+      heroAsideDescription="Main election mode is the stricter path. It assumes an admin-managed allowlist, explicit Merkle-root sync, and a mock KYC gate before voters enter the election UI."
+      heroAsideItems={[
+        {
+          label: "Actors",
+          value: "Admin + allowlisted voters",
+          description: "The admin prepares the election; voters commit and reveal only after they pass the gate.",
+        },
+        {
+          label: "Lifecycle",
+          value: "Setup -> Commit -> Reveal -> Results",
+          description: "Each stage has a different responsibility and the contract enforces the transitions.",
+        },
+        {
+          label: "Most critical action",
+          value: "Merkle root sync",
+          description: "If the root is stale, valid voters can still fail verification.",
+        },
+      ]}
+      footerActions={[
+        { label: "Open Demo Guide", to: "/guide/demo-election", variant: "secondary" },
+        { label: "Read the Blog", to: "/blog", variant: "secondary" },
+      ]}
     >
-      <section className="card-premium p-6">
-        <h2 className="text-lg font-semibold text-slate-900">Before You Start</h2>
-        <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-slate-600">
-          <li>Use MetaMask and connect to Sepolia network.</li>
-          <li>Keep backend running and configured in frontend environment.</li>
-          <li>Prepare a clean eligible voter address file for allowlist upload.</li>
-        </ul>
-      </section>
+      <DocsSplitSection
+        eyebrow="Preparation"
+        title="Set the election up correctly before voting starts"
+        description="The page now uses a TensorFlow-like split section here: one side explains the logic, the other side isolates the exact readiness checklist so the operator sees both context and action at once."
+        bullets={[
+          {
+            title: "Use MetaMask on Sepolia",
+            description: "The main flow assumes the wallet and chain are already correct before any admin action begins.",
+          },
+          {
+            title: "Keep the backend available",
+            description: "Allowlist upload, proof generation, and mock KYC support all depend on the backend layer being reachable.",
+          },
+          {
+            title: "Prepare a clean voter list",
+            description: "Garbage input at the allowlist stage turns into broken proofs later.",
+          },
+        ]}
+        asideTitle="Readiness checklist"
+        asideDescription="If these three items are true, the rest of the flow becomes predictable."
+        asideItems={[
+          {
+            title: "Wallet ready",
+            description: "MetaMask connected and pointed to Sepolia.",
+          },
+          {
+            title: "Backend ready",
+            description: "Frontend environment is wired to the running backend instance.",
+          },
+          {
+            title: "Allowlist ready",
+            description: "Eligible addresses are cleaned and prepared for upload.",
+          },
+        ]}
+      />
 
-      <section className="card-premium p-6">
-        <h2 className="text-lg font-semibold text-slate-900">Main Flow</h2>
-        <ol className="mt-4 space-y-3 text-sm text-slate-700">
-          {steps.map((step, index) => (
-            <li key={step} className="flex gap-3">
-              <span className="inline-flex h-6 w-6 flex-none items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white">
+      <DocsSectionIntro
+        eyebrow="Execution"
+        title="Run the main election in clear stages"
+        description="Each step is isolated as its own operational card so the flow reads more like a product playbook than a long unordered checklist."
+      />
+
+      <section className="grid gap-4 md:grid-cols-2">
+        {steps.map((step, index) => (
+          <article key={step.title} className="card-premium p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-900 text-sm font-semibold text-white">
                 {index + 1}
+              </div>
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                {step.phase}
               </span>
-              <span>{step}</span>
-            </li>
-          ))}
-        </ol>
-      </section>
-
-      <section className="card-premium p-6">
-        <h2 className="text-lg font-semibold text-slate-900">Troubleshooting</h2>
-        <p className="mt-2 text-sm text-slate-600">
-          If commit fails due to proof mismatch, re-check that backend allowlist was uploaded for the same election address
-          and Merkle root was synced on chain after the upload.
-        </p>
+            </div>
+            <h2 className="mt-4 text-lg font-semibold text-slate-900">{step.title}</h2>
+            <p className="mt-3 text-sm leading-7 text-slate-600">{step.detail}</p>
+          </article>
+        ))}
       </section>
     </DocsLayout>
   );
 }
-
