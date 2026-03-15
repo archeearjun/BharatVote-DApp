@@ -138,6 +138,7 @@ export default function CreateElection() {
           {explorerTxUrl ? (
             <a className="underline" href={explorerTxUrl} target="_blank" rel="noreferrer">
               {txHash}
+              <span className="sr-only"> (opens in new tab)</span>
             </a>
           ) : (
             txHash

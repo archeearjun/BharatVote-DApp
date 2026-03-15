@@ -1,12 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useI18n } from '../i18n';
 import { getExpectedChainId } from '@/utils/chain';
-import { 
-  Menu, 
-  MenuItem, 
-  Tooltip
-} from '@mui/material';
 import { 
   Languages,
   Shield,
@@ -40,7 +35,8 @@ const Header: React.FC<HeaderProps> = ({
   contractMerkleRoot,
   electionName
 }) => {
-  const [languageAnchor, setLanguageAnchor] = useState<null | HTMLElement>(null);
+  const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
+  const languageMenuRef = useRef<HTMLDivElement | null>(null);
   const { lang, setLang, t } = useI18n();
 
   const shortenAddress = (addr: string) => {
@@ -114,8 +110,32 @@ const Header: React.FC<HeaderProps> = ({
   const handleLanguageChange = (newLang: string) => {
     const map: any = { EN: 'en', 'हिं': 'hi', 'தமிழ்': 'ta' };
     setLang(map[newLang] || 'en');
-    setLanguageAnchor(null);
+    setLanguageMenuOpen(false);
   };
+
+  useEffect(() => {
+    if (!languageMenuOpen) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!languageMenuRef.current?.contains(event.target as Node)) {
+        setLanguageMenuOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setLanguageMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [languageMenuOpen]);
 
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/95 shadow-sm backdrop-blur">
@@ -216,44 +236,55 @@ const Header: React.FC<HeaderProps> = ({
                   </div>
                 </div>
                 {isAdmin && (
-                  <Tooltip title={t('header.administratorAccount')}>
-                    <div className="flex items-center">
-                      <Shield className="w-4 h-4 text-slate-900" />
-                    </div>
-                  </Tooltip>
+                  <div className="flex items-center" title={t('header.administratorAccount')}>
+                    <Shield className="w-4 h-4 text-slate-900" />
+                  </div>
                 )}
               </div>
             )}
 
             {/* Language Toggle */}
-            <div className="flex items-center">
+            <div className="relative flex items-center" ref={languageMenuRef}>
               <button
-                onClick={(e) => setLanguageAnchor(e.currentTarget)}
+                onClick={() => setLanguageMenuOpen((open) => !open)}
                 className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
                 aria-label="Choose language"
+                aria-expanded={languageMenuOpen}
+                aria-haspopup="menu"
               >
                 <Languages className="w-5 h-5" />
                 <span className="hidden xl:inline text-sm font-medium">Language</span>
               </button>
-              
-              <Menu
-                anchorEl={languageAnchor}
-                open={Boolean(languageAnchor)}
-                onClose={() => setLanguageAnchor(null)}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-                className="mt-2"
-              >
-                <MenuItem onClick={() => handleLanguageChange('EN')} className="text-sm">
-                  {t('header.language.english')}
-                </MenuItem>
-                <MenuItem onClick={() => handleLanguageChange('हिं')} className="text-sm">
-                  {t('header.language.hindi')}
-                </MenuItem>
-                <MenuItem onClick={() => handleLanguageChange('தமிழ்')} className="text-sm">
-                  {t('header.language.tamil')}
-                </MenuItem>
-              </Menu>
+
+              {languageMenuOpen && (
+                <div
+                  className="absolute right-0 top-[calc(100%+0.5rem)] z-50 min-w-[12rem] rounded-xl border border-slate-200 bg-white p-2 shadow-lg"
+                  role="menu"
+                  aria-label="Language options"
+                >
+                  {[
+                    { value: 'EN', label: t('header.language.english'), isActive: lang === 'en' },
+                    { value: 'हिं', label: t('header.language.hindi'), isActive: lang === 'hi' },
+                    { value: 'தமிழ்', label: t('header.language.tamil'), isActive: lang === 'ta' },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={option.isActive}
+                      onClick={() => handleLanguageChange(option.value)}
+                      className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+                        option.isActive
+                          ? 'bg-slate-900 text-white'
+                          : 'text-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      <span>{option.label}</span>
+                      {option.isActive && <span className="text-xs font-semibold uppercase tracking-wide">Active</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -15,10 +15,6 @@
     "test:coverage": "vitest --coverage"
   },
   "dependencies": {
-    "@emotion/react": "^11.11.3",
-    "@emotion/styled": "^11.11.0",
-    "@mui/icons-material": "^5.15.3",
-    "@mui/material": "^5.15.3",
     "@tensorflow/tfjs": "^4.15.0",
     "@types/bn.js": "^5.2.0",
     "@types/chai": "^5.2.2",

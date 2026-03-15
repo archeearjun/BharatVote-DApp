@@ -1,8 +1,8 @@
-import type { AlertColor } from "@mui/material";
+export type NotificationSeverity = 'success' | 'error' | 'warning' | 'info';
 
 export interface NotificationState {
   message: string;
-  severity: AlertColor;
+  severity: NotificationSeverity;
 }
 
 export interface AppState {

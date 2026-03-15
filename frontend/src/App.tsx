@@ -547,6 +547,7 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
                 onClick={connectWallet}
                 disabled={isLoading}
                 aria-label="Connect MetaMask Wallet"
+                aria-describedby="wallet-security-note"
                 className="btn-primary w-full mb-6"
               >
                 {isLoading ? (
@@ -565,6 +566,7 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
               <button
                 onClick={openMetaMaskInstall}
                 aria-label="Install MetaMask"
+                aria-describedby="wallet-security-note"
                 className="btn-warning w-full mb-6"
               >
                 <Wallet className="w-5 h-5" />
@@ -600,7 +602,7 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
             <div className="space-y-3">
               <div className="flex items-center justify-center gap-2 text-xs text-slate-500">
                 <Shield className="w-3 h-3" />
-                <span>{t('wallet.weNeverAccess')}</span>
+                <span id="wallet-security-note">{t('wallet.weNeverAccess')}</span>
               </div>
               <a
                 href="https://support.metamask.io/"
@@ -609,6 +611,7 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
                 className="text-xs text-slate-600 hover:text-slate-900 underline transition-colors"
               >
                 {t('wallet.learnHow')}
+                <span className="sr-only"> (opens in new tab)</span>
               </a>
             </div>
           </div>

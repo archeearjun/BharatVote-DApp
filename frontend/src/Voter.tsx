@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useI18n } from './i18n';
 import { 
   CheckCircle,
@@ -48,6 +49,7 @@ const Voter: React.FC<VoterProps> = ({
   onStatusChange,
 }) => {
   const { t } = useI18n();
+  const navigate = useNavigate();
   const [hasVoted, setHasVoted] = useState(false);
   const [hasRevealed, setHasRevealed] = useState(false);
   const [voteHash, setVoteHash] = useState<string | null>(null);
@@ -64,12 +66,46 @@ const Voter: React.FC<VoterProps> = ({
 
   const [isEligible, setIsEligible] = useState(false);
   const [isFetchingProof, setIsFetchingProof] = useState(false);
+  const [hasRecoverySnapshot, setHasRecoverySnapshot] = useState(false);
+  const recoveryStorageKey = useMemo(() => {
+    const scope = electionAddress ? String(electionAddress).toLowerCase() : 'default';
+    return `bv_vote_recovery_${scope}_${String(account).toLowerCase()}`;
+  }, [account, electionAddress]);
 
   const phases = [
     { id: 0, label: t('voter.commit'), description: t('voter.submitEncryptedVote'), icon: Lock },
     { id: 1, label: t('voter.reveal'), description: t('voter.revealActualVote'), icon: Unlock },
     { id: 2, label: t('voter.finished'), description: t('voter.electionCompleted'), icon: CheckSquare }
   ];
+
+  const persistRecoverySnapshot = useCallback((candidateId: number, nextSalt: string, commitHash?: string | null) => {
+    try {
+      sessionStorage.setItem(
+        recoveryStorageKey,
+        JSON.stringify({
+          candidateId,
+          salt: nextSalt,
+          commitHash: commitHash || null,
+        })
+      );
+      setHasRecoverySnapshot(true);
+    } catch {}
+  }, [recoveryStorageKey]);
+
+  const clearRecoverySnapshot = useCallback(() => {
+    try {
+      sessionStorage.removeItem(recoveryStorageKey);
+    } catch {}
+    setHasRecoverySnapshot(false);
+  }, [recoveryStorageKey]);
+
+  const returnToVerification = useCallback(() => {
+    if (electionAddress) {
+      window.location.assign(`/election/${electionAddress}`);
+      return;
+    }
+    navigate('/');
+  }, [electionAddress, navigate]);
 
   useEffect(() => {
     const checkEligibility = async () => {
@@ -117,10 +153,16 @@ const Voter: React.FC<VoterProps> = ({
       setHasRevealed(revealed);
       onStatusChange?.({ committed, revealed });
 
+      if (!committed || revealed) {
+        clearRecoverySnapshot();
+      }
+
       try {
         const onchainCommit: string = await contract.commits(account);
         if (onchainCommit && onchainCommit !== '0x' && onchainCommit !== '0x0000000000000000000000000000000000000000000000000000000000000000') {
           setVoteHash(onchainCommit);
+        } else if (!committed) {
+          setVoteHash(null);
         }
       } catch (innerErr) {
         console.warn('Failed to read on-chain commit hash', innerErr);
@@ -129,6 +171,36 @@ const Voter: React.FC<VoterProps> = ({
       console.warn('Failed to refresh vote status', err);
     }
   };
+
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(recoveryStorageKey);
+      if (!raw) {
+        setHasRecoverySnapshot(false);
+        return;
+      }
+
+      const parsed = JSON.parse(raw) as {
+        candidateId?: number;
+        salt?: string;
+        commitHash?: string | null;
+      };
+
+      if (typeof parsed.candidateId === 'number' && selectedCandidateId === null) {
+        setSelectedCandidateId(parsed.candidateId);
+      }
+      if (typeof parsed.salt === 'string' && !salt) {
+        setSalt(parsed.salt);
+      }
+      if (typeof parsed.commitHash === 'string' && !voteHash) {
+        setVoteHash(parsed.commitHash);
+      }
+
+      setHasRecoverySnapshot(true);
+    } catch {
+      setHasRecoverySnapshot(false);
+    }
+  }, [recoveryStorageKey]);
 
   const generateSalt = () => {
     return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
@@ -234,10 +306,11 @@ const Voter: React.FC<VoterProps> = ({
       const tx = await contract.commitVote(commitHash, proof);
       await tx.wait();
 
+      persistRecoverySnapshot(selectedCandidateId, salt.trim(), commitHash);
       setVoteHash(commitHash);
       setHasVoted(true);
       onCommitSuccess?.();
-      setSuccess('Vote committed successfully! Your vote is now encrypted and secure.');
+      setSuccess('Vote committed successfully. A temporary recovery copy is saved in this browser until reveal completes.');
       setShowCommitModal(true);
 
       // Do not store any candidate/salt locally to preserve privacy
@@ -277,8 +350,6 @@ const Voter: React.FC<VoterProps> = ({
     const resetOrReopenedCommit = phase === 0 && (refreshChanged || (previousPhase !== null && previousPhase !== 0));
 
     if (enteredReveal) {
-      setSelectedCandidateId(null);
-      setSalt('');
       setIsSaltVisible(false);
       setShowCommitModal(false);
       setError(null);
@@ -295,6 +366,7 @@ const Voter: React.FC<VoterProps> = ({
       setHasRevealed(false);
       setError(null);
       setSuccess(null);
+      clearRecoverySnapshot();
     }
 
     if (phase !== 1) {
@@ -304,7 +376,7 @@ const Voter: React.FC<VoterProps> = ({
     checkVoteStatus();
     previousPhaseRef.current = phase;
     previousRefreshSignalRef.current = refreshSignal;
-  }, [phase, refreshSignal]);
+  }, [clearRecoverySnapshot, phase, refreshSignal]);
 
   const handleRevealVote = async () => {
     if (selectedCandidateId === null || !salt.trim()) {
@@ -345,6 +417,7 @@ const Voter: React.FC<VoterProps> = ({
       const tx = await contract.revealVote(candidateId, bytes32Salt);
       await tx.wait();
       
+      clearRecoverySnapshot();
       setSuccess('Vote revealed successfully! Your vote has been counted.');
       onRevealSuccess();
       
@@ -359,6 +432,12 @@ const Voter: React.FC<VoterProps> = ({
       setIsRevealing(false);
     }
   };
+
+  useEffect(() => {
+    if (hasRevealed) {
+      clearRecoverySnapshot();
+    }
+  }, [clearRecoverySnapshot, hasRevealed]);
 
   const handleNewSalt = () => {
     setSalt(generateSalt());
@@ -460,7 +539,7 @@ const Voter: React.FC<VoterProps> = ({
   if (!voterId) {
     return (
       <div className="min-h-screen bg-gradient-subtle flex items-center justify-center">
-        <div className="text-center">
+        <div className="card-premium max-w-md p-8 text-center">
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
@@ -468,6 +547,9 @@ const Voter: React.FC<VoterProps> = ({
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Voter ID Not Available</h3>
           <p className="text-sm text-gray-600 mb-4">Please complete KYC verification first.</p>
+          <button type="button" onClick={returnToVerification} className="btn-secondary">
+            Return to Verification
+          </button>
         </div>
       </div>
     );
@@ -542,7 +624,7 @@ const Voter: React.FC<VoterProps> = ({
 
       {/* Alerts */}
       {error && (
-        <div className="card p-4 bg-error-50 border-error-200">
+        <div className="card p-4 bg-error-50 border-error-200" role="alert" aria-live="assertive">
           <div className="flex items-start gap-3">
             <AlertTriangle className="w-5 h-5 text-error-600 mt-0.5" />
             <div className="flex-1">
@@ -552,6 +634,7 @@ const Voter: React.FC<VoterProps> = ({
             <button
               onClick={() => setError(null)}
               className="text-error-600 hover:text-error-700"
+              aria-label="Dismiss error"
             >
               <X className="w-4 h-4" />
             </button>
@@ -560,7 +643,7 @@ const Voter: React.FC<VoterProps> = ({
       )}
 
       {success && (
-        <div className="card p-4 bg-success-50 border-success-200">
+        <div className="card p-4 bg-success-50 border-success-200" role="status" aria-live="polite">
           <div className="flex items-start gap-3">
             <CheckCircle className="w-5 h-5 text-success-600 mt-0.5" />
             <div className="flex-1">
@@ -570,6 +653,7 @@ const Voter: React.FC<VoterProps> = ({
             <button
               onClick={() => setSuccess(null)}
               className="text-success-600 hover:text-success-700"
+              aria-label="Dismiss success message"
             >
               <X className="w-4 h-4" />
             </button>
@@ -746,6 +830,9 @@ const Voter: React.FC<VoterProps> = ({
                 <p className="text-xs text-slate-500">
                   Any phrase works. You must use the exact same one during reveal.
                 </p>
+                <p className="text-xs text-slate-500">
+                  After commit, BharatVote keeps a temporary recovery copy in this browser until reveal completes.
+                </p>
                 <button
                   onClick={handleNewSalt}
                   className="btn-ghost text-sm"
@@ -855,6 +942,11 @@ const Voter: React.FC<VoterProps> = ({
               <p className="text-xs text-slate-500 mt-3">
                 Enter the exact same password you used during the commit phase.
               </p>
+              {hasRecoverySnapshot && (
+                <p className="mt-2 text-xs text-slate-500">
+                  Your commit recovery details are available in this browser for this election.
+                </p>
+              )}
             </div>
 
             {/* Candidate Selection */}

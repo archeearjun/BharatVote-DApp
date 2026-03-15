@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useI18n } from './i18n';
 import FaceRecognition from './components/FaceRecognition';
 import { BACKEND_URL } from './constants';
@@ -32,6 +32,7 @@ const KycPage: React.FC<KycPageProps> = ({ account, electionAddress, onVerified 
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [faceVisible, setFaceVisible] = useState(false);
+  const otpInputRefs = useRef<Array<HTMLInputElement | null>>([]);
 
   const steps = [t('kyc.epic'), t('kyc.otp'), t('kyc.complete')];
   const shortAccount = `${account.slice(0, 6)}...${account.slice(-4)}`;
@@ -94,14 +95,37 @@ const KycPage: React.FC<KycPageProps> = ({ account, electionAddress, onVerified 
   };
 
   const handleOtpChange = (index: number, value: string) => {
-    if (value.length > 1) return;
+    const sanitizedValue = value.replace(/\D/g, '').slice(-1);
     const nextOtp = [...otp];
-    nextOtp[index] = value;
+    nextOtp[index] = sanitizedValue;
     setOtp(nextOtp);
 
-    if (value && index < OTP_LENGTH - 1) {
-      const nextInput = document.getElementById(`otp-${index + 1}`);
-      nextInput?.focus();
+    if (sanitizedValue && index < OTP_LENGTH - 1) {
+      otpInputRefs.current[index + 1]?.focus();
+    }
+
+    if (!sanitizedValue && index > 0) {
+      otpInputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleOtpKeyDown = (index: number, event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Backspace' && !otp[index] && index > 0) {
+      otpInputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleOtpPaste = (event: React.ClipboardEvent<HTMLInputElement>) => {
+    const pastedDigits = event.clipboardData.getData('text').replace(/\D/g, '').slice(0, OTP_LENGTH);
+    if (!pastedDigits) return;
+
+    event.preventDefault();
+    const nextOtp = Array.from({ length: OTP_LENGTH }, (_, index) => pastedDigits[index] || '');
+    setOtp(nextOtp);
+
+    const nextFocusIndex = Math.min(pastedDigits.length, OTP_LENGTH) - 1;
+    if (nextFocusIndex >= 0) {
+      otpInputRefs.current[nextFocusIndex]?.focus();
     }
   };
 
@@ -282,10 +306,17 @@ const KycPage: React.FC<KycPageProps> = ({ account, electionAddress, onVerified 
                     key={index}
                     id={`otp-${index}`}
                     type="text"
+                    ref={(element) => {
+                      otpInputRefs.current[index] = element;
+                    }}
                     inputMode="numeric"
+                    autoComplete={index === 0 ? "one-time-code" : "off"}
+                    pattern="[0-9]*"
                     maxLength={1}
                     value={digit}
                     onChange={(e) => handleOtpChange(index, e.target.value)}
+                    onKeyDown={(e) => handleOtpKeyDown(index, e)}
+                    onPaste={handleOtpPaste}
                     className="h-12 w-12 rounded-lg border border-slate-300 text-center text-lg font-mono outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-500"
                   />
                 ))}
@@ -361,6 +392,8 @@ const KycPage: React.FC<KycPageProps> = ({ account, electionAddress, onVerified 
             className={`card-premium min-w-80 p-4 ${
               toast.type === 'success' ? 'border-l-4 border-green-500' : 'border-l-4 border-red-500'
             }`}
+            role={toast.type === 'success' ? 'status' : 'alert'}
+            aria-live={toast.type === 'success' ? 'polite' : 'assertive'}
           >
             <div className="flex items-start gap-3">
               {toast.type === 'success' ? (

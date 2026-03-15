@@ -45,6 +45,8 @@ interface AdminState {
   merkleLoading: boolean;
 }
 
+type DestructiveAction = 'reset' | 'clear' | 'emergency' | null;
+
 const initialState: AdminState = {
   candidateName: "",
   candidates: [],
@@ -74,6 +76,8 @@ export default function Admin({
   const [allowlistLoading, setAllowlistLoading] = useState(false);
   const [allowlistError, setAllowlistError] = useState<string | null>(null);
   const [allowlistSuccess, setAllowlistSuccess] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<DestructiveAction>(null);
+  const [confirmText, setConfirmText] = useState('');
   const { t } = useI18n();
   const rootsAligned =
     Boolean(contract) &&
@@ -455,6 +459,34 @@ export default function Admin({
     }
   };
 
+  const openDestructiveConfirm = (action: Exclude<DestructiveAction, null>) => {
+    setConfirmAction(action);
+    setConfirmText('');
+  };
+
+  const closeDestructiveConfirm = () => {
+    setConfirmAction(null);
+    setConfirmText('');
+  };
+
+  const handleConfirmDestructiveAction = async () => {
+    if (!confirmAction || !confirmationConfig || confirmText.trim().toUpperCase() !== confirmationConfig.phrase) {
+      return;
+    }
+
+    try {
+      if (confirmAction === 'reset') {
+        await handleResetElection();
+      } else if (confirmAction === 'clear') {
+        await handleClearAllCandidates();
+      } else if (confirmAction === 'emergency') {
+        await handleEmergencyReset();
+      }
+    } finally {
+      closeDestructiveConfirm();
+    }
+  };
+
   const getPhaseIcon = (phaseNum: number) => {
     switch (phaseNum) {
       case COMMIT_PHASE: return Clock;
@@ -478,6 +510,31 @@ export default function Admin({
   const candidateNameByteLength = getUtf8ByteLength(trimmedCandidateName);
   const candidateNameError = trimmedCandidateName
     ? getNameLengthError(trimmedCandidateName, "Candidate name")
+    : null;
+  const confirmationConfig = confirmAction
+    ? {
+        reset: {
+          title: 'Reset election',
+          description: 'This starts a new round and clears the current round status for voters.',
+          phrase: 'RESET',
+          buttonClass: 'btn-secondary',
+          buttonText: 'Confirm Reset',
+        },
+        clear: {
+          title: 'Clear candidates',
+          description: 'This removes all candidates from the finished election so you can prepare a new run.',
+          phrase: 'CLEAR',
+          buttonClass: 'btn-error',
+          buttonText: 'Confirm Clear',
+        },
+        emergency: {
+          title: 'Emergency reset',
+          description: 'This immediately forces the election back to commit mode. Use it only for recovery.',
+          phrase: 'EMERGENCY',
+          buttonClass: 'btn-warning',
+          buttonText: 'Confirm Emergency Reset',
+        },
+      }[confirmAction]
     : null;
 
   const parseAllowlistEntries = useCallback((raw: string): { valid: string[]; invalid: string[] } => {
@@ -666,7 +723,7 @@ export default function Admin({
 
         {/* Alerts */}
         {state.error && (
-          <div className="mb-6 p-4 bg-error-50 border border-error-200 rounded-xl">
+          <div className="mb-6 rounded-xl border border-error-200 bg-error-50 p-4" role="alert" aria-live="assertive">
             <div className="flex items-start gap-3">
               <AlertTriangle className="w-5 h-5 text-error-600 mt-0.5" />
               <div className="flex-1">
@@ -676,6 +733,7 @@ export default function Admin({
               <button
                 onClick={() => setState(p => ({ ...p, error: null }))}
                 className="text-error-600 hover:text-error-700"
+                aria-label="Dismiss error"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -684,7 +742,7 @@ export default function Admin({
         )}
 
         {state.success && (
-          <div className="mb-6 p-4 bg-success-50 border border-success-200 rounded-xl">
+          <div className="mb-6 rounded-xl border border-success-200 bg-success-50 p-4" role="status" aria-live="polite">
             <div className="flex items-start gap-3">
               <CheckCircle className="w-5 h-5 text-success-600 mt-0.5" />
               <div className="flex-1">
@@ -694,6 +752,7 @@ export default function Admin({
               <button
                 onClick={() => setState(p => ({ ...p, success: null }))}
                 className="text-success-600 hover:text-success-700"
+                aria-label="Dismiss success message"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -867,7 +926,7 @@ export default function Admin({
 
             <div className="flex flex-col sm:flex-row gap-3">
               <button
-                onClick={handleResetElection}
+                onClick={() => openDestructiveConfirm('reset')}
                 disabled={state.loading || phase !== FINISH_PHASE}
                 className="btn-secondary w-full sm:w-auto"
                 title={phase !== FINISH_PHASE ? `Reset only available in Finish Phase. Current: ${PHASE_LABELS[phase as keyof typeof PHASE_LABELS]}` : ""}
@@ -883,7 +942,7 @@ export default function Admin({
               </button>
 
               <button
-                onClick={handleClearAllCandidates}
+                onClick={() => openDestructiveConfirm('clear')}
                 disabled={state.loading || phase !== FINISH_PHASE}
                 className="btn-error w-full sm:w-auto"
               >
@@ -898,7 +957,7 @@ export default function Admin({
               </button>
 
               <button
-                onClick={handleEmergencyReset}
+                onClick={() => openDestructiveConfirm('emergency')}
                 disabled={state.loading}
                 className="btn-warning w-full sm:w-auto"
               >
@@ -920,6 +979,50 @@ export default function Admin({
           </div>
         )}
       </div>
+
+      {confirmationConfig && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">
+          <div className="card-premium w-full max-w-md p-6">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100">
+                <AlertTriangle className="h-5 w-5 text-slate-700" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-slate-900">{confirmationConfig.title}</h3>
+                <p className="mt-2 text-sm text-slate-600">{confirmationConfig.description}</p>
+              </div>
+            </div>
+
+            <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-sm text-slate-700">
+                Type <span className="font-mono font-semibold text-slate-900">{confirmationConfig.phrase}</span> to continue.
+              </p>
+              <input
+                type="text"
+                value={confirmText}
+                onChange={(event) => setConfirmText(event.target.value.toUpperCase())}
+                className="input-base mt-3"
+                placeholder={confirmationConfig.phrase}
+                autoFocus
+              />
+            </div>
+
+            <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button type="button" onClick={closeDestructiveConfirm} className="btn-secondary">
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDestructiveAction}
+                disabled={confirmText.trim().toUpperCase() !== confirmationConfig.phrase || state.loading}
+                className={confirmationConfig.buttonClass}
+              >
+                {confirmationConfig.buttonText}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-8 lg:grid-cols-2">
         {/* Registered Candidates */}

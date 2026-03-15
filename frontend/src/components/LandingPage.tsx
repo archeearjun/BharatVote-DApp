@@ -18,6 +18,8 @@ export default function LandingPage() {
     () => Boolean(demoElectionAddress) && ethers.isAddress(demoElectionAddress as string),
     [demoElectionAddress]
   );
+  const trimmedAddressInput = addressInput.trim();
+  const canGoToElection = ethers.isAddress(trimmedAddressInput);
 
   useEffect(() => {
     if (demoElectionAddress && !demoEnabled) {
@@ -183,24 +185,32 @@ export default function LandingPage() {
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={joinDemo}
-                disabled={!demoEnabled || isJoiningDemo}
-                className={`btn-primary w-full mt-4 ${!demoEnabled || isJoiningDemo ? 'opacity-70 cursor-not-allowed' : ''}`}
-              >
-                {isJoiningDemo ? 'Setting up your wallet...' : 'Join Demo Election'}
-                {!isJoiningDemo && <ArrowRight className="w-4 h-4" />}
-              </button>
+                <button
+                  type="button"
+                  onClick={joinDemo}
+                  disabled={!demoEnabled || isJoiningDemo}
+                  className={`btn-primary mt-4 w-full ${!demoEnabled || isJoiningDemo ? 'bg-slate-300 text-slate-700 hover:bg-slate-300 hover:shadow-sm' : ''}`}
+                >
+                  {isJoiningDemo ? 'Setting up your wallet...' : 'Join Demo Election'}
+                  {!isJoiningDemo && <ArrowRight className="w-4 h-4" />}
+                </button>
 
               {!demoEnabled && (
-                <div className="mt-2 text-xs text-slate-600">
-                  Demo is not configured. Set <span className="font-mono">VITE_DEMO_ELECTION_ADDRESS</span>.
+                <div className="mt-2 rounded-lg border border-slate-200 bg-white p-3 text-xs text-slate-600" aria-live="polite">
+                  {demoElectionAddress ? (
+                    <>
+                      Demo is configured with an invalid address. Fix <span className="font-mono">VITE_DEMO_ELECTION_ADDRESS</span>.
+                    </>
+                  ) : (
+                    <>
+                      Demo is not configured. Set <span className="font-mono">VITE_DEMO_ELECTION_ADDRESS</span>.
+                    </>
+                  )}
                 </div>
               )}
 
               {demoError && (
-                <div className="mt-3 text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+                <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700" role="alert" aria-live="polite">
                   {demoError}
                 </div>
               )}
@@ -215,14 +225,18 @@ export default function LandingPage() {
               <div className="mt-2 flex gap-2">
                 <input
                   value={addressInput}
-                  onChange={(e) => setAddressInput(e.target.value)}
+                  onChange={(e) => {
+                    setAddressInput(e.target.value);
+                    if (joinError) setJoinError(null);
+                  }}
                   placeholder="0x..."
                   className="input-base"
                 />
                 <button
                   type="button"
                   onClick={() => goToElection(addressInput)}
-                  className="btn-secondary px-5"
+                  disabled={!canGoToElection}
+                  className="btn-secondary px-5 disabled:border-slate-200 disabled:bg-slate-200 disabled:text-slate-700"
                 >
                   Go
                 </button>
@@ -241,7 +255,11 @@ export default function LandingPage() {
                   Paste from clipboard
                 </button>
               </div>
-              {joinError && <div className="mt-2 text-sm text-red-600">{joinError}</div>}
+              {joinError && (
+                <div className="mt-2 text-sm text-red-600" role="alert" aria-live="polite">
+                  {joinError}
+                </div>
+              )}
               <p className="mt-3 text-xs text-slate-500">
                 Main elections use a guided verification flow (EPIC → OTP → Face) hosted on the backend.
               </p>

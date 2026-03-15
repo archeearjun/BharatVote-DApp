@@ -69,10 +69,19 @@ const FaceRecognition: React.FC<FaceRecognitionProps> = ({ onVerified, children 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
+      setError(null);
     } catch {
       setError('Camera access is required for this verification step.');
     }
   }, [isTestEnv]);
+
+  const handleRetry = useCallback(async () => {
+    setError(null);
+    setReady(false);
+    setVerified(false);
+    await loadModels();
+    await initCamera();
+  }, [initCamera, loadModels]);
 
   useEffect(() => {
     if (isTestEnv) {
@@ -156,7 +165,7 @@ const FaceRecognition: React.FC<FaceRecognitionProps> = ({ onVerified, children 
         <div className="pointer-events-none absolute inset-4 rounded-2xl border border-white/50" />
       </div>
 
-      <div className={`mt-4 flex items-start gap-3 rounded-xl border px-4 py-3 text-sm ${statusTone}`}>
+      <div className={`mt-4 flex items-start gap-3 rounded-xl border px-4 py-3 text-sm ${statusTone}`} aria-live="polite">
         {error ? (
           <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
         ) : verified ? (
@@ -187,6 +196,12 @@ const FaceRecognition: React.FC<FaceRecognitionProps> = ({ onVerified, children 
           </p>
         </div>
       </div>
+
+      {error && (
+        <button type="button" onClick={handleRetry} className="mt-3 btn-secondary">
+          Retry Camera Setup
+        </button>
+      )}
 
       {children}
     </div>
