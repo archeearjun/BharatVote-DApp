@@ -21,6 +21,7 @@ contract BharatVote is Initializable {
     error NoCommit();
     error HashMismatch();
     error InvalidNameLength();
+    error InvalidMerkleRoot();
     error CanOnlyResetAfterFinish();
 
     address public admin;
@@ -97,7 +98,8 @@ contract BharatVote is Initializable {
 
     /* ───── Admin Controls ───── */
 
-    function setMerkleRoot(bytes32 _root) external onlyAdmin {
+    function setMerkleRoot(bytes32 _root) external onlyAdmin onlyPhase(0) {
+        if (_root == bytes32(0)) revert InvalidMerkleRoot();
         merkleRoot = _root;
     }
 

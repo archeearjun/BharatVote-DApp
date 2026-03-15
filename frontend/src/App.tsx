@@ -1,4 +1,4 @@
-import { useEffect, Suspense, lazy, useState, useMemo } from "react";
+import { useEffect, Suspense, lazy, useState, useMemo, useCallback } from "react";
 import { Routes, Route, Navigate, useLocation, useParams } from "react-router-dom";
 import eligibleVoters from "../../eligibleVoters.json";
 import MainContainer from './components/MainContainer';
@@ -109,7 +109,7 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
     setVerifiedVoterId(null);
   }, [account, electionAddress]);
 
-  const fetchCandidates = async () => {
+  const fetchCandidates = useCallback(async () => {
     if (!contract) {
       setCandidates([]);
       return;
@@ -146,7 +146,7 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
         setCandidates([]);
       }
     }
-  };
+  }, [contract]);
 
   // Fetch backend merkle root once (or when backend URL changes)
   useEffect(() => {
@@ -303,6 +303,7 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
             // Dev-only fallback for localhost hardhat account.
             const knownAdminAddress = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
             const isKnownAdmin =
+              import.meta.env.DEV &&
               Number(chainId) === 31337 &&
               String(currentAccount).toLowerCase() === knownAdminAddress.toLowerCase();
 
@@ -394,7 +395,7 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
       }
       try { (window as any).__bv_cleanup_phase?.(); } catch {}
     };
-  }, [isConnected, contract, account]);
+  }, [account, chainId, contract, fetchCandidates, isConnected]);
 
   // Enable Enter/Space key to trigger connect on the connect screen
   useEffect(() => {

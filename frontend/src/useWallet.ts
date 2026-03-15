@@ -246,22 +246,42 @@ export default function useWallet(electionAddress?: string) {
 
   useEffect(() => {
     const handleAccountsChanged = (accounts: string[]) => {
-      if (accounts.length > 0) {
-        setState((prev: WalletState) => ({
-          ...prev,
-          account: accounts[0],
-          error: null,
-          isConnected: true,
-        }));
-      } else {
-        setState((prev: WalletState) => ({
-          ...prev,
-          account: null,
-          isConnected: false,
-          contract: null,
-          error: WALLET_ERRORS.NO_ACCOUNTS,
-        }));
-      }
+      void (async () => {
+        if (accounts.length === 0) {
+          setState((prev: WalletState) => ({
+            ...prev,
+            account: null,
+            isConnected: false,
+            contract: null,
+            error: WALLET_ERRORS.NO_ACCOUNTS,
+          }));
+          return;
+        }
+
+        try {
+          const provider = new ethers.BrowserProvider(window.ethereum!);
+          const network = await provider.getNetwork();
+          const chainId = normalizeChainId(network.chainId);
+          const wrongNetwork = chainId === null ? true : !checkNetwork(chainId);
+
+          let contract: WalletState["contract"] = null;
+          if (!wrongNetwork && chainId !== null && electionAddress) {
+            contract = await attachElectionContract(provider, electionAddress);
+          }
+
+          setState((prev: WalletState) => ({
+            ...prev,
+            provider,
+            account: accounts[0],
+            chainId: chainId ?? prev.chainId,
+            contract,
+            error: wrongNetwork ? WALLET_ERRORS.WRONG_NETWORK : null,
+            isConnected: true,
+          }));
+        } catch (err) {
+          handleError(err, WALLET_ERRORS.CONNECT_FAILED);
+        }
+      })();
     };
 
     const handleChainChanged = (chainId: string) => {
@@ -279,7 +299,7 @@ export default function useWallet(electionAddress?: string) {
         window.ethereum.removeListener?.('chainChanged', handleChainChanged);
       }
     };
-  }, []);
+  }, [attachElectionContract, checkNetwork, electionAddress, handleError]);
 
   return {
     connect,

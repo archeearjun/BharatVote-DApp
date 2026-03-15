@@ -22,6 +22,7 @@ import {
   X
 } from 'lucide-react';
 import { getNameLengthError, getUtf8ByteLength, MAX_NAME_BYTES } from "./utils/nameValidation";
+import { buildAllowlistUploadMessage, normalizeAllowlistAddresses } from "./utils/allowlistAuth";
 
 interface AdminProps {
   contract: BharatVote | null;
@@ -663,31 +664,57 @@ export default function Admin({
       return;
     }
 
+    const signer = contract?.runner as ethers.Signer | undefined;
+    if (!signer || typeof (signer as any).signMessage !== 'function') {
+      setAllowlistError('Connect the admin wallet before uploading the voter list.');
+      return;
+    }
+
     setAllowlistLoading(true);
     setAllowlistError(null);
     setAllowlistSuccess(null);
     try {
+      const normalizedAddresses = normalizeAllowlistAddresses(parsed.valid);
+      const issuedAt = Date.now();
+      const signature = await (signer as any).signMessage(
+        buildAllowlistUploadMessage(electionAddress, normalizedAddresses, issuedAt)
+      );
+
       const resp = await fetch(`${BACKEND_URL}/api/admin/voter-list`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ electionAddress, addresses: parsed.valid }),
+        body: JSON.stringify({
+          electionAddress,
+          addresses: normalizedAddresses,
+          auth: {
+            issuedAt,
+            signature,
+          },
+        }),
       });
       if (!resp.ok) {
-        const message = await resp.text();
-        throw new Error(message || `Upload failed (${resp.status})`);
+        let message = `Upload failed (${resp.status})`;
+        try {
+          const data = await resp.json();
+          message = data?.error || message;
+        } catch {
+          const text = await resp.text();
+          if (text) message = text;
+        }
+        throw new Error(message);
       }
       const data = await resp.json();
-      setAllowlistCount(data?.count ?? parsed.valid.length);
+      setAllowlistCount(data?.count ?? normalizedAddresses.length);
       setAllowlistRoot(data?.merkleRoot || null);
-      setAllowlistSuccess(`Prepared ${data?.count ?? parsed.valid.length} eligible voter${(data?.count ?? parsed.valid.length) === 1 ? '' : 's'}.`);
-      onAllowlistUpdated?.({ count: data?.count ?? parsed.valid.length, merkleRoot: data?.merkleRoot });
+      setAllowlistSuccess(`Prepared ${data?.count ?? normalizedAddresses.length} eligible voter${(data?.count ?? normalizedAddresses.length) === 1 ? '' : 's'}.`);
+      onAllowlistUpdated?.({ count: data?.count ?? normalizedAddresses.length, merkleRoot: data?.merkleRoot });
       await fetchAllowlistSummary();
     } catch (err: any) {
       setAllowlistError(err?.message || 'Failed to upload allowlist');
     } finally {
       setAllowlistLoading(false);
     }
-  }, [allowlistInput, electionAddress, fetchAllowlistSummary, isDemoElection, onAllowlistUpdated, parseAllowlistEntries]);
+  }, [allowlistInput, contract?.runner, electionAddress, fetchAllowlistSummary, isDemoElection, onAllowlistUpdated, parseAllowlistEntries]);
 
   const handleAllowlistFile = async (file: File | null) => {
     if (!file) return;

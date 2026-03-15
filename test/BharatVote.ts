@@ -87,6 +87,20 @@ describe("BharatVote", () => {
     it("should have zero candidates initially", async () => {
       expect(await vote.candidateCount()).to.equal(0);
     });
+
+    it("blocks setting an empty merkle root", async () => {
+      await expect(
+        vote.connect(admin).setMerkleRoot(ethers.ZeroHash)
+      ).to.be.revertedWithCustomError(vote, "InvalidMerkleRoot");
+    });
+
+    it("blocks merkle root updates outside commit phase", async () => {
+      await vote.connect(admin).startReveal();
+
+      await expect(
+        vote.connect(admin).setMerkleRoot(merkleRoot)
+      ).to.be.revertedWithCustomError(vote, "WrongPhase");
+    });
   });
 
   describe("Candidate Management", () => {

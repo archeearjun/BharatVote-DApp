@@ -75,6 +75,16 @@ const UPSTASH_REDIS_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
 const DEMO_ANALYTICS_STORAGE =
   process.env.DEMO_ANALYTICS_STORAGE ||
   (UPSTASH_REDIS_REST_URL && UPSTASH_REDIS_REST_TOKEN ? 'upstash' : 'file');
+const ELIGIBLE_VOTERS_PATH = path.join(__dirname, '..', 'eligibleVoters.json');
+const MAX_DEMO_ELIGIBLE_VOTERS = (() => {
+  const parsed = Number.parseInt(String(process.env.MAX_DEMO_ELIGIBLE_VOTERS || '500'), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 500;
+})();
+const ADMIN_ALLOWLIST_SIGNATURE_TTL_MS = (() => {
+  const parsed = Number.parseInt(String(process.env.ADMIN_ALLOWLIST_SIGNATURE_TTL_MS || '300000'), 10);
+  return Number.isFinite(parsed) && parsed >= 10000 ? parsed : 300000;
+})();
+const ELECTION_ADMIN_ABI = ['function admin() view returns (address)'];
 
 const sanitizeVoterId = (id) => (typeof id === 'string' ? id.replace(/[^\w-]/g, '').slice(0, 64) : '');
 
@@ -117,7 +127,8 @@ const ADMIN_ADDRESS =
   '0xad9f935ba3c0b1ed22ef90e9cb6230b034383b5b';
 const initialEligible = (() => {
   try {
-    const fromFile = require('../eligibleVoters.json');
+    const raw = fs.readFileSync(ELIGIBLE_VOTERS_PATH, 'utf8');
+    const fromFile = JSON.parse(raw);
     return [ADMIN_ADDRESS, ...(Array.isArray(fromFile) ? fromFile : [])];
   } catch {
     return [ADMIN_ADDRESS];
@@ -133,6 +144,14 @@ const eligibleVoters = Array.from(
       .map((a) => ethers.getAddress(a)) // checksum + normalize
   )
 );
+
+const saveEligibleVoters = () => {
+  try {
+    fs.writeFileSync(ELIGIBLE_VOTERS_PATH, JSON.stringify(eligibleVoters, null, 2));
+  } catch (e) {
+    console.warn('Failed to persist eligible voters file', e?.message || e);
+  }
+};
 
 // --- 2. SETUP BLOCKCHAIN CONNECTION ---
 const provider = RPC_URL ? new ethers.JsonRpcProvider(RPC_URL) : null;
@@ -342,6 +361,7 @@ const removeDemoEligibleVoter = (address) => {
   if (index === -1) return false;
   eligibleVoters.splice(index, 1);
   rebuildTree();
+  saveEligibleVoters();
   return true;
 };
 
@@ -373,6 +393,66 @@ const buildElectionTree = (addresses) => {
   const t = new MerkleTree(leaves, keccak256Hasher, { sortLeaves: true, sortPairs: true });
   const root = '0x' + t.getRoot().toString('hex');
   return { tree: t, merkleRoot: root };
+};
+
+const hashAllowlistAddresses = (addresses) =>
+  ethers.keccak256(ethers.toUtf8Bytes(normalizeAddressList(addresses).join('\n')));
+
+const buildAllowlistUploadMessage = ({ electionAddress, addressesHash, issuedAt }) =>
+  [
+    'BharatVote Admin Allowlist Upload',
+    `Election: ${ethers.getAddress(electionAddress)}`,
+    `Addresses Hash: ${addressesHash}`,
+    `Issued At: ${issuedAt}`,
+  ].join('\n');
+
+const verifyAllowlistUploadAuth = async ({ electionAddress, addresses, auth }) => {
+  if (!provider) {
+    return { ok: false, status: 503, error: 'RPC provider not configured for admin verification' };
+  }
+
+  const issuedAt = Number(auth?.issuedAt);
+  const signature = typeof auth?.signature === 'string' ? auth.signature.trim() : '';
+
+  if (!Number.isFinite(issuedAt) || !signature) {
+    return { ok: false, status: 401, error: 'Missing admin signature' };
+  }
+
+  if (Math.abs(Date.now() - issuedAt) > ADMIN_ALLOWLIST_SIGNATURE_TTL_MS) {
+    return { ok: false, status: 401, error: 'Admin signature expired. Please sign again.' };
+  }
+
+  const normalizedAddresses = normalizeAddressList(addresses);
+  const addressesHash = hashAllowlistAddresses(normalizedAddresses);
+  const message = buildAllowlistUploadMessage({ electionAddress, addressesHash, issuedAt });
+
+  let recoveredAddress;
+  try {
+    recoveredAddress = ethers.verifyMessage(message, signature);
+  } catch {
+    return { ok: false, status: 401, error: 'Invalid admin signature' };
+  }
+
+  try {
+    const electionRead = new ethers.Contract(electionAddress, ELECTION_ADMIN_ABI, provider);
+    const onChainAdmin = await electionRead.admin();
+
+    if (String(recoveredAddress).toLowerCase() !== String(onChainAdmin).toLowerCase()) {
+      return { ok: false, status: 403, error: 'Signed wallet is not the election admin' };
+    }
+
+    return {
+      ok: true,
+      normalizedAddresses,
+      recoveredAddress: ethers.getAddress(recoveredAddress),
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      status: 503,
+      error: `Failed to verify election admin: ${e?.message || String(e)}`,
+    };
+  }
 };
 
 const saveElectionAllowlists = () => {
@@ -517,6 +597,62 @@ const demoState = {
   lastErrorPhase: null,
   transitioning: false,
 };
+const DEMO_STATE_PATH = path.join(__dirname, 'demo-state.json');
+
+const persistDemoState = () => {
+  try {
+    fs.writeFileSync(
+      DEMO_STATE_PATH,
+      JSON.stringify(
+        {
+          roundId: demoState.roundId,
+          lastObservedPhase: demoState.lastObservedPhase,
+          roundStartedAtMs: demoState.roundStartedAtMs,
+          commitEndsAtMs: demoState.commitEndsAtMs,
+          revealEndsAtMs: demoState.revealEndsAtMs,
+          finishedAtMs: demoState.finishedAtMs,
+          resetAtMs: demoState.resetAtMs,
+          lastTransitionTx: demoState.lastTransitionTx,
+          lastTransitionAtMs: demoState.lastTransitionAtMs,
+          lastAttemptAtMs: demoState.lastAttemptAtMs,
+          lastError: demoState.lastError,
+          lastErrorAtMs: demoState.lastErrorAtMs,
+          lastErrorPhase: demoState.lastErrorPhase,
+        },
+        null,
+        2
+      )
+    );
+  } catch (e) {
+    console.warn('Failed to persist demo state file', e?.message || e);
+  }
+};
+
+const loadDemoState = () => {
+  try {
+    if (!fs.existsSync(DEMO_STATE_PATH)) return;
+    const parsed = JSON.parse(fs.readFileSync(DEMO_STATE_PATH, 'utf8'));
+    if (!parsed || typeof parsed !== 'object') return;
+
+    demoState.roundId = Number.isFinite(parsed.roundId) ? parsed.roundId : demoState.roundId;
+    demoState.lastObservedPhase = Number.isFinite(parsed.lastObservedPhase) ? parsed.lastObservedPhase : demoState.lastObservedPhase;
+    demoState.roundStartedAtMs = Number.isFinite(parsed.roundStartedAtMs) ? parsed.roundStartedAtMs : demoState.roundStartedAtMs;
+    demoState.commitEndsAtMs = Number.isFinite(parsed.commitEndsAtMs) ? parsed.commitEndsAtMs : demoState.commitEndsAtMs;
+    demoState.revealEndsAtMs = Number.isFinite(parsed.revealEndsAtMs) ? parsed.revealEndsAtMs : demoState.revealEndsAtMs;
+    demoState.finishedAtMs = Number.isFinite(parsed.finishedAtMs) ? parsed.finishedAtMs : demoState.finishedAtMs;
+    demoState.resetAtMs = Number.isFinite(parsed.resetAtMs) ? parsed.resetAtMs : demoState.resetAtMs;
+    demoState.lastTransitionTx = typeof parsed.lastTransitionTx === 'string' ? parsed.lastTransitionTx : demoState.lastTransitionTx;
+    demoState.lastTransitionAtMs = Number.isFinite(parsed.lastTransitionAtMs) ? parsed.lastTransitionAtMs : demoState.lastTransitionAtMs;
+    demoState.lastAttemptAtMs = Number.isFinite(parsed.lastAttemptAtMs) ? parsed.lastAttemptAtMs : demoState.lastAttemptAtMs;
+    demoState.lastError = typeof parsed.lastError === 'string' ? parsed.lastError : demoState.lastError;
+    demoState.lastErrorAtMs = Number.isFinite(parsed.lastErrorAtMs) ? parsed.lastErrorAtMs : demoState.lastErrorAtMs;
+    demoState.lastErrorPhase = Number.isFinite(parsed.lastErrorPhase) ? parsed.lastErrorPhase : demoState.lastErrorPhase;
+  } catch (e) {
+    console.warn('Failed to load demo state file', e?.message || e);
+  }
+};
+
+loadDemoState();
 
 function nowMs() {
   return Date.now();
@@ -599,6 +735,8 @@ function ensureDemoSchedule(phase) {
     // Reset target is implicit: finished + grace
     demoState.resetAtMs = demoState.finishedAtMs + resetGraceSeconds * 1000;
   }
+
+  persistDemoState();
 }
 
 function demoStatusPayload(extra) {
@@ -752,6 +890,7 @@ async function runDemoSchedulerOnce() {
       demoState.lastError = formatted;
       demoState.lastErrorAtMs = nowMs();
       demoState.lastErrorPhase = phase;
+      persistDemoState();
 
       // If the configured wallet is no longer admin, disable autophasing to stop noisy retries.
       if (/\bNotAdmin\b/.test(formatted)) {
@@ -768,12 +907,14 @@ async function runDemoSchedulerOnce() {
       demoState.lastTransitionTx = tx.hash;
       demoState.lastTransitionAtMs = nowMs();
       demoState.finishedAtMs = null;
+      persistDemoState();
     } else if (shouldFinish) {
       const tx = await contract.finishElection();
       await waitForTx(tx);
       demoState.lastTransitionTx = tx.hash;
       demoState.lastTransitionAtMs = nowMs();
       demoState.finishedAtMs = nowMs();
+      persistDemoState();
     } else if (shouldReset) {
       const tx = await contract.resetElection();
       await waitForTx(tx);
@@ -786,12 +927,14 @@ async function runDemoSchedulerOnce() {
       demoState.finishedAtMs = null;
       demoState.resetAtMs = null;
       ensureDemoSchedule(0);
+      persistDemoState();
     }
   } catch (e) {
     console.error('? Demo scheduler tick failed:', e);
     demoState.lastError = formatDemoAutomationError({ action: null, err: e });
     demoState.lastErrorAtMs = nowMs();
     demoState.lastErrorPhase = demoState.lastObservedPhase;
+    persistDemoState();
   } finally {
     demoState.transitioning = false;
   }
@@ -945,14 +1088,30 @@ app.post('/api/admin/voter-list', (req, res) => {
   }
 
   const addresses = req.body?.addresses;
-  const { count, merkleRoot: root } = setElectionAllowlist(electionAddress, addresses || []);
+  const auth = req.body?.auth;
 
-  return res.json({
-    success: true,
-    electionAddress: ethers.getAddress(electionAddress),
-    count,
-    merkleRoot: root,
-  });
+  verifyAllowlistUploadAuth({ electionAddress, addresses, auth })
+    .then((verification) => {
+      if (!verification.ok) {
+        return res.status(verification.status).json({ error: verification.error });
+      }
+
+      const { count, merkleRoot: root } = setElectionAllowlist(
+        electionAddress,
+        verification.normalizedAddresses
+      );
+
+      return res.json({
+        success: true,
+        electionAddress: ethers.getAddress(electionAddress),
+        count,
+        merkleRoot: root,
+        updatedBy: verification.recoveredAddress,
+      });
+    })
+    .catch((error) => {
+      return res.status(500).json({ error: error?.message || 'Allowlist upload failed' });
+    });
 });
 
 // 2.3 Admin allowlist summary
@@ -1060,6 +1219,13 @@ app.post('/api/join', async (req, res) => {
     try {
       const alreadyEligible = eligibleVoters.some((v) => v.toLowerCase() === normalized.toLowerCase());
       if (!alreadyEligible) {
+        if (eligibleVoters.length >= MAX_DEMO_ELIGIBLE_VOTERS) {
+          return res.status(429).json({
+            error: 'Demo join limit reached. Please ask the admin to reset the demo allowlist.',
+            limit: MAX_DEMO_ELIGIBLE_VOTERS,
+          });
+        }
+
         if (!provider || !adminWallet) {
           return res.status(503).json({
             error:
@@ -1089,6 +1255,7 @@ app.post('/api/join', async (req, res) => {
 
         eligibleVoters.push(normalized);
         rebuildTree();
+        saveEligibleVoters();
         listChanged = true;
         console.log(`✅ User added! New Root: ${merkleRoot}`);
 
@@ -1154,6 +1321,7 @@ app.post('/api/join', async (req, res) => {
               demoState.finishedAtMs = null;
               demoState.resetAtMs = null;
               ensureDemoSchedule(0);
+              persistDemoState();
             }
           }
         } catch {

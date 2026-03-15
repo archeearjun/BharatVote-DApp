@@ -204,7 +204,7 @@ const Voter: React.FC<VoterProps> = ({
   }, [recoveryStorageKey]);
 
   const generateSalt = () => {
-    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    return ethers.hexlify(ethers.randomBytes(16)).slice(2);
   };
 
   const hashVote = async (candidateIdNumber: number, plainSalt: string) => {
@@ -483,14 +483,17 @@ const Voter: React.FC<VoterProps> = ({
   };
 
   const preventSaltClipboard = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    if (phase !== 0) return;
     e.preventDefault();
   };
 
   const preventSaltDragDrop = (e: React.DragEvent<HTMLInputElement>) => {
+    if (phase !== 0) return;
     e.preventDefault();
   };
 
   const preventSaltContextMenu = (e: React.MouseEvent<HTMLInputElement>) => {
+    if (phase !== 0) return;
     e.preventDefault();
   };
 
