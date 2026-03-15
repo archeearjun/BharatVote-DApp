@@ -269,11 +269,11 @@ export default function DocsLayout({
   description,
   children,
   heroActions,
-  heroAsideTitle = "Page Blueprint",
-  heroAsideDescription = "This page follows the same pattern throughout: strong entry point, guided sections, and clear next actions.",
+  heroAsideTitle = "Quick Snapshot",
+  heroAsideDescription = "Use this panel for the key context, audience, and core signals that matter before diving deeper.",
   heroAsideItems,
-  footerTitle = "Continue through BharatVote with the same structured path",
-  footerDescription = "The non-landing pages now share a stronger page rhythm: overview first, detail second, and actions kept close to the content they support.",
+  footerTitle = "Continue exploring BharatVote",
+  footerDescription = "Move between the guides, glossary, FAQ, and blog to understand the product from both operational and technical angles.",
   footerActions = defaultFooterActions,
 }: DocsLayoutProps) {
   return (
@@ -425,7 +425,7 @@ export default function DocsLayout({
           <div>
             <p className="text-base font-semibold text-slate-900">BharatVote Docs</p>
             <p className="mt-3 max-w-sm text-sm leading-7 text-slate-600">
-              These pages lead with context, break complex ideas into guided sections, and keep the next step close to the content.
+              Explore the guides, glossary, FAQ, and blog to understand BharatVote from both product and technical angles.
             </p>
           </div>
 

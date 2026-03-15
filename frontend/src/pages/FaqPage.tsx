@@ -38,12 +38,12 @@ export default function FaqPage() {
     <DocsLayout
       eyebrow="Help Center"
       title="Frequently Asked Questions"
-      description="This page now uses a more structured support pattern: explain the common concerns up front, then present each answer as a categorized card instead of a plain stacked list."
+      description="Find direct answers to the most common questions about architecture, eligibility, prototype scope, and election operations."
       heroActions={[
         { label: "Open Main Guide", to: "/guide/main-election", variant: "primary" },
         { label: "Read the Blog", to: "/blog", variant: "secondary" },
       ]}
-      heroAsideTitle="Who this page is for"
+      heroAsideTitle="Who this helps"
       heroAsideDescription="These answers are written for evaluators, technical reviewers, admins, and curious users who need short, reliable explanations without digging through the app."
       heroAsideItems={[
         {
@@ -106,7 +106,7 @@ export default function FaqPage() {
       <DocsSectionIntro
         eyebrow="Answers"
         title="Operational and technical questions, categorized"
-        description="The page keeps the answers short, but the new layout makes them easier to scan by grouping each one as a focused support card."
+        description="Each answer focuses on a specific operational or technical concern so the most important points are easy to scan."
       />
 
       <section className="grid gap-4 xl:grid-cols-2">

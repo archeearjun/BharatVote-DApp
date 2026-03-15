@@ -56,12 +56,12 @@ export default function LearnPage() {
     <DocsLayout
       eyebrow="Glossary"
       title="Key Terms"
-      description="This glossary now follows a stronger instructional pattern: orient the reader first, then break the vocabulary into labeled concept cards so the product is easier to read page by page."
+      description="Use this glossary to understand the core concepts behind eligibility, privacy, architecture, and election flow in BharatVote."
       heroActions={[
         { label: "Open Main Guide", to: "/guide/main-election", variant: "primary" },
         { label: "Read the FAQ", to: "/faq", variant: "secondary" },
       ]}
-      heroAsideTitle="How to use this page"
+      heroAsideTitle="How to use this glossary"
       heroAsideDescription="Read this like a reference panel, not a long article. The goal is to make each core concept easy to scan before jumping into the guides or blog."
       heroAsideItems={[
         {
@@ -88,7 +88,7 @@ export default function LearnPage() {
       <DocsSplitSection
         eyebrow="Orientation"
         title="Start with the concepts that shape every page"
-        description="This glossary frames the concepts first, then presents each idea in a compact, scannable unit."
+        description="These concepts appear across the guides, admin flow, voter flow, and technical write-ups, so learning them first makes the rest of the product easier to follow."
         bullets={[
           {
             title: "Understand the voting lifecycle",
@@ -120,7 +120,7 @@ export default function LearnPage() {
       <DocsSectionIntro
         eyebrow="Concept Library"
         title="Grouped terms, not just a long glossary"
-        description="Each card carries a track label so readers can understand where the concept belongs in the product."
+        description="Each term is grouped by role so you can quickly see where it belongs in the product."
       />
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

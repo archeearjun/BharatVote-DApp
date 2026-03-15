@@ -80,7 +80,7 @@ export default function DemoElectionGuidePage() {
       <DocsSplitSection
         eyebrow="Difference"
         title="Demo mode is faster, not structurally looser"
-        description="The page now makes the tradeoff explicit. Demo mode skips the heavyweight onboarding path, but the election still relies on the same proof-based commit and verified reveal lifecycle."
+        description="Demo mode removes the heavier onboarding steps, but the election still follows the same proof-based commit and verified reveal lifecycle."
         bullets={[
           {
             title: "Faster entry",
@@ -116,7 +116,7 @@ export default function DemoElectionGuidePage() {
       <DocsSectionIntro
         eyebrow="Execution"
         title="Run the demo flow as a guided sequence"
-        description="Each card below maps to an operational stage so the fast path still feels controlled and understandable."
+        description="Follow the demo journey from joining and wallet connection to commit, reveal, and public observation."
       />
 
       <section className="grid gap-4 md:grid-cols-2">

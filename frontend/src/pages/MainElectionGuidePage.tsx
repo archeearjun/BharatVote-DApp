@@ -48,7 +48,7 @@ export default function MainElectionGuidePage() {
     <DocsLayout
       eyebrow="Operator Guide"
       title="Main Election Guide"
-      description="This page now follows a more deliberate product-doc pattern: preparation first, execution second, and troubleshooting kept adjacent to the flow instead of buried at the end."
+      description="Follow the full operator workflow for a main election, from setup and allowlist preparation to commit, reveal, and final results."
       heroActions={[
         { label: "Read Key Terms", to: "/learn", variant: "primary" },
         { label: "Open FAQ", to: "/faq", variant: "secondary" },
@@ -80,7 +80,7 @@ export default function MainElectionGuidePage() {
       <DocsSplitSection
         eyebrow="Preparation"
         title="Set the election up correctly before voting starts"
-        description="This split section puts the logic on one side and the readiness checklist on the other, so the operator sees both context and action at once."
+        description="A reliable election starts with the right wallet, a working backend, and a clean allowlist prepared before voting opens."
         bullets={[
           {
             title: "Use MetaMask on Sepolia",
@@ -116,7 +116,7 @@ export default function MainElectionGuidePage() {
       <DocsSectionIntro
         eyebrow="Execution"
         title="Run the main election in clear stages"
-        description="Each step is isolated as its own operational card so the flow reads more like a product playbook than a long unordered checklist."
+        description="Move through the election lifecycle step by step, from contract setup to final tally review."
       />
 
       <section className="grid gap-4 md:grid-cols-2">

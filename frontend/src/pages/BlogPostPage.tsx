@@ -51,12 +51,12 @@ export default function BlogPostPage() {
         { label: "Read Key Terms", to: "/learn", variant: "secondary" },
       ]}
       heroAsideTitle="Article metadata"
-      heroAsideDescription="The hero keeps the article summary in view and moves the publication metadata into a dedicated side panel, which follows the same organizational pattern as the other pages."
+      heroAsideDescription="Use this panel for the publication date, reading time, and article structure before diving into the full post."
       heroAsideItems={[
         {
           label: "Published",
           value: formatDate(post.publishedAt),
-          description: "Use the date to understand where this note sits in the evolution of the project.",
+          description: "Use the date to place this note in the broader development of BharatVote.",
         },
         {
           label: "Read time",
@@ -66,7 +66,7 @@ export default function BlogPostPage() {
         {
           label: "Sections",
           value: `${post.sections.length} blocks`,
-          description: "The article is split into structured sections rather than one long wall of text.",
+          description: "Each section focuses on one part of the overall argument.",
         },
       ]}
       footerActions={[

@@ -35,7 +35,7 @@ export default function AboutPage() {
     <DocsLayout
       eyebrow="Project Story"
       title="About BharatVote and Me"
-      description="This page now opens like a product overview instead of a loose profile page: who built BharatVote, how the system is organized, why the design choices matter, and where to review the working demo."
+      description="Meet the builder behind BharatVote, understand how the system is organized, and see the design choices that shape the product."
       heroActions={[
         {
           label: "Watch Demo Video",
@@ -48,8 +48,8 @@ export default function AboutPage() {
           variant: "secondary",
         },
       ]}
-      heroAsideTitle="What this page covers"
-      heroAsideDescription="This page moves from project context to system breakdown, then to proof points and next actions."
+      heroAsideTitle="Overview"
+      heroAsideDescription="Get the project context, the system breakdown, and the core principles behind BharatVote in one place."
       heroAsideItems={[
         {
           label: "Builder",
@@ -75,7 +75,7 @@ export default function AboutPage() {
       <DocsSectionIntro
         eyebrow="System View"
         title="How BharatVote is organized"
-        description="Instead of presenting the project as one big block, the page breaks it into guided modules: overview, architecture, principles, and supporting proof points."
+        description="BharatVote combines on-chain election logic, off-chain operational support, and a frontend shaped around clear admin and voter journeys."
       />
 
       <section className="grid gap-4 lg:grid-cols-3">
@@ -137,7 +137,7 @@ export default function AboutPage() {
       <DocsSectionIntro
         eyebrow="Highlights"
         title="What the project demonstrates well"
-        description="This is the evaluation layer of the page: concise proof points instead of long narrative paragraphs."
+        description="These highlights capture the technical and product decisions that define the project."
       />
 
       <section className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
@@ -156,7 +156,7 @@ export default function AboutPage() {
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Walkthrough</p>
           <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-900">See the full product flow in action</h2>
           <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
-            The demo video shows the end-to-end system rather than isolated screens. That makes it the best companion to this page after the architecture overview.
+            The demo video walks through the product end to end, from setup to voting flow, so you can see the system working in context.
           </p>
           <a
             href="https://drive.google.com/file/d/1DVnHP_X05USvukOKQOIMmL6KTnCEIO2r/view?usp=sharing"

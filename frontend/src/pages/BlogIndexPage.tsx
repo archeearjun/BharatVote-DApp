@@ -15,7 +15,7 @@ export default function BlogIndexPage() {
     <DocsLayout
       eyebrow="Technical Notes"
       title="BharatVote Blog"
-      description="The blog now opens with a featured entry point and a clearer post library, following the same organization pattern as the other content pages instead of dropping straight into a generic list."
+      description="Read short technical posts about BharatVote’s design decisions, election mechanics, and product tradeoffs."
       heroActions={[
         featuredPost
           ? { label: "Read Featured Post", to: `/blog/${featuredPost.slug}`, variant: "primary" }
@@ -51,7 +51,7 @@ export default function BlogIndexPage() {
           <DocsSectionIntro
             eyebrow="Featured"
             title="Start with the clearest system-level explanation"
-            description="The first post gets a wider spotlight so the library has a clear entry point instead of a flat wall of cards."
+            description="Begin with the featured post for a strong overview of the system and its key decisions."
           />
 
           <section className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
@@ -98,7 +98,7 @@ export default function BlogIndexPage() {
       <DocsSectionIntro
         eyebrow="Library"
         title="All posts"
-        description="The remaining posts stay in a clean grid, but they now sit under a dedicated section header instead of competing with the featured entry."
+        description="Browse the rest of the library for focused notes on privacy, eligibility, UX, and implementation."
       />
 
       <section className="grid gap-4 lg:grid-cols-2">
