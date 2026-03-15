@@ -62,7 +62,22 @@ const KycPage: React.FC<KycPageProps> = ({ account, electionAddress, onVerified 
 
       const response = await fetch(kycUrl.toString());
       if (!response.ok) {
-        throw new Error(`Backend validation failed with status ${response.status}`);
+        let backendMessage = '';
+        try {
+          const contentType = response.headers.get('content-type') || '';
+          if (contentType.includes('application/json')) {
+            const payload = await response.json();
+            backendMessage = String(payload?.error || '').trim();
+          } else {
+            backendMessage = (await response.text()).trim();
+          }
+        } catch {}
+
+        if (response.status === 404 && backendMessage.toLowerCase().includes('allowlist not uploaded')) {
+          throw new Error('This election is not ready for voter verification yet. Ask the admin to upload the voter list first.');
+        }
+
+        throw new Error(backendMessage || `Backend validation failed with status ${response.status}`);
       }
 
       const kycResult = await response.json();

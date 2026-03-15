@@ -830,7 +830,10 @@ app.get('/api/kyc', (req, res) => {
 
     const allowlist = getElectionAllowlist(electionAddress);
     if (!allowlist || !Array.isArray(allowlist.addresses)) {
-      return res.status(404).json({ eligible: false, error: 'Allowlist not uploaded for this election' });
+      return res.status(404).json({
+        eligible: false,
+        error: 'This election is not ready yet. The admin must upload the voter list before voter verification can begin.',
+      });
     }
 
     const normalized = ethers.getAddress(address);
