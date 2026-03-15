@@ -4,6 +4,7 @@ import { ethers } from "ethers";
 import { ArrowRight, Shield, Sparkles, Users } from "lucide-react";
 import CreateElection from "./CreateElection";
 import MainContainer from "./MainContainer";
+import { setStoredKycVerification } from "@/utils/kycStorage";
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -78,9 +79,8 @@ export default function LandingPage() {
         throw new Error(message);
       }
 
-      // Skip KYC gate for demo users (persisted per-account in App.tsx)
-      const key = `bv_kyc_${String(userAddress).toLowerCase()}`;
-      localStorage.setItem(key, '1');
+      // Skip KYC gate for demo users, scoped to the demo election only.
+      setStoredKycVerification(userAddress, demoElectionAddress, userAddress);
 
       navigate(`/election/${demoElectionAddress}`);
     } catch (err) {

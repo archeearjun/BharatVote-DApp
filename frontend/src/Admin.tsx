@@ -21,6 +21,7 @@ import {
   CheckCircle,
   X
 } from 'lucide-react';
+import { getNameLengthError, getUtf8ByteLength, MAX_NAME_BYTES } from "./utils/nameValidation";
 
 interface AdminProps {
   contract: BharatVote | null;
@@ -139,7 +140,15 @@ export default function Admin({
   }, [fetchCandidates]);
 
   const handleAddCandidate = async () => {
-    if (!contract || !state.candidateName.trim() || phase !== COMMIT_PHASE) {
+    if (!contract) {
+      setState(prev => ({
+        ...prev,
+        error: "Contract not available"
+      }));
+      return;
+    }
+
+    if (phase !== COMMIT_PHASE) {
       setState(prev => ({
         ...prev,
         error: ERROR_MESSAGES.WRONG_PHASE
@@ -147,15 +156,31 @@ export default function Admin({
       return;
     }
 
+    if (!trimmedCandidateName) {
+      setState(prev => ({
+        ...prev,
+        error: "Enter a candidate name before adding it."
+      }));
+      return;
+    }
+
+    if (candidateNameError) {
+      setState(prev => ({
+        ...prev,
+        error: candidateNameError
+      }));
+      return;
+    }
+
     setState(prev => ({ ...prev, loading: true, error: null, success: null }));
     try {
-      const tx = await contract.addCandidate(state.candidateName.trim());
+      const tx = await contract.addCandidate(trimmedCandidateName);
       await tx.wait();
       try {
         const count = await (contract as any).candidateCount?.();
         const newId = Number(count ?? 0) - 1 >= 0 ? Number(count ?? 0) - 1 : 0;
         const address = ((contract as any)?.target as string) || ((contract as any)?.address as string) || '';
-        setCandidateLabels(address, newId, { en: state.candidateName.trim() });
+        setCandidateLabels(address, newId, { en: trimmedCandidateName });
       } catch {}
       setState(prev => ({
         ...prev,
@@ -449,6 +474,11 @@ export default function Admin({
   };
 
   const PhaseIcon = getPhaseIcon(phase);
+  const trimmedCandidateName = state.candidateName.trim();
+  const candidateNameByteLength = getUtf8ByteLength(trimmedCandidateName);
+  const candidateNameError = trimmedCandidateName
+    ? getNameLengthError(trimmedCandidateName, "Candidate name")
+    : null;
 
   const parseAllowlistEntries = useCallback((raw: string): { valid: string[]; invalid: string[] } => {
     if (!raw) return { valid: [], invalid: [] };
@@ -960,18 +990,33 @@ export default function Admin({
               <input
                 type="text"
                 value={state.candidateName}
-                onChange={e => setState(prev => ({ ...prev, candidateName: e.target.value }))}
+                onChange={e => setState(prev => ({
+                  ...prev,
+                  candidateName: e.target.value,
+                  error: null,
+                }))}
                 placeholder={t('admin.input.placeholder')}
                 disabled={state.loading || phase !== COMMIT_PHASE}
                 className="input-base"
               />
+              <div className="mt-2 flex items-center justify-between gap-3 text-xs">
+                <span className={candidateNameError ? "text-red-600" : "text-slate-500"}>
+                  Candidate names must be between 1 and {MAX_NAME_BYTES} bytes.
+                </span>
+                <span className={candidateNameError ? "text-red-600" : "text-slate-500"}>
+                  {candidateNameByteLength}/{MAX_NAME_BYTES} bytes
+                </span>
+              </div>
+              {candidateNameError && (
+                <p className="mt-2 text-sm text-red-600">{candidateNameError}</p>
+              )}
               {phase !== COMMIT_PHASE && (
                 <p className="mt-2 text-sm text-slate-500">{t('admin.commitOnlyAdd')}</p>
               )}
             </div>
             <button
               onClick={handleAddCandidate}
-              disabled={state.loading || !state.candidateName.trim() || phase !== COMMIT_PHASE}
+              disabled={state.loading || !trimmedCandidateName || Boolean(candidateNameError) || phase !== COMMIT_PHASE}
               className="btn-primary px-6 sm:self-start"
             >
               {state.loading ? (

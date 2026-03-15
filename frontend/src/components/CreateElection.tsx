@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { getFactoryAddress, getFactoryContract } from "@/utils/contract";
 import useWallet from "@/useWallet";
 import PrimaryButton from "@/components/PrimaryButton";
+import { getNameLengthError, getUtf8ByteLength, MAX_NAME_BYTES } from "@/utils/nameValidation";
 
 export default function CreateElection() {
   const navigate = useNavigate();
@@ -15,6 +16,9 @@ export default function CreateElection() {
 
   const factoryAddress = useMemo(() => getFactoryAddress(), []);
   const explorerTxUrl = txHash ? `https://sepolia.etherscan.io/tx/${txHash}` : null;
+  const trimmedName = name.trim();
+  const nameByteLength = getUtf8ByteLength(trimmedName);
+  const nameLengthError = trimmedName ? getNameLengthError(trimmedName, "Election name") : null;
   const loadingText = !isConnected
     ? "Connecting..."
     : txHash
@@ -26,9 +30,12 @@ export default function CreateElection() {
     setCreatedAddress(null);
     setTxHash(null);
 
-    const trimmedName = name.trim();
     if (!trimmedName) {
       setError("Please enter an election name");
+      return;
+    }
+    if (nameLengthError) {
+      setError(nameLengthError);
       return;
     }
 
@@ -98,13 +105,30 @@ export default function CreateElection() {
         <label className="text-sm font-medium text-slate-700">Election name</label>
         <input
           value={name}
-          onChange={(e) => setName(e.target.value)}
+          onChange={(e) => {
+            setName(e.target.value);
+            if (error) setError(null);
+          }}
           placeholder="e.g. Student Council 2026"
           className="input-base"
         />
+        <div className="flex items-center justify-between gap-3 text-xs">
+          <span className={nameLengthError ? "text-red-600" : "text-slate-500"}>
+            Names must be between 1 and {MAX_NAME_BYTES} bytes.
+          </span>
+          <span className={nameLengthError ? "text-red-600" : "text-slate-500"}>
+            {nameByteLength}/{MAX_NAME_BYTES} bytes
+          </span>
+        </div>
+        {nameLengthError && <p className="text-sm text-red-600">{nameLengthError}</p>}
       </div>
 
-      <PrimaryButton onClick={onCreate} loading={isLoading || isCreating} loadingText={loadingText}>
+      <PrimaryButton
+        onClick={onCreate}
+        loading={isLoading || isCreating}
+        loadingText={loadingText}
+        disabled={Boolean(nameLengthError)}
+      >
         {isConnected ? "Create Election" : "Connect Wallet"}
       </PrimaryButton>
 

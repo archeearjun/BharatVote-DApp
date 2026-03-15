@@ -30,6 +30,7 @@ import DemoElectionGuidePage from "./pages/DemoElectionGuidePage";
 import BlogIndexPage from "./pages/BlogIndexPage";
 import BlogPostPage from "./pages/BlogPostPage";
 import FaqPage from "./pages/FaqPage";
+import { getStoredKycVerification, setStoredKycVerification } from "./utils/kycStorage";
 
 const AdminPanel = lazy(() => import('./Admin'));
 const Voter = lazy(() => import('./Voter'));
@@ -81,45 +82,32 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
     if (!isDemoElection) return;
     if (!account) return;
     if (isAdmin) return;
-    const key = `bv_kyc_${String(account).toLowerCase()}`;
     try {
-      localStorage.setItem(key, '1');
-      localStorage.setItem(`${key}_id`, account);
+      setStoredKycVerification(account, electionAddress, account);
     } catch {}
     setIsKycVerified(true);
     setVerifiedVoterId(account);
-  }, [isDemoElection, account, isAdmin]);
+  }, [isDemoElection, account, isAdmin, electionAddress]);
 
-  // Persist KYC verification per account so refresh does not force re-verification
+  // Keep the local KYC gate aligned with the current election scope.
   useEffect(() => {
     if (!account) {
+      setIsKycVerified(false);
+      setVerifiedVoterId(null);
       return;
     }
-    const key = `bv_kyc_${account.toLowerCase()}`;
-    const fromStorage = localStorage.getItem(key);
-    const storedVoterId = localStorage.getItem(`${key}_id`);
-    
-    if (fromStorage === '1') {
-      setIsKycVerified(true);
-      setVerifiedVoterId(storedVoterId || account);
-    }
-  }, [account]);
 
-  // Additional effect to persist KYC state when phase changes (prevent re-KYC)
-  useEffect(() => {
-    if (!account || isAdmin) {
+    const { isVerified, voterId } = getStoredKycVerification(account, electionAddress);
+
+    if (isVerified) {
+      setIsKycVerified(true);
+      setVerifiedVoterId(voterId || account);
       return;
     }
-    
-    const key = `bv_kyc_${account.toLowerCase()}`;
-    const fromStorage = localStorage.getItem(key);
-    const storedVoterId = localStorage.getItem(`${key}_id`);
-    
-    if (fromStorage === '1' && !isKycVerified) {
-      setIsKycVerified(true);
-      setVerifiedVoterId(storedVoterId || account);
-    }
-  }, [account, phase, isAdmin, isKycVerified]);
+
+    setIsKycVerified(false);
+    setVerifiedVoterId(null);
+  }, [account, electionAddress]);
 
   const fetchCandidates = async () => {
     if (!contract) {
@@ -658,9 +646,7 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
           setVerifiedVoterId(voterId);
           
           if (account) {
-            const key = `bv_kyc_${account.toLowerCase()}`;
-            localStorage.setItem(key, '1');
-            localStorage.setItem(`${key}_id`, voterId);
+            setStoredKycVerification(account, electionAddress, voterId);
           }
         }}
       />

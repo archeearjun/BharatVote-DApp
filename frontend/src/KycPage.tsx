@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useI18n } from './i18n';
 import FaceRecognition from './components/FaceRecognition';
 import { BACKEND_URL } from './constants';
+import { setStoredKycVerification } from './utils/kycStorage';
 import {
   Shield,
   CheckCircle,
@@ -131,9 +132,7 @@ const KycPage: React.FC<KycPageProps> = ({ account, electionAddress, onVerified 
     setToast({ type: 'success', message: t('kyc.faceVerified') });
     setTimeout(() => {
       try {
-        const key = `bv_kyc_${account.toLowerCase()}`;
-        localStorage.setItem(key, '1');
-        localStorage.setItem(`${key}_id`, voterId);
+        setStoredKycVerification(account, electionAddress, voterId);
       } catch {}
       onVerified(voterId);
     }, 1200);
