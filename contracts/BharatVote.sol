@@ -35,16 +35,26 @@ contract BharatVote is Initializable {
         bool isActive;
     }
 
-    Candidate[] public candidates;
+    struct CandidateRecord {
+        uint256 id;
+        string name;
+    }
+
+    struct VoteState {
+        bytes32 commitHash;
+        uint256 commitRound;
+        uint256 revealRound;
+    }
+
+    CandidateRecord[] private candidateRecords;
 
     bytes32 public merkleRoot;
 
-    mapping(address => bytes32) public commits;
-    mapping(address => bool) public hasCommitted;
-    mapping(address => bool) public hasRevealed;
-    mapping(uint256 => uint256) public tally;
+    uint256 public electionRound;
 
-    address[] private voters; // Used to reset state
+    mapping(address => VoteState) private voteStates;
+    mapping(uint256 => mapping(uint256 => uint256)) private talliesByRound;
+    mapping(uint256 => mapping(uint256 => bool)) private candidateDisabledByRound;
 
     /* ───── Events ───── */
     event CandidateAdded(uint256 id, string name);
@@ -68,8 +78,8 @@ contract BharatVote is Initializable {
     }
 
     modifier validCandidateId(uint256 _id) {
-        if (_id >= candidates.length) revert InvalidCandidateId();
-        if (!candidates[_id].isActive) revert InactiveCandidate();
+        if (_id >= candidateRecords.length) revert InvalidCandidateId();
+        if (candidateDisabledByRound[electionRound][_id]) revert InactiveCandidate();
         _;
     }
 
@@ -82,6 +92,7 @@ contract BharatVote is Initializable {
         if (_admin == address(0)) revert ZeroAdmin();
         name = _name;
         admin = _admin;
+        electionRound = 1;
     }
 
     /* ───── Admin Controls ───── */
@@ -96,8 +107,8 @@ contract BharatVote is Initializable {
         onlyPhase(0) // 0: Commit
     {
         if (bytes(_name).length == 0 || bytes(_name).length > 100) revert InvalidNameLength();
-        uint256 id = candidates.length;
-        candidates.push(Candidate(id, _name, true));
+        uint256 id = candidateRecords.length;
+        candidateRecords.push(CandidateRecord(id, _name));
         emit CandidateAdded(id, _name);
     }
 
@@ -107,7 +118,7 @@ contract BharatVote is Initializable {
         onlyPhase(0) // 0: Commit
         validCandidateId(_id)
     {
-        candidates[_id].isActive = false;
+        candidateDisabledByRound[electionRound][_id] = true;
         emit CandidateRemoved(_id);
     }
 
@@ -124,23 +135,8 @@ contract BharatVote is Initializable {
 
     function resetElection() external onlyAdmin {
         if (phase != 2) revert CanOnlyResetAfterFinish(); // 2: Finished
-
-        // Reset candidates
-        for (uint i = 0; i < candidates.length; i++) {
-            candidates[i].isActive = true;
-            tally[i] = 0;
-        }
-
-        // Reset voter states
-        for (uint i = 0; i < voters.length; i++) {
-            address v = voters[i];
-            commits[v] = bytes32(0);
-            hasCommitted[v] = false;
-            hasRevealed[v] = false;
-        }
-
-        delete voters;
         phase = 0; // 0: Commit
+        electionRound += 1;
 
         emit ElectionReset();
         emit PhaseChanged(phase);
@@ -148,36 +144,15 @@ contract BharatVote is Initializable {
 
     // Emergency reset function - can be called from any phase
     function emergencyReset() external onlyAdmin {
-        // Reset candidates
-        for (uint i = 0; i < candidates.length; i++) {
-            candidates[i].isActive = true;
-            tally[i] = 0;
-        }
-
-        // Reset voter states
-        for (uint i = 0; i < voters.length; i++) {
-            address v = voters[i];
-            commits[v] = bytes32(0);
-            hasCommitted[v] = false;
-            hasRevealed[v] = false;
-        }
-
-        delete voters;
         phase = 0; // 0: Commit
+        electionRound += 1;
 
         emit ElectionReset();
         emit PhaseChanged(phase);
     }
 
     function clearAllCandidates() external onlyAdmin onlyPhase(2) {
-        // Capture current candidate count before clearing
-        uint256 count = candidates.length;
-        // Remove all candidate entries
-        delete candidates;
-        // Reset tallies for each old candidate index
-        for (uint256 i = 0; i < count; i++) {
-            delete tally[i];
-        }
+        delete candidateRecords;
         emit AllCandidatesCleared();
     }
 
@@ -188,13 +163,13 @@ contract BharatVote is Initializable {
         external
         onlyPhase(0) // 0: Commit
     {
-        if (hasCommitted[msg.sender]) revert AlreadyCommitted();
+        VoteState storage state = voteStates[msg.sender];
+        if (state.commitRound == electionRound) revert AlreadyCommitted();
         if (_commit == bytes32(0)) revert EmptyHash();
         if (!verify(_proof, msg.sender)) revert NotEligible();
 
-        commits[msg.sender] = _commit;
-        hasCommitted[msg.sender] = true;
-        voters.push(msg.sender);
+        state.commitHash = _commit;
+        state.commitRound = electionRound;
         emit VoteCommitted(msg.sender, _commit);
     }
 
@@ -203,14 +178,15 @@ contract BharatVote is Initializable {
         onlyPhase(1) // 1: Reveal
         validCandidateId(_choice)
     {
-        if (!hasCommitted[msg.sender]) revert NoCommit();
-        if (hasRevealed[msg.sender]) revert AlreadyRevealed();
+        VoteState storage state = voteStates[msg.sender];
+        if (state.commitRound != electionRound) revert NoCommit();
+        if (state.revealRound == electionRound) revert AlreadyRevealed();
 
         bytes32 expectedHash = keccak256(abi.encodePacked(_choice, _salt));
-        if (expectedHash != commits[msg.sender]) revert HashMismatch();
+        if (expectedHash != state.commitHash) revert HashMismatch();
 
-        hasRevealed[msg.sender] = true;
-        tally[_choice] += 1;
+        state.revealRound = electionRound;
+        talliesByRound[electionRound][_choice] += 1;
         emit VoteRevealed(msg.sender, _choice);
     }
 
@@ -229,27 +205,65 @@ contract BharatVote is Initializable {
     /* ───── Views ───── */
 
     function candidateCount() external view returns (uint256) {
-        return candidates.length;
+        return candidateRecords.length;
+    }
+
+    function candidates(uint256 _index) external view returns (uint256 id, string memory candidateName, bool isActive) {
+        if (_index >= candidateRecords.length) revert InvalidCandidateId();
+        CandidateRecord storage record = candidateRecords[_index];
+        return (record.id, record.name, !candidateDisabledByRound[electionRound][_index]);
+    }
+
+    function commits(address _voter) external view returns (bytes32) {
+        VoteState storage state = voteStates[_voter];
+        if (state.commitRound != electionRound) return bytes32(0);
+        return state.commitHash;
+    }
+
+    function hasCommitted(address _voter) external view returns (bool) {
+        return voteStates[_voter].commitRound == electionRound;
+    }
+
+    function hasRevealed(address _voter) external view returns (bool) {
+        return voteStates[_voter].revealRound == electionRound;
+    }
+
+    function tally(uint256 _id) external view returns (uint256) {
+        return talliesByRound[electionRound][_id];
     }
 
     function getVotes(uint256 _id) external view validCandidateId(_id) returns (uint256) {
-        return tally[_id];
+        return talliesByRound[electionRound][_id];
     }
 
     function getTally() public view returns (uint256[] memory) {
-        uint256 n = candidates.length;
+        uint256 n = candidateRecords.length;
         uint256[] memory counts = new uint256[](n);
         for (uint i = 0; i < n; i++) {
-            counts[i] = tally[i];
+            counts[i] = talliesByRound[electionRound][i];
         }
         return counts;
     }
 
     function getCandidates() external view returns (Candidate[] memory) {
-        return candidates;
+        uint256 n = candidateRecords.length;
+        Candidate[] memory currentCandidates = new Candidate[](n);
+        for (uint256 i = 0; i < n; i++) {
+            CandidateRecord storage record = candidateRecords[i];
+            currentCandidates[i] = Candidate({
+                id: record.id,
+                name: record.name,
+                isActive: !candidateDisabledByRound[electionRound][i]
+            });
+        }
+        return currentCandidates;
     }
 
     function getVoterStatus(address _voter) external view returns (bool committed, bool revealed) {
-        return (hasCommitted[_voter], hasRevealed[_voter]);
+        VoteState storage state = voteStates[_voter];
+        return (
+            state.commitRound == electionRound,
+            state.revealRound == electionRound
+        );
     }
 }

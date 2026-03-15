@@ -420,5 +420,59 @@ describe("BharatVote", () => {
         vote.connect(admin).resetElection()
       ).to.be.revertedWithCustomError(vote, "CanOnlyResetAfterFinish");
     });
+
+    it("reactivates candidates in the next round without clearing them one by one", async () => {
+      await vote.connect(admin).addCandidate("Alice");
+      await vote.connect(admin).removeCandidate(0);
+
+      let candidates = await vote.getCandidates();
+      expect(candidates[0].isActive).to.be.false;
+
+      await vote.connect(admin).startReveal();
+      await vote.connect(admin).finishElection();
+      await vote.connect(admin).resetElection();
+
+      candidates = await vote.getCandidates();
+      expect(candidates[0].isActive).to.be.true;
+    });
+
+    it("lets the same voter participate again after a reset", async () => {
+      await vote.connect(admin).addCandidate("Alice");
+
+      const candidateId = 0;
+      const saltRoundOne = "round-one";
+      const saltRoundTwo = "round-two";
+
+      const commitOne = keccak256(
+        ethers.AbiCoder.defaultAbiCoder().encode(
+          ["uint256", "bytes32"],
+          [candidateId, zeroPadValue(ethers.toUtf8Bytes(saltRoundOne), 32)]
+        )
+      );
+
+      const commitTwo = keccak256(
+        ethers.AbiCoder.defaultAbiCoder().encode(
+          ["uint256", "bytes32"],
+          [candidateId, zeroPadValue(ethers.toUtf8Bytes(saltRoundTwo), 32)]
+        )
+      );
+
+      const proof = merkleTree.getProof(
+        Buffer.from(solidityPackedKeccak256(['address'], [voter1.address.toLowerCase()]).substring(2), 'hex')
+      ).map(x => '0x' + x.data.toString('hex'));
+
+      await vote.connect(voter1).commitVote(commitOne, proof);
+      await vote.connect(admin).startReveal();
+      await vote.connect(admin).finishElection();
+      await vote.connect(admin).resetElection();
+
+      let [committed, revealed] = await vote.getVoterStatus(voter1.address);
+      expect(committed).to.be.false;
+      expect(revealed).to.be.false;
+
+      await expect(vote.connect(voter1).commitVote(commitTwo, proof))
+        .to.emit(vote, "VoteCommitted")
+        .withArgs(voter1.address, commitTwo);
+    });
   });
 });

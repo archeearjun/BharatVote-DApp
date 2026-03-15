@@ -139,7 +139,9 @@ const provider = RPC_URL ? new ethers.JsonRpcProvider(RPC_URL) : null;
 const analyticsProvider = DEMO_ANALYTICS_RPC_URL
   ? new ethers.JsonRpcProvider(DEMO_ANALYTICS_RPC_URL)
   : provider;
-const adminWallet = provider && NORMALIZED_PRIVATE_KEY ? new ethers.Wallet(NORMALIZED_PRIVATE_KEY, provider) : null;
+const baseAdminWallet =
+  provider && NORMALIZED_PRIVATE_KEY ? new ethers.Wallet(NORMALIZED_PRIVATE_KEY, provider) : null;
+const adminWallet = baseAdminWallet ? new ethers.NonceManager(baseAdminWallet) : null;
 
 const TOPIC_VOTE_COMMITTED_V1 = ethers.id('VoteCommitted(address,bytes32)');
 const TOPIC_VOTE_COMMITTED_V2 = ethers.id('VoteCommitted(address,bytes32,uint256)');
@@ -334,6 +336,15 @@ const rebuildTree = () => {
   merkleRoot = '0x' + tree.getRoot().toString('hex');
 };
 
+const removeDemoEligibleVoter = (address) => {
+  const normalized = ethers.getAddress(address);
+  const index = eligibleVoters.findIndex((entry) => String(entry).toLowerCase() === normalized.toLowerCase());
+  if (index === -1) return false;
+  eligibleVoters.splice(index, 1);
+  rebuildTree();
+  return true;
+};
+
 rebuildTree();
 
 // --- 2.1 Admin-managed allowlists (per election) ---
@@ -431,6 +442,11 @@ const DEMO_ELECTION_ABI = [
 const DEMO_ELECTION_IFACE = new ethers.Interface(DEMO_ELECTION_ABI);
 
 async function syncDemoElectionMerkleRootIfConfigured({ onlyIfChanged }) {
+  if (syncDemoElectionMerkleRootIfConfigured.inFlight) {
+    return syncDemoElectionMerkleRootIfConfigured.inFlight;
+  }
+
+  syncDemoElectionMerkleRootIfConfigured.inFlight = (async () => {
   if (!provider || !adminWallet) {
     console.log('?? Demo sync skipped (missing RPC_URL or PRIVATE_KEY).');
     return { synced: false, reason: 'missing_rpc_or_key' };
@@ -470,6 +486,13 @@ async function syncDemoElectionMerkleRootIfConfigured({ onlyIfChanged }) {
   } catch (error) {
     console.error('? Demo merkleRoot sync failed:', error);
     return { synced: false, reason: 'sync_failed', error: error?.message || String(error) };
+  }
+  })();
+
+  try {
+    return await syncDemoElectionMerkleRootIfConfigured.inFlight;
+  } finally {
+    syncDemoElectionMerkleRootIfConfigured.inFlight = null;
   }
 }
 
@@ -608,6 +631,14 @@ function demoStatusPayload(extra) {
     lastErrorAtMs: demoState.lastErrorAtMs,
     transitioning: Boolean(demoState.transitioning),
   };
+}
+
+let demoJoinQueue = Promise.resolve();
+
+function withDemoJoinLock(work) {
+  const run = demoJoinQueue.then(() => work(), () => work());
+  demoJoinQueue = run.then(() => undefined, () => undefined);
+  return run;
 }
 
 async function waitForTx(tx) {
@@ -1018,115 +1049,131 @@ app.post('/api/join', async (req, res) => {
   const normalized = ethers.getAddress(address);
   console.log(`✨ New Demo Request: ${normalized}`);
 
-  try {
+  return withDemoJoinLock(async () => {
     let listChanged = false;
+    let sync = { synced: false, reason: 'list_unchanged' };
+    let funding = { attempted: false, sent: false, skipped: true, reason: 'not_needed', txHash: null, error: null };
 
-    const alreadyEligible = eligibleVoters.some((v) => v.toLowerCase() === normalized.toLowerCase());
-    if (!alreadyEligible) {
-      // If we cannot sync eligibility on-chain, do not mutate the allowlist.
-      // Otherwise the UI will "join" but the contract will still revert with NotEligible.
-      if (!provider || !adminWallet) {
-        return res.status(503).json({
-          error:
-            'Public demo join is not enabled on this backend (missing RPC_URL/PRIVATE_KEY for on-chain merkleRoot sync).',
-          reason: 'missing_rpc_or_key',
-        });
-      }
-
-      // Ensure the configured wallet can administer the demo contract.
-      try {
-        const electionRead = new ethers.Contract(DEMO_ELECTION_ADDRESS, DEMO_ELECTION_ABI, provider);
-        const [onChainAdmin, walletAddr] = await Promise.all([electionRead.admin(), adminWallet.getAddress()]);
-        if (String(onChainAdmin).toLowerCase() !== String(walletAddr).toLowerCase()) {
+    try {
+      const alreadyEligible = eligibleVoters.some((v) => v.toLowerCase() === normalized.toLowerCase());
+      if (!alreadyEligible) {
+        if (!provider || !adminWallet) {
           return res.status(503).json({
-            error: 'Public demo join is not enabled on this backend (configured PRIVATE_KEY is not the demo admin).',
-            reason: 'wallet_not_demo_admin',
-            expectedAdmin: onChainAdmin,
-            configuredWallet: walletAddr,
+            error:
+              'Public demo join is not enabled on this backend (missing RPC_URL/PRIVATE_KEY for on-chain merkleRoot sync).',
+            reason: 'missing_rpc_or_key',
           });
         }
-      } catch (e) {
-        return res.status(503).json({
-          error: 'Public demo join is temporarily unavailable (failed to verify demo admin permissions).',
-          reason: 'admin_check_failed',
-          details: e?.message || String(e),
-        });
-      }
 
-      eligibleVoters.push(normalized);
-      rebuildTree();
-      listChanged = true;
-      console.log(`✅ User added! New Root: ${merkleRoot}`);
-    } else {
-      console.log('ℹ️ User already in list.');
-    }
-
-    // B. Fund them (if they are poor)
-    if (provider && adminWallet) {
-      const balance = await provider.getBalance(normalized);
-      if (balance < ethers.parseEther('0.005')) {
-        console.log('💸 User needs gas. Sending 0.01 ETH...');
-        const tx = await adminWallet.sendTransaction({
-          to: normalized,
-          value: ethers.parseEther('0.01'),
-        });
-        if (DEMO_SYNC_WAIT_CONFIRMATIONS > 0) {
-          await tx.wait(DEMO_SYNC_WAIT_CONFIRMATIONS);
+        try {
+          const electionRead = new ethers.Contract(DEMO_ELECTION_ADDRESS, DEMO_ELECTION_ABI, provider);
+          const [onChainAdmin, walletAddr] = await Promise.all([electionRead.admin(), adminWallet.getAddress()]);
+          if (String(onChainAdmin).toLowerCase() !== String(walletAddr).toLowerCase()) {
+            return res.status(503).json({
+              error: 'Public demo join is not enabled on this backend (configured PRIVATE_KEY is not the demo admin).',
+              reason: 'wallet_not_demo_admin',
+              expectedAdmin: onChainAdmin,
+              configuredWallet: walletAddr,
+            });
+          }
+        } catch (e) {
+          return res.status(503).json({
+            error: 'Public demo join is temporarily unavailable (failed to verify demo admin permissions).',
+            reason: 'admin_check_failed',
+            details: e?.message || String(e),
+          });
         }
-        console.log('✅ User funding transaction submitted.');
+
+        eligibleVoters.push(normalized);
+        rebuildTree();
+        listChanged = true;
+        console.log(`✅ User added! New Root: ${merkleRoot}`);
+
+        sync = await syncDemoElectionMerkleRootIfConfigured({ onlyIfChanged: true });
+        if (!sync?.synced) {
+          removeDemoEligibleVoter(normalized);
+          return res.status(503).json({
+            error:
+              'Demo eligibility sync failed (cannot update on-chain merkleRoot). Check RPC_URL/PRIVATE_KEY and demo admin permissions.',
+            merkleRoot,
+            sync,
+          });
+        }
+      } else {
+        console.log('ℹ️ User already in list.');
       }
-    } else {
-      console.log('ℹ️ Funding skipped (missing RPC_URL or PRIVATE_KEY).');
-    }
 
-    // C. Keep the demo election usable: update on-chain merkleRoot when the backend list changes.
-    const sync = listChanged
-      ? await syncDemoElectionMerkleRootIfConfigured({ onlyIfChanged: true })
-      : { synced: false, reason: 'list_unchanged' };
+      if (provider && adminWallet) {
+        try {
+          const balance = await provider.getBalance(normalized);
+          if (balance < ethers.parseEther('0.005')) {
+            funding = { attempted: true, sent: false, skipped: false, reason: 'low_balance', txHash: null, error: null };
+            console.log('💸 User needs gas. Sending 0.01 ETH...');
+            const tx = await adminWallet.sendTransaction({
+              to: normalized,
+              value: ethers.parseEther('0.01'),
+            });
+            if (DEMO_SYNC_WAIT_CONFIRMATIONS > 0) {
+              await tx.wait(DEMO_SYNC_WAIT_CONFIRMATIONS);
+            }
+            funding = { attempted: true, sent: true, skipped: false, reason: null, txHash: tx.hash, error: null };
+            console.log('✅ User funding transaction submitted.');
+          } else {
+            funding = { attempted: false, sent: false, skipped: true, reason: 'balance_sufficient', txHash: null, error: null };
+          }
+        } catch (fundingError) {
+          console.warn('⚠️ Funding skipped after eligibility sync:', fundingError?.message || fundingError);
+          funding = {
+            attempted: true,
+            sent: false,
+            skipped: false,
+            reason: 'funding_failed',
+            txHash: null,
+            error: fundingError?.message || String(fundingError),
+          };
+        }
+      } else {
+        funding = { attempted: false, sent: false, skipped: true, reason: 'missing_rpc_or_key', txHash: null, error: null };
+        console.log('ℹ️ Funding skipped (missing RPC_URL or PRIVATE_KEY).');
+      }
 
-    // If we changed the allowlist, the on-chain merkleRoot must be updated too or the voter will revert as NotEligible.
-    if (listChanged && !sync?.synced) {
-      return res.status(503).json({
-        error:
-          'Demo eligibility sync failed (cannot update on-chain merkleRoot). Check RPC_URL/PRIVATE_KEY and demo admin permissions.',
+      let phase = null;
+      if (demoState.enabled && provider && adminWallet) {
+        try {
+          const contract = await getDemoContract();
+          if (contract) {
+            phase = Number(await contract.phase());
+            if (DEMO_START_MODE === 'on_first_join' && phase === 0 && !demoState.roundStartedAtMs) {
+              demoState.roundId += 1;
+              demoState.roundStartedAtMs = nowMs();
+              demoState.commitEndsAtMs = null;
+              demoState.revealEndsAtMs = null;
+              demoState.finishedAtMs = null;
+              demoState.resetAtMs = null;
+              ensureDemoSchedule(0);
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      return res.json({
+        success: true,
+        message: 'Welcome to the demo!',
         merkleRoot,
         sync,
+        funding,
+        demo: demoStatusPayload({ phase }),
       });
-    }
-
-    // D. If demo autophasing is enabled, start the round schedule on first join (commit phase only).
-    let phase = null;
-    if (demoState.enabled && provider && adminWallet) {
-      try {
-        const contract = await getDemoContract();
-        if (contract) {
-          phase = Number(await contract.phase());
-          if (DEMO_START_MODE === 'on_first_join' && phase === 0 && !demoState.roundStartedAtMs) {
-            demoState.roundId += 1;
-            demoState.roundStartedAtMs = nowMs();
-            demoState.commitEndsAtMs = null;
-            demoState.revealEndsAtMs = null;
-            demoState.finishedAtMs = null;
-            demoState.resetAtMs = null;
-            ensureDemoSchedule(0);
-          }
-        }
-      } catch {
-        // ignore
+    } catch (error) {
+      if (listChanged && !sync?.synced) {
+        removeDemoEligibleVoter(normalized);
       }
+      console.error('❌ Onboarding failed:', error);
+      return res.status(500).json({ error: error?.message || 'Onboarding failed' });
     }
-
-    return res.json({
-      success: true,
-      message: 'Welcome to the demo!',
-      merkleRoot,
-      sync,
-      demo: demoStatusPayload({ phase }),
-    });
-  } catch (error) {
-    console.error('❌ Onboarding failed:', error);
-    return res.status(500).json({ error: error?.message || 'Onboarding failed' });
-  }
+  });
 });
 
 app.listen(PORT, () => {

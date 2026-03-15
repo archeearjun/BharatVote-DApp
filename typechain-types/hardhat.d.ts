@@ -14,134 +14,134 @@ import * as Contracts from ".";
 declare module "hardhat/types/runtime" {
   interface HardhatEthersHelpers extends HardhatEthersHelpersBase {
     getContractFactory(
-      name: "Clones",
+      name: "IBharatVote",
       signerOrOptions?: ethers.Signer | FactoryOptions
-    ): Promise<Contracts.Clones__factory>;
-    getContractFactory(
-      name: "Initializable",
-      signerOrOptions?: ethers.Signer | FactoryOptions
-    ): Promise<Contracts.Initializable__factory>;
-    getContractFactory(
-      name: "Create2",
-      signerOrOptions?: ethers.Signer | FactoryOptions
-    ): Promise<Contracts.Create2__factory>;
-    getContractFactory(
-      name: "Errors",
-      signerOrOptions?: ethers.Signer | FactoryOptions
-    ): Promise<Contracts.Errors__factory>;
-    getContractFactory(
-      name: "BharatVote",
-      signerOrOptions?: ethers.Signer | FactoryOptions
-    ): Promise<Contracts.BharatVote__factory>;
+    ): Promise<Contracts.IBharatVote__factory>;
     getContractFactory(
       name: "ElectionFactory",
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.ElectionFactory__factory>;
     getContractFactory(
-      name: "IBharatVote",
+      name: "BharatVote",
       signerOrOptions?: ethers.Signer | FactoryOptions
-    ): Promise<Contracts.IBharatVote__factory>;
+    ): Promise<Contracts.BharatVote__factory>;
+    getContractFactory(
+      name: "Errors",
+      signerOrOptions?: ethers.Signer | FactoryOptions
+    ): Promise<Contracts.Errors__factory>;
+    getContractFactory(
+      name: "Create2",
+      signerOrOptions?: ethers.Signer | FactoryOptions
+    ): Promise<Contracts.Create2__factory>;
+    getContractFactory(
+      name: "Initializable",
+      signerOrOptions?: ethers.Signer | FactoryOptions
+    ): Promise<Contracts.Initializable__factory>;
+    getContractFactory(
+      name: "Clones",
+      signerOrOptions?: ethers.Signer | FactoryOptions
+    ): Promise<Contracts.Clones__factory>;
 
     getContractAt(
-      name: "Clones",
+      name: "IBharatVote",
       address: string | ethers.Addressable,
       signer?: ethers.Signer
-    ): Promise<Contracts.Clones>;
-    getContractAt(
-      name: "Initializable",
-      address: string | ethers.Addressable,
-      signer?: ethers.Signer
-    ): Promise<Contracts.Initializable>;
-    getContractAt(
-      name: "Create2",
-      address: string | ethers.Addressable,
-      signer?: ethers.Signer
-    ): Promise<Contracts.Create2>;
-    getContractAt(
-      name: "Errors",
-      address: string | ethers.Addressable,
-      signer?: ethers.Signer
-    ): Promise<Contracts.Errors>;
-    getContractAt(
-      name: "BharatVote",
-      address: string | ethers.Addressable,
-      signer?: ethers.Signer
-    ): Promise<Contracts.BharatVote>;
+    ): Promise<Contracts.IBharatVote>;
     getContractAt(
       name: "ElectionFactory",
       address: string | ethers.Addressable,
       signer?: ethers.Signer
     ): Promise<Contracts.ElectionFactory>;
     getContractAt(
-      name: "IBharatVote",
+      name: "BharatVote",
       address: string | ethers.Addressable,
       signer?: ethers.Signer
-    ): Promise<Contracts.IBharatVote>;
+    ): Promise<Contracts.BharatVote>;
+    getContractAt(
+      name: "Errors",
+      address: string | ethers.Addressable,
+      signer?: ethers.Signer
+    ): Promise<Contracts.Errors>;
+    getContractAt(
+      name: "Create2",
+      address: string | ethers.Addressable,
+      signer?: ethers.Signer
+    ): Promise<Contracts.Create2>;
+    getContractAt(
+      name: "Initializable",
+      address: string | ethers.Addressable,
+      signer?: ethers.Signer
+    ): Promise<Contracts.Initializable>;
+    getContractAt(
+      name: "Clones",
+      address: string | ethers.Addressable,
+      signer?: ethers.Signer
+    ): Promise<Contracts.Clones>;
 
     deployContract(
-      name: "Clones",
+      name: "IBharatVote",
       signerOrOptions?: ethers.Signer | DeployContractOptions
-    ): Promise<Contracts.Clones>;
-    deployContract(
-      name: "Initializable",
-      signerOrOptions?: ethers.Signer | DeployContractOptions
-    ): Promise<Contracts.Initializable>;
-    deployContract(
-      name: "Create2",
-      signerOrOptions?: ethers.Signer | DeployContractOptions
-    ): Promise<Contracts.Create2>;
-    deployContract(
-      name: "Errors",
-      signerOrOptions?: ethers.Signer | DeployContractOptions
-    ): Promise<Contracts.Errors>;
-    deployContract(
-      name: "BharatVote",
-      signerOrOptions?: ethers.Signer | DeployContractOptions
-    ): Promise<Contracts.BharatVote>;
+    ): Promise<Contracts.IBharatVote>;
     deployContract(
       name: "ElectionFactory",
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.ElectionFactory>;
     deployContract(
-      name: "IBharatVote",
+      name: "BharatVote",
       signerOrOptions?: ethers.Signer | DeployContractOptions
-    ): Promise<Contracts.IBharatVote>;
-
-    deployContract(
-      name: "Clones",
-      args: any[],
-      signerOrOptions?: ethers.Signer | DeployContractOptions
-    ): Promise<Contracts.Clones>;
-    deployContract(
-      name: "Initializable",
-      args: any[],
-      signerOrOptions?: ethers.Signer | DeployContractOptions
-    ): Promise<Contracts.Initializable>;
-    deployContract(
-      name: "Create2",
-      args: any[],
-      signerOrOptions?: ethers.Signer | DeployContractOptions
-    ): Promise<Contracts.Create2>;
+    ): Promise<Contracts.BharatVote>;
     deployContract(
       name: "Errors",
-      args: any[],
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.Errors>;
     deployContract(
-      name: "BharatVote",
+      name: "Create2",
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.Create2>;
+    deployContract(
+      name: "Initializable",
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.Initializable>;
+    deployContract(
+      name: "Clones",
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.Clones>;
+
+    deployContract(
+      name: "IBharatVote",
       args: any[],
       signerOrOptions?: ethers.Signer | DeployContractOptions
-    ): Promise<Contracts.BharatVote>;
+    ): Promise<Contracts.IBharatVote>;
     deployContract(
       name: "ElectionFactory",
       args: any[],
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.ElectionFactory>;
     deployContract(
-      name: "IBharatVote",
+      name: "BharatVote",
       args: any[],
       signerOrOptions?: ethers.Signer | DeployContractOptions
-    ): Promise<Contracts.IBharatVote>;
+    ): Promise<Contracts.BharatVote>;
+    deployContract(
+      name: "Errors",
+      args: any[],
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.Errors>;
+    deployContract(
+      name: "Create2",
+      args: any[],
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.Create2>;
+    deployContract(
+      name: "Initializable",
+      args: any[],
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.Initializable>;
+    deployContract(
+      name: "Clones",
+      args: any[],
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.Clones>;
 
     // default types
     getContractFactory(

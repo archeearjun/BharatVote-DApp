@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useI18n } from './i18n';
 import { 
   CheckCircle,
@@ -27,6 +27,7 @@ interface VoterProps {
   voterId: string;
   isDemoElection?: boolean;
   electionAddress?: string;
+  refreshSignal?: number;
   onRevealSuccess: () => void;
   candidates?: any[];
   onCommitSuccess?: () => void;
@@ -40,6 +41,7 @@ const Voter: React.FC<VoterProps> = ({
   voterId,
   isDemoElection,
   electionAddress,
+  refreshSignal = 0,
   onRevealSuccess,
   candidates = [],
   onCommitSuccess,
@@ -63,6 +65,8 @@ const Voter: React.FC<VoterProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [showCommitModal, setShowCommitModal] = useState(false);
+  const previousPhaseRef = useRef<number | null>(null);
+  const previousRefreshSignalRef = useRef(refreshSignal);
 
   const [isEligible, setIsEligible] = useState(false);
   const [isFetchingProof, setIsFetchingProof] = useState(false);
@@ -308,23 +312,41 @@ const Voter: React.FC<VoterProps> = ({
     }
   };
 
-  // Privacy: when entering reveal phase, ensure nothing is prefilled
-  // Also check vote status to update hasVoted state
   useEffect(() => {
-    if (phase === 1) {
+    const previousPhase = previousPhaseRef.current;
+    const refreshChanged = previousRefreshSignalRef.current !== refreshSignal;
+    const enteredReveal = phase === 1 && previousPhase !== 1;
+    const resetOrReopenedCommit = phase === 0 && (refreshChanged || (previousPhase !== null && previousPhase !== 0));
+
+    if (enteredReveal) {
       setSelectedCandidateId(null);
       setSalt('');
       setIsSaltVisible(false);
-      // Close commit modal if it's still open
       setShowCommitModal(false);
-      // Check vote status when entering reveal phase
-      checkVoteStatus();
+      setError(null);
+      setSuccess(null);
     }
-  }, [phase]);
 
-  useEffect(() => {
-    setIsSaltVisible(false);
-  }, [phase]);
+    if (resetOrReopenedCommit) {
+      setSelectedCandidateId(null);
+      setSalt('');
+      setIsSaltVisible(false);
+      setShowCommitModal(false);
+      setVoteHash(null);
+      setHasVoted(false);
+      setHasRevealed(false);
+      setError(null);
+      setSuccess(null);
+    }
+
+    if (phase !== 1) {
+      setIsSaltVisible(false);
+    }
+
+    checkVoteStatus();
+    previousPhaseRef.current = phase;
+    previousRefreshSignalRef.current = refreshSignal;
+  }, [phase, refreshSignal]);
 
   const handleRevealVote = async () => {
     if (selectedCandidateId === null || !salt.trim()) {

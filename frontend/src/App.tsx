@@ -70,6 +70,7 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
   const [hasUserRevealed, setHasUserRevealed] = useState(false);
   const [adminTallyOpen, setAdminTallyOpen] = useState(false);
   const [showPublicResults, setShowPublicResults] = useState(false);
+  const [voterRefreshSignal, setVoterRefreshSignal] = useState(0);
   const demoElectionAddress = import.meta.env.VITE_DEMO_ELECTION_ADDRESS as string | undefined;
   const isDemoElection = useMemo(() => {
     if (!demoElectionAddress || !electionAddress) return false;
@@ -442,6 +443,7 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
             contract.on('PhaseChanged', async (newPhase: bigint) => {
               console.log('DEBUG APP EVENT: PhaseChanged event - newPhase:', newPhase);
               setPhase(Number(newPhase)); // Update phase when a change event is received.
+              setVoterRefreshSignal((prev) => prev + 1);
 
               try {
                 const root = await contract.merkleRoot();
@@ -468,6 +470,7 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
             contract.on('ElectionReset', async () => {
               setCandidates([]);
               setPhase(0);
+              setVoterRefreshSignal((prev) => prev + 1);
               await fetchCandidates();
             });
           }
@@ -477,6 +480,7 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
             try {
               const p = await contract.phase();
               setPhase(Number(p));
+              setVoterRefreshSignal((prev) => prev + 1);
               await fetchCandidates();
             } catch {}
           };
@@ -918,6 +922,7 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
                   setHasUserCommitted(committed);
                   setHasUserRevealed(revealed);
                 }}
+                refreshSignal={voterRefreshSignal}
                 candidates={candidates}
               />
             </Suspense>
