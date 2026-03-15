@@ -335,11 +335,11 @@ export default function DocsLayout({
       </header>
 
       <MainContainer className="space-y-8" paddingYClassName="py-6 sm:py-8 lg:py-10">
-        <section className="relative overflow-hidden rounded-[32px] border border-white/70 bg-white/90 shadow-[0_24px_80px_-32px_rgba(15,23,42,0.35)]">
-          <div className="absolute inset-y-0 right-0 hidden w-1/2 bg-[linear-gradient(135deg,rgba(241,245,249,0.12),rgba(226,232,240,0.8))] lg:block" />
-          <div className="absolute -right-16 top-10 h-64 w-64 rounded-full border border-slate-200/80 bg-slate-100/70 blur-2xl" />
-          <div className="grid gap-8 px-6 py-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)] lg:px-10 lg:py-12">
-            <div className="relative">
+        <section className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)] xl:items-start">
+          <div className="relative overflow-hidden rounded-[32px] border border-white/70 bg-white/90 shadow-[0_24px_80px_-32px_rgba(15,23,42,0.35)]">
+            <div className="absolute inset-y-0 right-0 hidden w-2/5 bg-[linear-gradient(135deg,rgba(241,245,249,0.12),rgba(226,232,240,0.8))] xl:block" />
+            <div className="absolute -right-16 top-10 h-64 w-64 rounded-full border border-slate-200/80 bg-slate-100/70 blur-2xl" />
+            <div className="relative px-6 py-8 lg:px-10 lg:py-12">
               <div className="inline-flex items-center rounded-full border border-slate-200 bg-white/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500 shadow-sm">
                 {eyebrow}
               </div>
@@ -358,43 +358,43 @@ export default function DocsLayout({
                 </div>
               ) : null}
             </div>
-
-            <aside className="relative grid gap-3">
-              <div className="rounded-[28px] bg-slate-900 p-6 text-white shadow-xl shadow-slate-900/15">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10">
-                    <Compass className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-300">
-                      Structured View
-                    </p>
-                    <h2 className="mt-1 text-xl font-semibold">{heroAsideTitle}</h2>
-                  </div>
-                </div>
-                <p className="mt-4 text-sm leading-7 text-slate-300">{heroAsideDescription}</p>
-              </div>
-
-              {heroAsideItems?.length ? (
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-                  {heroAsideItems.map((item) => (
-                    <div
-                      key={`${item.label}-${item.value}`}
-                      className="rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm"
-                    >
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
-                        {item.label}
-                      </p>
-                      <p className="mt-2 text-lg font-semibold text-slate-900">{item.value}</p>
-                      {item.description ? (
-                        <p className="mt-2 text-sm leading-6 text-slate-600">{item.description}</p>
-                      ) : null}
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-            </aside>
           </div>
+
+          <aside className="relative grid gap-3">
+            <div className="rounded-[28px] bg-slate-900 p-6 text-white shadow-xl shadow-slate-900/15">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10">
+                  <Compass className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-300">
+                    Structured View
+                  </p>
+                  <h2 className="mt-1 text-xl font-semibold">{heroAsideTitle}</h2>
+                </div>
+              </div>
+              <p className="mt-4 text-sm leading-7 text-slate-300">{heroAsideDescription}</p>
+            </div>
+
+            {heroAsideItems?.length ? (
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                {heroAsideItems.map((item) => (
+                  <div
+                    key={`${item.label}-${item.value}`}
+                    className="rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm"
+                  >
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
+                      {item.label}
+                    </p>
+                    <p className="mt-2 text-lg font-semibold text-slate-900">{item.value}</p>
+                    {item.description ? (
+                      <p className="mt-2 text-sm leading-6 text-slate-600">{item.description}</p>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </aside>
         </section>
 
         <div className="space-y-8">{children}</div>
