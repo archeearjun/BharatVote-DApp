@@ -1,5 +1,5 @@
 import { useEffect, Suspense, lazy, useState, useMemo } from "react";
-import { Routes, Route, Navigate, useParams } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation, useParams } from "react-router-dom";
 import eligibleVoters from "../../eligibleVoters.json";
 import MainContainer from './components/MainContainer';
 import Header from './components/Header';
@@ -1031,19 +1031,32 @@ function ElectionRoute() {
   return <ElectionUI electionAddress={address} />;
 }
 
+function ScrollToTop() {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [pathname]);
+
+  return null;
+}
+
 export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<LandingPage />} />
-      <Route path="/about" element={<AboutPage />} />
-      <Route path="/learn" element={<LearnPage />} />
-      <Route path="/guide/main-election" element={<MainElectionGuidePage />} />
-      <Route path="/guide/demo-election" element={<DemoElectionGuidePage />} />
-      <Route path="/blog" element={<BlogIndexPage />} />
-      <Route path="/blog/:slug" element={<BlogPostPage />} />
-      <Route path="/faq" element={<FaqPage />} />
-      <Route path="/election/:address" element={<ElectionRoute />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <>
+      <ScrollToTop />
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/about" element={<AboutPage />} />
+        <Route path="/learn" element={<LearnPage />} />
+        <Route path="/guide/main-election" element={<MainElectionGuidePage />} />
+        <Route path="/guide/demo-election" element={<DemoElectionGuidePage />} />
+        <Route path="/blog" element={<BlogIndexPage />} />
+        <Route path="/blog/:slug" element={<BlogPostPage />} />
+        <Route path="/faq" element={<FaqPage />} />
+        <Route path="/election/:address" element={<ElectionRoute />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </>
   );
 }
