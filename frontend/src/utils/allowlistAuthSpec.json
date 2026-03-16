@@ -1,0 +1,8 @@
+{
+  "title": "BharatVote Admin Allowlist Upload",
+  "fields": {
+    "election": "Election",
+    "addressesHash": "Addresses Hash",
+    "issuedAt": "Issued At"
+  }
+}

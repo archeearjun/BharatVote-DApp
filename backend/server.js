@@ -1,5 +1,6 @@
 const path = require('path');
 const fs = require('fs');
+const allowlistAuthSpec = require('../frontend/src/utils/allowlistAuthSpec.json');
 
 // Load env from repo root so `npm -C backend start` works.
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
@@ -382,10 +383,13 @@ const normalizeAddressList = (raw) => {
       .map((x) => x.trim())
       .filter(Boolean);
   }
-  const normalized = list
-    .filter((a) => ethers.isAddress(a))
-    .map((a) => ethers.getAddress(a));
-  return Array.from(new Set(normalized));
+  return Array.from(
+    new Set(
+      list
+        .filter((address) => ethers.isAddress(address))
+        .map((address) => ethers.getAddress(address))
+    )
+  );
 };
 
 const buildElectionTree = (addresses) => {
@@ -398,13 +402,17 @@ const buildElectionTree = (addresses) => {
 const hashAllowlistAddresses = (addresses) =>
   ethers.keccak256(ethers.toUtf8Bytes(normalizeAddressList(addresses).join('\n')));
 
-const buildAllowlistUploadMessage = ({ electionAddress, addressesHash, issuedAt }) =>
-  [
-    'BharatVote Admin Allowlist Upload',
-    `Election: ${ethers.getAddress(electionAddress)}`,
-    `Addresses Hash: ${addressesHash}`,
-    `Issued At: ${issuedAt}`,
+const buildAllowlistUploadMessage = (electionAddress, addresses, issuedAt) => {
+  const normalizedElectionAddress = ethers.getAddress(electionAddress);
+  const addressesHash = hashAllowlistAddresses(addresses);
+
+  return [
+    allowlistAuthSpec.title,
+    `${allowlistAuthSpec.fields.election}: ${normalizedElectionAddress}`,
+    `${allowlistAuthSpec.fields.addressesHash}: ${addressesHash}`,
+    `${allowlistAuthSpec.fields.issuedAt}: ${issuedAt}`,
   ].join('\n');
+};
 
 const verifyAllowlistUploadAuth = async ({ electionAddress, addresses, auth }) => {
   if (!provider) {
@@ -423,8 +431,7 @@ const verifyAllowlistUploadAuth = async ({ electionAddress, addresses, auth }) =
   }
 
   const normalizedAddresses = normalizeAddressList(addresses);
-  const addressesHash = hashAllowlistAddresses(normalizedAddresses);
-  const message = buildAllowlistUploadMessage({ electionAddress, addressesHash, issuedAt });
+  const message = buildAllowlistUploadMessage(electionAddress, normalizedAddresses, issuedAt);
 
   let recoveredAddress;
   try {

@@ -1,4 +1,5 @@
 import { ethers } from "ethers";
+import allowlistAuthSpec from "./allowlistAuthSpec.json";
 
 export function normalizeAllowlistAddresses(addresses: string[]) {
   return Array.from(
@@ -25,9 +26,9 @@ export function buildAllowlistUploadMessage(
   const addressesHash = hashAllowlistAddresses(addresses);
 
   return [
-    "BharatVote Admin Allowlist Upload",
-    `Election: ${normalizedElectionAddress}`,
-    `Addresses Hash: ${addressesHash}`,
-    `Issued At: ${issuedAt}`,
+    allowlistAuthSpec.title,
+    `${allowlistAuthSpec.fields.election}: ${normalizedElectionAddress}`,
+    `${allowlistAuthSpec.fields.addressesHash}: ${addressesHash}`,
+    `${allowlistAuthSpec.fields.issuedAt}: ${issuedAt}`,
   ].join("\n");
 }
