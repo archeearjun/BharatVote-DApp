@@ -3,7 +3,7 @@ import { ethers } from "ethers";
 import { PHASE_LABELS, ERROR_MESSAGES, COMMIT_PHASE, REVEAL_PHASE, FINISH_PHASE, CANDIDATE_MESSAGES, SUCCESS_MESSAGES, BACKEND_URL } from "./constants";
 import { useI18n } from './i18n';
 import type { BharatVote } from "@typechain/contracts/BharatVote";
-import { getCandidateLabel, setCandidateLabels } from './utils/candidateLabels';
+import { getCandidateDisplayName, setCandidateLabels } from './utils/candidateLabels';
 import type { Candidate } from "./types/candidates";
 import { 
   Plus,
@@ -79,7 +79,7 @@ export default function Admin({
   const [allowlistSuccess, setAllowlistSuccess] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<DestructiveAction>(null);
   const [confirmText, setConfirmText] = useState('');
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const rootsAligned =
     Boolean(contract) &&
     Boolean(contractMerkleRoot) &&
@@ -737,7 +737,7 @@ export default function Admin({
             </div>
             <div>
               <h1 className="text-xl sm:text-2xl font-semibold text-slate-900">{t('admin.title')}</h1>
-              <p className="text-sm text-slate-600">Manage election phases and candidates</p>
+              <p className="text-sm text-slate-600">{t('admin.subtitle')}</p>
             </div>
           </div>
           <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl border ${getPhaseColor(phase)} self-start sm:self-auto`}>
@@ -1096,7 +1096,7 @@ export default function Admin({
             <div className="text-center py-8">
               <User className="w-12 h-12 text-slate-400 mx-auto mb-3" />
               <p className="text-slate-600 mb-2">{CANDIDATE_MESSAGES.UI.NO_CANDIDATES}</p>
-              <p className="text-sm text-slate-500">Use the form to add your first candidate</p>
+              <p className="text-sm text-slate-500">{t('admin.useAddCandidateForm')}</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -1111,13 +1111,18 @@ export default function Admin({
                     </div>
                     <div>
                       <p className="font-medium text-slate-900">
-                        {getCandidateLabel((contract as any)?.target || (contract as any)?.address || '', candidate.id, (localStorage.getItem('lang') as any) || 'en') || candidate.name}
+                        {getCandidateDisplayName(
+                          (contract as any)?.target || (contract as any)?.address || '',
+                          candidate.id,
+                          lang,
+                          candidate.name
+                        )}
                       </p>
                       <p className="text-sm text-slate-600">ID: {candidate.id}</p>
                     </div>
                   </div>
                   <div className={`badge ${candidate.isActive ? 'badge-success' : 'badge-error'}`}>
-                    {candidate.isActive ? 'Active' : 'Inactive'}
+                    {candidate.isActive ? t('common.active') : t('common.inactive')}
                   </div>
                 </div>
               ))}
@@ -1133,7 +1138,7 @@ export default function Admin({
             </div>
             <div>
               <h2 className="text-lg font-semibold text-slate-900">{t('admin.addCandidate')}</h2>
-              <p className="text-sm text-slate-600">Add candidates before you move past the commit phase.</p>
+              <p className="text-sm text-slate-600">{t('admin.addCandidateSubtitle')}</p>
             </div>
           </div>
 
@@ -1153,7 +1158,7 @@ export default function Admin({
               />
               <div className="mt-2 flex items-center justify-between gap-3 text-xs">
                 <span className={candidateNameError ? "text-red-600" : "text-slate-500"}>
-                  Candidate names must be between 1 and {MAX_NAME_BYTES} bytes.
+                  {t('admin.byteLimitHint')}
                 </span>
                 <span className={candidateNameError ? "text-red-600" : "text-slate-500"}>
                   {candidateNameByteLength}/{MAX_NAME_BYTES} bytes
@@ -1189,9 +1194,9 @@ export default function Admin({
         <div className="flex items-start gap-3">
           <AlertTriangle className="w-5 h-5 text-slate-600 mt-0.5" />
           <div>
-            <h3 className="text-sm font-medium text-slate-900 mb-1">Troubleshooting</h3>
+            <h3 className="text-sm font-medium text-slate-900 mb-1">{t('admin.troubleshooting')}</h3>
             <p className="text-sm text-slate-600">
-              If an action fails, verify the connected wallet, Sepolia network, and the eligibility sync state before retrying.
+              {t('admin.troubleshootingBody')}
             </p>
           </div>
         </div>

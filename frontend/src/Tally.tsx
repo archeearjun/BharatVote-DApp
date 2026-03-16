@@ -9,6 +9,7 @@ import {
   Trophy,
   TrendingUp,
 } from 'lucide-react';
+import { getCandidateDisplayName } from './utils/candidateLabels';
 
 interface TallyProps {
   contract: any;
@@ -25,12 +26,13 @@ interface Candidate {
 }
 
 const Tally: React.FC<TallyProps> = ({ contract, phase, refreshTrigger, eligibleCount, isDemoElection }) => {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [totalVotes, setTotalVotes] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const contractAddress = ((contract as any)?.target as string) || ((contract as any)?.address as string) || '';
 
   const phases = [
     { id: 0, label: t('tally.commit'), description: t('tally.votesBeingCollected') },
@@ -91,7 +93,7 @@ const Tally: React.FC<TallyProps> = ({ contract, phase, refreshTrigger, eligible
   const completionPct =
     eligibleCount && eligibleCount > 0 ? `${Math.min(100, (totalVotes / eligibleCount) * 100).toFixed(1)}%` : '—';
   const showEligibility = !isDemoElection;
-  const headerLabel = isDemoElection ? 'Demo Results' : t('tally.electionResults');
+  const headerLabel = isDemoElection ? t('tally.demoResults') : t('tally.electionResults');
   const phaseLabel = phase === 0 ? t('tally.commit') : phase === 1 ? t('tally.reveal') : t('tally.finished');
 
   const phaseMessage =
@@ -118,31 +120,31 @@ const Tally: React.FC<TallyProps> = ({ contract, phase, refreshTrigger, eligible
               {isDemoElection && <span className="badge badge-info">Demo</span>}
             </div>
             <p className="mt-2 text-sm text-slate-600">
-              Review live vote totals, current phase, and participation progress from the election contract.
+              {t('tally.headerDescription')}
             </p>
             {lastUpdated && (
-              <p className="mt-2 text-xs text-slate-500">Last updated {lastUpdated.toLocaleTimeString()}</p>
+              <p className="mt-2 text-xs text-slate-500">{t('tally.lastUpdatedAt')} {lastUpdated.toLocaleTimeString()}</p>
             )}
           </div>
           <button onClick={fetchResults} disabled={isLoading} className="btn-secondary inline-flex items-center gap-2 self-start">
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-            Refresh
+            {t('tally.refreshResults')}
           </button>
         </div>
 
         <div className={`grid grid-cols-1 gap-3 ${showEligibility ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
           {showEligibility && (
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs uppercase tracking-wide text-slate-500">Eligible voters</p>
+              <p className="text-xs uppercase tracking-wide text-slate-500">{t('tally.eligibleVoters')}</p>
               <p className="mt-1 text-2xl font-semibold text-slate-900">{eligibleCount ?? '—'}</p>
             </div>
           )}
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <p className="text-xs uppercase tracking-wide text-slate-500">Votes cast</p>
+            <p className="text-xs uppercase tracking-wide text-slate-500">{t('tally.votesCast')}</p>
             <p className="mt-1 text-2xl font-semibold text-slate-900">{totalVotes}</p>
           </div>
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <p className="text-xs uppercase tracking-wide text-slate-500">{showEligibility ? 'Completion' : 'Phase'}</p>
+            <p className="text-xs uppercase tracking-wide text-slate-500">{showEligibility ? t('tally.completion') : t('tally.phaseLabel')}</p>
             <p className="mt-1 text-2xl font-semibold text-slate-900">{showEligibility ? completionPct : phaseLabel}</p>
           </div>
         </div>
@@ -247,7 +249,7 @@ const Tally: React.FC<TallyProps> = ({ contract, phase, refreshTrigger, eligible
                 <Trophy className="h-7 w-7 text-green-600" />
                 <div>
                   <p className="text-sm font-semibold text-green-800">{t('tally.electionWinner')}</p>
-                  <p className="text-xl font-semibold text-slate-900">{winner.name}</p>
+                  <p className="text-xl font-semibold text-slate-900">{getCandidateDisplayName(contractAddress, winner.id, lang, winner.name)}</p>
                   <p className="text-sm text-green-800">
                     {winner.voteCount} votes ({formatPercentage(winner.voteCount)})
                   </p>
@@ -260,7 +262,7 @@ const Tally: React.FC<TallyProps> = ({ contract, phase, refreshTrigger, eligible
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 text-center">
               <p className="text-sm font-semibold text-slate-800">{t('tally.electionDraw')}</p>
               <p className="mt-2 text-xl font-semibold text-slate-900">
-                {topCandidates.map((candidate) => candidate.name).join(' & ')}
+                {topCandidates.map((candidate) => getCandidateDisplayName(contractAddress, candidate.id, lang, candidate.name)).join(' & ')}
               </p>
               <p className="mt-1 text-sm text-slate-600">
                 {topVoteCount} votes each ({formatPercentage(topVoteCount)})
@@ -280,7 +282,7 @@ const Tally: React.FC<TallyProps> = ({ contract, phase, refreshTrigger, eligible
                     <div className="flex items-center gap-3">
                       <span className="badge badge-info">#{candidate.id}</span>
                       <div>
-                        <p className="text-sm font-semibold text-slate-900">{candidate.name}</p>
+                        <p className="text-sm font-semibold text-slate-900">{getCandidateDisplayName(contractAddress, candidate.id, lang, candidate.name)}</p>
                         {(isWinnerCard || isDrawLeader) && (
                           <p className="mt-1 text-xs text-slate-500">
                             {isWinnerCard ? t('tally.winner') : t('tally.draw')}

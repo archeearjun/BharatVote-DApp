@@ -20,6 +20,7 @@ import {
 import { ethers } from 'ethers';
 import { BACKEND_URL } from './constants';
 import DemoTimerBanner from './components/DemoTimerBanner';
+import { getCandidateDisplayName } from './utils/candidateLabels';
 
 interface VoterProps {
   contract: any;
@@ -49,7 +50,7 @@ const Voter: React.FC<VoterProps> = ({
   onCommitSuccess,
   onStatusChange,
 }) => {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const navigate = useNavigate();
   const [hasVoted, setHasVoted] = useState(false);
   const [hasRevealed, setHasRevealed] = useState(false);
@@ -72,6 +73,7 @@ const Voter: React.FC<VoterProps> = ({
     const scope = electionAddress ? String(electionAddress).toLowerCase() : 'default';
     return `bv_vote_recovery_${scope}_${String(account).toLowerCase()}`;
   }, [account, electionAddress]);
+  const contractAddress = ((contract as any)?.target as string) || ((contract as any)?.address as string) || '';
 
   const phases = [
     { id: 0, label: t('voter.commit'), description: t('voter.submitEncryptedVote'), icon: Lock },
@@ -738,9 +740,10 @@ const Voter: React.FC<VoterProps> = ({
                   {candidates.map((c:any) => {
                     const candidateId = Number(c.id);
                     const isSelected = selectedCandidateId === candidateId;
+                    const displayName = getCandidateDisplayName(contractAddress, candidateId, lang, c.name);
                     
                     // Get initials for avatar
-                    const initials = c.name
+                    const initials = displayName
                       .split(' ')
                       .map((n: string) => n[0])
                       .join('')
@@ -808,10 +811,10 @@ const Voter: React.FC<VoterProps> = ({
                               id={`candidate-commit-${candidateId}-name`}
                               className="text-base font-semibold text-slate-900 truncate"
                             >
-                              {c.name}
+                              {displayName}
                             </h3>
                             <p className="text-xs text-slate-500 mt-0.5">
-                              Candidate ID: {String(c.id)}
+                              {t('voter.candidateIdLabel')}: {String(c.id)}
                             </p>
                           </div>
                           
@@ -820,7 +823,7 @@ const Voter: React.FC<VoterProps> = ({
                             {isSelected ? (
                               <div className="flex items-center gap-2">
                                 <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-900 text-white">
-                                  Selected
+                                  {t('voter.selected')}
                                 </span>
                                 <div className="w-6 h-6 rounded-full bg-slate-900 flex items-center justify-center animate-in fade-in zoom-in duration-150">
                                   <CheckCircle className="w-5 h-5 text-white" />
@@ -840,12 +843,12 @@ const Voter: React.FC<VoterProps> = ({
 
             {/* Salt Input */}
             <div>
-              <label className="block text-sm font-medium text-slate-900 mb-4">Security Password</label>
+              <label className="block text-sm font-medium text-slate-900 mb-4">{t('voter.securityPassword')}</label>
               <div className="space-y-3">
                 <div className="relative">
                   <input
                     type={isSaltVisible ? "text" : "password"}
-                    placeholder="Enter a memorable phrase for vote security"
+                    placeholder={t('voter.securityPasswordPlaceholder')}
                     value={salt}
                     onChange={(e) => setSalt(e.target.value)}
                     onCopy={preventSaltClipboard}
@@ -868,10 +871,10 @@ const Voter: React.FC<VoterProps> = ({
                   </button>
                 </div>
                 <p className="text-xs text-slate-500">
-                  Any phrase works. You must use the exact same one during reveal.
+                  {t('voter.passwordHint')}
                 </p>
                 <p className="text-xs text-slate-500">
-                  After commit, BharatVote keeps a temporary recovery copy in this browser until reveal completes.
+                  {t('voter.recoveryHint')}
                 </p>
                 <button
                   onClick={handleNewSalt}
@@ -879,7 +882,7 @@ const Voter: React.FC<VoterProps> = ({
                   title="Generate a random salt (you can still change it)"
                 >
                   <Shuffle className="w-4 h-4" />
-                  Generate Random Password
+                  {t('voter.generateRandomPassword')}
                 </button>
                 <button
                   type="button"
@@ -889,17 +892,16 @@ const Voter: React.FC<VoterProps> = ({
                   title="Download a private recovery file for reveal"
                 >
                   <Download className="w-4 h-4" />
-                  Download Recovery File
+                  {t('voter.downloadRecoveryFile')}
                 </button>
               </div>
               <div className="mt-4 p-4 bg-warning-50 border border-warning-200 rounded-xl">
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="w-5 h-5 text-warning-600 mt-0.5" />
                   <div>
-                    <p className="text-sm font-medium text-warning-800 mb-1">Important</p>
+                    <p className="text-sm font-medium text-warning-800 mb-1">{t('voter.important')}</p>
                     <p className="text-sm text-warning-700">
-                      Remember this exact password - you'll need to enter it again during the reveal phase. 
-                      Write it down or use something memorable.
+                      {t('voter.passwordReminder')}
                     </p>
                   </div>
                 </div>
@@ -914,10 +916,10 @@ const Voter: React.FC<VoterProps> = ({
                   <CheckCircle className="w-5 h-5 text-success-600 mt-0.5" />
                   <div>
                     <p className="text-sm font-semibold text-success-900 mb-1">
-                      Vote Already Committed
+                      {t('voter.voteAlreadyCommitted')}
                     </p>
                     <p className="text-sm text-success-800">
-                      Your vote has been committed successfully. Please wait for the Reveal phase to reveal your vote.
+                      {t('voter.voteAlreadyCommittedDetail')}
                     </p>
                   </div>
                 </div>
@@ -931,7 +933,7 @@ const Voter: React.FC<VoterProps> = ({
             >
               <span className="inline-flex items-center gap-2">
                 {isFetchingProof && <Loader2 className="w-4 h-4 animate-spin" />}
-                {isCommitting ? 'Submitting...' : t('voter.commitVote')}
+                {isCommitting ? t('voter.submitting') : t('voter.commitVote')}
               </span>
             </button>
             {!canCommit && commitDisabledReason && (
@@ -950,7 +952,7 @@ const Voter: React.FC<VoterProps> = ({
             </div>
             <div>
               <h2 className="text-lg font-semibold text-slate-900">{t('voter.revealYourVote')}</h2>
-              <p className="text-sm text-slate-600">Reveal your encrypted vote to be counted</p>
+              <p className="text-sm text-slate-600">{t('voter.revealIntro')}</p>
             </div>
           </div>
 
@@ -990,11 +992,11 @@ const Voter: React.FC<VoterProps> = ({
                 </button>
               </div>
               <p className="text-xs text-slate-500 mt-3">
-                Enter the exact same password you used during the commit phase.
+                {t('voter.revealPasswordHint')}
               </p>
               {hasRecoverySnapshot && (
                 <p className="mt-2 text-xs text-slate-500">
-                  Your commit recovery details are available in this browser for this election.
+                  {t('voter.recoveryAvailable')}
                 </p>
               )}
               <button
@@ -1005,7 +1007,7 @@ const Voter: React.FC<VoterProps> = ({
                 title="Download your recovery details"
               >
                 <Download className="w-4 h-4" />
-                Download Recovery File
+                {t('voter.downloadRecoveryFile')}
               </button>
             </div>
 
@@ -1025,9 +1027,10 @@ const Voter: React.FC<VoterProps> = ({
                   {candidates.map((c:any) => {
                     const candidateId = Number(c.id);
                     const isSelected = selectedCandidateId === candidateId;
+                    const displayName = getCandidateDisplayName(contractAddress, candidateId, lang, c.name);
                     
                     // Get initials for avatar
-                    const initials = c.name
+                    const initials = displayName
                       .split(' ')
                       .map((n: string) => n[0])
                       .join('')
@@ -1095,10 +1098,10 @@ const Voter: React.FC<VoterProps> = ({
                               id={`candidate-${candidateId}-name`}
                               className="text-base font-semibold text-slate-900 truncate"
                             >
-                              {c.name}
+                              {displayName}
                             </h3>
                             <p className="text-xs text-slate-500 mt-0.5">
-                              Candidate ID: {String(c.id)}
+                              {t('voter.candidateIdLabel')}: {String(c.id)}
                             </p>
                           </div>
                           
@@ -1107,7 +1110,7 @@ const Voter: React.FC<VoterProps> = ({
                             {isSelected ? (
                               <div className="flex items-center gap-2">
                                 <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-900 text-white">
-                                  Selected
+                                  {t('voter.selected')}
                                 </span>
                                 <div className="w-6 h-6 rounded-full bg-slate-900 flex items-center justify-center animate-in fade-in zoom-in duration-150">
                                   <CheckCircle className="w-5 h-5 text-white" />
@@ -1138,7 +1141,7 @@ const Voter: React.FC<VoterProps> = ({
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="w-5 h-5 text-warning-600 mt-0.5" />
                   <p className="text-sm text-warning-800">
-                    You must commit a vote during the Commit phase before you can reveal it.
+                    {t('voter.commitRequiredBeforeReveal')}
                   </p>
                 </div>
               </div>
@@ -1148,7 +1151,7 @@ const Voter: React.FC<VoterProps> = ({
                 <div className="flex items-start gap-3">
                   <CheckCircle className="w-5 h-5 text-success-600 mt-0.5" />
                   <p className="text-sm text-success-800">
-                    You have already revealed your vote. Thank you for participating!
+                    {t('voter.alreadyRevealed')}
                   </p>
                 </div>
               </div>
@@ -1167,7 +1170,7 @@ const Voter: React.FC<VoterProps> = ({
               >
               <span className="inline-flex items-center gap-2">
                 {isRevealing && <Loader2 className="w-4 h-4 animate-spin" />}
-                {isRevealing ? 'Revealing...' : t('voter.revealVote')}
+                {isRevealing ? t('voter.revealing') : t('voter.revealVote')}
               </span>
               </button>
             </div>
@@ -1201,23 +1204,21 @@ const Voter: React.FC<VoterProps> = ({
               
               <div>
                 <h3 className="text-xl font-semibold text-slate-900 mb-3">
-                  Vote Committed Successfully!
+                  {t('voter.voteCommittedSuccessTitle')}
                 </h3>
                 <div className="space-y-3 text-left">
                   <p className="text-sm text-slate-700">
-                    Your vote has been committed to the blockchain and is now encrypted and secure.
+                    {t('voter.voteCommittedSuccessBody')}
                   </p>
                   <div className="p-4 bg-warning-50 border border-warning-200 rounded-xl">
                     <div className="flex items-start gap-3">
                       <AlertTriangle className="w-5 h-5 text-warning-600 mt-0.5 flex-shrink-0" />
                       <div>
                         <p className="text-sm font-semibold text-warning-900 mb-2">
-                          Important: Remember Your Password
+                          {t('voter.passwordReminderTitle')}
                         </p>
                         <p className="text-sm text-warning-800">
-                          Please wait for the phase to change to <strong>Reveal</strong>. 
-                          You will need to enter the <strong>exact same password</strong> you used 
-                          during commit to reveal your vote.
+                          {t('voter.voteCommittedReminder')}
                         </p>
                       </div>
                     </div>
@@ -1230,7 +1231,7 @@ const Voter: React.FC<VoterProps> = ({
                 className="btn-primary w-full"
               >
                 <CheckCircle className="w-4 h-4" />
-                I Understand
+                {t('common.confirm')}
               </button>
             </div>
           </div>

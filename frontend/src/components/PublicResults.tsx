@@ -3,6 +3,8 @@ import { ethers } from 'ethers';
 import contractJson from '../contracts/BharatVote.json';
 import { RefreshCcw, Clock, AlertTriangle, Users, BarChart3 } from 'lucide-react';
 import { decodeVoteRevealedChoiceFromLogData } from '../utils/publicResultsEvents';
+import { useI18n } from '../i18n';
+import { getCandidateDisplayName } from '../utils/candidateLabels';
 
 interface Candidate {
   id: number;
@@ -30,6 +32,7 @@ const POLL_INTERVAL_MS = 15000;
 type ResultsMode = 'current' | 'allTime';
 
 const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoElection }) => {
+  const { t, lang } = useI18n();
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [totalVotes, setTotalVotes] = useState(0);
   const [votesCommittedAllTime, setVotesCommittedAllTime] = useState<number | null>(null);
@@ -644,13 +647,13 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
         </div>
 
         {isLoading && (
-          <div className="text-sm text-slate-500">Loading results...</div>
+          <div className="text-sm text-slate-500">{t('publicResults.loading')}</div>
         )}
 
         {!isLoading && candidates.length === 0 && (
           <div className="flex items-center gap-2 text-sm text-slate-600">
             <BarChart3 className="w-4 h-4 text-slate-400" />
-            No candidates yet.
+            {t('publicResults.noCandidates')}
           </div>
         )}
 
@@ -662,13 +665,14 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
                 : c.voteCount;
               const pctBase = mode === 'allTime' ? allTimeTotalRevealedVotes : totalVotes;
               const pct = pctBase === 0 ? '0%' : `${((voteCount / pctBase) * 100).toFixed(1)}%`;
+              const displayName = getCandidateDisplayName(contractAddress || publicContractAddress || '', c.id, lang, c.name);
 
               return (
               <div key={c.id} className="space-y-1">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="text-xs px-2 py-1 rounded bg-slate-100 text-slate-700">#{c.id}</span>
-                    <span className="text-sm font-medium text-slate-900">{c.name}</span>
+                    <span className="text-sm font-medium text-slate-900">{displayName}</span>
                   </div>
                   <div className="text-right">
                     <div className="text-sm font-semibold text-slate-900">{voteCount}</div>

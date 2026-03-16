@@ -192,7 +192,7 @@ const KycPage: React.FC<KycPageProps> = ({ account, electionAddress, onVerified 
               <h1 className="mb-2 text-2xl font-semibold text-slate-900">BharatVote</h1>
               <p className="text-sm text-slate-600">{t('kyc.voterVerification')}</p>
               <p className="mt-2 text-sm text-slate-500">
-                Demo elections skip KYC. You are verifying for a main election.
+                {t('kyc.mainElectionOnly')}
               </p>
             </div>
 
@@ -202,14 +202,14 @@ const KycPage: React.FC<KycPageProps> = ({ account, electionAddress, onVerified 
                   <Wallet className="h-5 w-5 text-slate-700" />
                 </div>
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Connected wallet</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t('kyc.connectedWallet')}</p>
                   <p className="font-mono text-sm text-slate-900">{shortAccount}</p>
                 </div>
               </div>
               <div className="mt-4 grid gap-2 text-sm text-slate-600 sm:grid-cols-3">
-                <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">1. Verify voter ID</div>
-                <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">2. Confirm OTP</div>
-                <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">3. Complete face check</div>
+                <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">{t('kyc.step.verifyId')}</div>
+                <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">{t('kyc.step.confirmOtp')}</div>
+                <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">{t('kyc.step.faceCheck')}</div>
               </div>
             </div>
 
@@ -245,8 +245,8 @@ const KycPage: React.FC<KycPageProps> = ({ account, electionAddress, onVerified 
                   <CheckCircle className="h-10 w-10 text-green-600" />
                 </div>
                 <div>
-                  <h3 className="mb-2 text-xl font-semibold text-slate-900">Identity verified</h3>
-                  <p className="text-sm text-slate-600">Redirecting you to the voting interface…</p>
+                  <h3 className="mb-2 text-xl font-semibold text-slate-900">{t('kyc.identityVerifiedTitle')}</h3>
+                  <p className="text-sm text-slate-600">{t('kyc.redirectingToVoting')}</p>
                 </div>
                 <div className="flex justify-center">
                   <div className="spinner h-6 w-6" />
@@ -255,29 +255,29 @@ const KycPage: React.FC<KycPageProps> = ({ account, electionAddress, onVerified 
             ) : (
               <form onSubmit={handleSendOtp} className="space-y-6">
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 text-left">
-                  <p className="text-sm font-semibold text-slate-900">Verify identity</p>
+                  <p className="text-sm font-semibold text-slate-900">{t('kyc.verifyIdentityTitle')}</p>
                   <p className="mt-2 text-sm leading-6 text-slate-600">
-                    Enter the voter ID linked to this wallet. BharatVote will verify the wallet-address match before the voting UI is unlocked.
+                    {t('kyc.verifyIdentityDescription')}
                   </p>
                 </div>
 
                 <div className="text-left">
                   <label htmlFor="epic" className="mb-2 block text-sm font-medium text-slate-700">
-                    Voter ID
+                    {t('kyc.enterVoterId')}
                   </label>
                   <input
                     id="epic"
                     type="text"
                     value={voterId}
                     onChange={(e) => setVoterId(e.target.value.toUpperCase())}
-                    placeholder="VOTER1"
+                    placeholder={t('kyc.voterIdPlaceholder')}
                     maxLength={15}
                     autoFocus
                     className="input-base w-full text-center font-mono"
                     disabled={loading}
                   />
                   <p className="mt-2 text-sm text-slate-500">
-                    Use the voter ID from the allowlisted record for this election.
+                    {t('kyc.voterIdHelper')}
                   </p>
                 </div>
 
@@ -285,12 +285,12 @@ const KycPage: React.FC<KycPageProps> = ({ account, electionAddress, onVerified 
                   {loading ? (
                     <div className="flex items-center justify-center gap-2">
                       <div className="spinner h-4 w-4" />
-                      Verifying voter record...
+                      {t('kyc.verifyingVoterRecord')}
                     </div>
                   ) : (
                     <div className="flex items-center justify-center gap-2">
                       <Phone className="h-4 w-4" />
-                      Continue to OTP
+                      {t('kyc.continueToOtp')}
                     </div>
                   )}
                 </button>
@@ -309,13 +309,15 @@ const KycPage: React.FC<KycPageProps> = ({ account, electionAddress, onVerified 
               </div>
 
               <div>
-                <h3 className="mb-2 text-lg font-semibold text-slate-900">OTP verification</h3>
+                <h3 className="mb-2 text-lg font-semibold text-slate-900">{t('kyc.otpVerificationTitle')}</h3>
                 <p className="mb-2 text-sm text-slate-600">
-                  Enter the 6-digit OTP sent to your registered mobile number.
+                  {t('kyc.otpVerificationDescription')}
                 </p>
-                <div className="rounded-lg bg-slate-50 p-2 text-xs text-slate-500">
-                  <strong>Sandbox code:</strong> Use <code className="rounded bg-slate-200 px-1">{SANDBOX_OTP}</code> in this verification flow.
-                </div>
+                {SANDBOX_OTP && (
+                  <div className="rounded-lg bg-slate-50 p-2 text-xs text-slate-500">
+                    <strong>{t('kyc.sandboxCodeLabel')}</strong> {t('kyc.sandboxCodeHint')} <code className="rounded bg-slate-200 px-1">{SANDBOX_OTP}</code>.
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-center gap-2">
@@ -350,7 +352,7 @@ const KycPage: React.FC<KycPageProps> = ({ account, electionAddress, onVerified 
                   }}
                   className="btn-secondary flex-1"
                 >
-                  Back
+                  {t('common.cancel')}
                 </button>
                 <button
                   type="button"
@@ -360,19 +362,19 @@ const KycPage: React.FC<KycPageProps> = ({ account, electionAddress, onVerified 
                 >
                   <div className="flex items-center justify-center gap-2">
                     <CheckCircle className="h-4 w-4" />
-                    Verify OTP
+                    {t('otp.verifyOTP')}
                   </div>
                 </button>
               </div>
 
               <p className="text-sm text-slate-600">
-                Need a fresh code?{' '}
+                {t('kyc.needFreshCode')}{' '}
                 <button
                   type="button"
                   className="font-medium text-slate-700 underline hover:text-slate-900"
-                  onClick={() => setToast({ type: 'success', message: 'Verification code resent. Use the same sandbox code.' })}
+                  onClick={() => setToast({ type: 'success', message: t('kyc.verificationCodeResent') })}
                 >
-                  Resend
+                  {t('otp.resendOTP')}
                 </button>
               </p>
             </div>

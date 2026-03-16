@@ -230,19 +230,19 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
   const steps = useMemo(() => {
     if (isAdmin) {
       return [
-        { id: 0, title: 'Setup', description: 'Connect & configure' },
-        { id: 1, title: 'Voting', description: 'Commit votes' },
-        { id: 2, title: 'Reveal', description: 'Reveal votes' },
-        { id: 3, title: 'Tally', description: 'Results' },
+        { id: 0, title: t('step.setup'), description: t('step.admin.setup') },
+        { id: 1, title: t('step.voting'), description: t('step.admin.voting') },
+        { id: 2, title: t('step.reveal'), description: t('step.admin.reveal') },
+        { id: 3, title: t('step.tally'), description: t('step.admin.tally') },
       ];
     }
     return [
-      { id: 0, title: 'Setup', description: 'Verify identity' },
-      { id: 1, title: 'Commit', description: 'Submit your choice' },
-      { id: 2, title: 'Reveal', description: 'Prove your vote' },
-      { id: 3, title: 'Results', description: 'View tally' },
+      { id: 0, title: t('step.setup'), description: t('step.voter.setup') },
+      { id: 1, title: t('step.commit'), description: t('step.voter.commit') },
+      { id: 2, title: t('step.reveal'), description: t('step.voter.reveal') },
+      { id: 3, title: t('step.results'), description: t('step.voter.results') },
     ];
-  }, [isAdmin]);
+  }, [isAdmin, t]);
 
   const currentStep = useMemo(() => {
     if (isAdmin) {
