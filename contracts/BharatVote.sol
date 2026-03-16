@@ -23,9 +23,11 @@ contract BharatVote is Initializable {
     error InvalidNameLength();
     error InvalidMerkleRoot();
     error CanOnlyResetAfterFinish();
+    error ElectionPaused();
 
     address public admin;
     string public name;
+    bool public paused;
 
     // Removed enum Phase, using uint8 for phase management
     uint8 public phase = 0; // 0: Commit, 1: Reveal, 2: Finished
@@ -58,6 +60,8 @@ contract BharatVote is Initializable {
     mapping(uint256 => mapping(uint256 => bool)) private candidateDisabledByRound;
 
     /* ───── Events ───── */
+    event Paused();
+    event Unpaused();
     event CandidateAdded(uint256 id, string name);
     event CandidateRemoved(uint256 id);
     event VoteCommitted(address indexed voter, bytes32 commit);
@@ -75,6 +79,11 @@ contract BharatVote is Initializable {
 
     modifier onlyPhase(uint8 p) {
         if (phase != p) revert WrongPhase();
+        _;
+    }
+
+    modifier whenNotPaused() {
+        if (paused) revert ElectionPaused();
         _;
     }
 
@@ -144,6 +153,18 @@ contract BharatVote is Initializable {
         emit PhaseChanged(phase);
     }
 
+    /// @notice Halt all vote commits and reveals without destroying state.
+    ///         Use when fraud is suspected; unpause to resume after investigation.
+    function pause() external onlyAdmin {
+        paused = true;
+        emit Paused();
+    }
+
+    function unpause() external onlyAdmin {
+        paused = false;
+        emit Unpaused();
+    }
+
     // Emergency reset function - can be called from any phase
     function emergencyReset() external onlyAdmin {
         phase = 0; // 0: Commit
@@ -164,6 +185,7 @@ contract BharatVote is Initializable {
     function commitVote(bytes32 _commit, bytes32[] calldata _proof)
         external
         onlyPhase(0) // 0: Commit
+        whenNotPaused
     {
         VoteState storage state = voteStates[msg.sender];
         if (state.commitRound == electionRound) revert AlreadyCommitted();
@@ -179,6 +201,7 @@ contract BharatVote is Initializable {
         external
         onlyPhase(1) // 1: Reveal
         validCandidateId(_choice)
+        whenNotPaused
     {
         VoteState storage state = voteStates[msg.sender];
         if (state.commitRound != electionRound) revert NoCommit();

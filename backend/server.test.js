@@ -2,7 +2,7 @@ const request = require('supertest');
 const express = require('express');
 const cors = require('cors');
 const { MerkleTree } = require('merkletreejs');
-const { keccak256, solidityPackedKeccak256 } = require('ethers');
+const { keccak256, solidityPackedKeccak256, ethers } = require('ethers');
 
 // Mock the KYC data
 jest.mock('./kyc-data.json', () => [
@@ -313,11 +313,133 @@ describe('BharatVote Backend API', () => {
             .expect(200)
         );
       }
-      
+
       const results = await Promise.all(promises);
       results.forEach(response => {
         expect(response.body.eligible).toBe(true);
       });
+    });
+  });
+
+  describe('Admin Allowlist Auth', () => {
+    // Build a minimal admin voter-list endpoint that mirrors server.js auth logic
+    // so we can unit-test the validation rules without a live blockchain.
+    let adminApp;
+    const FAKE_ELECTION = '0x1234567890123456789012345678901234567890';
+    const TTL_MS = 300_000; // 5 min
+
+    const buildMessage = (electionAddress, addresses, issuedAt) => {
+      const addressesHash = ethers.keccak256(ethers.toUtf8Bytes(addresses.join('\n')));
+      return [
+        'BharatVote Admin Allowlist Upload',
+        `Election: ${electionAddress}`,
+        `Addresses Hash: ${addressesHash}`,
+        `Issued At: ${issuedAt}`,
+      ].join('\n');
+    };
+
+    beforeAll(() => {
+      adminApp = express();
+      adminApp.use(express.json());
+
+      // No provider in tests — RPC step returns 503 for valid sigs
+      adminApp.post('/api/admin/voter-list', async (req, res) => {
+        const electionAddress = String(req.body?.electionAddress || '').trim();
+        if (!electionAddress || !ethers.isAddress(electionAddress)) {
+          return res.status(400).json({ error: 'Valid electionAddress is required' });
+        }
+        const auth = req.body?.auth;
+        const issuedAt = Number(auth?.issuedAt);
+        const signature = typeof auth?.signature === 'string' ? auth.signature.trim() : '';
+        if (!Number.isFinite(issuedAt) || !signature) {
+          return res.status(401).json({ error: 'Missing admin signature' });
+        }
+        const serverNow = Date.now();
+        if (issuedAt > serverNow + 30_000 || serverNow - issuedAt > TTL_MS) {
+          return res.status(401).json({ error: 'Admin signature expired. Please sign again.' });
+        }
+        const addresses = Array.isArray(req.body?.addresses)
+          ? req.body.addresses.filter(a => ethers.isAddress(a))
+          : [];
+        const message = buildMessage(electionAddress, addresses, issuedAt);
+        let recovered;
+        try {
+          recovered = ethers.verifyMessage(message, signature);
+        } catch {
+          return res.status(401).json({ error: 'Invalid admin signature' });
+        }
+        // No provider in tests → simulate 503
+        return res.status(503).json({ error: 'RPC provider not configured for admin verification', recovered });
+      });
+    });
+
+    it('returns 400 for missing electionAddress', async () => {
+      const res = await request(adminApp)
+        .post('/api/admin/voter-list')
+        .send({ addresses: [], auth: { issuedAt: Date.now(), signature: '0x' + '00'.repeat(65) } });
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 401 for missing signature', async () => {
+      const res = await request(adminApp)
+        .post('/api/admin/voter-list')
+        .send({ electionAddress: FAKE_ELECTION, addresses: [], auth: {} });
+      expect(res.status).toBe(401);
+      expect(res.body.error).toMatch(/Missing admin signature/);
+    });
+
+    it('returns 401 for expired issuedAt (too old)', async () => {
+      const expiredAt = Date.now() - TTL_MS - 1000;
+      const res = await request(adminApp)
+        .post('/api/admin/voter-list')
+        .send({
+          electionAddress: FAKE_ELECTION,
+          addresses: [],
+          auth: { issuedAt: expiredAt, signature: '0x' + '00'.repeat(65) },
+        });
+      expect(res.status).toBe(401);
+      expect(res.body.error).toMatch(/expired/);
+    });
+
+    it('returns 401 for future-dated issuedAt (> 30s ahead)', async () => {
+      const futureAt = Date.now() + 60_000; // 60s in the future
+      const res = await request(adminApp)
+        .post('/api/admin/voter-list')
+        .send({
+          electionAddress: FAKE_ELECTION,
+          addresses: [],
+          auth: { issuedAt: futureAt, signature: '0x' + '00'.repeat(65) },
+        });
+      expect(res.status).toBe(401);
+      expect(res.body.error).toMatch(/expired/);
+    });
+
+    it('returns 401 for malformed signature', async () => {
+      const res = await request(adminApp)
+        .post('/api/admin/voter-list')
+        .send({
+          electionAddress: FAKE_ELECTION,
+          addresses: [],
+          auth: { issuedAt: Date.now(), signature: 'not-a-valid-sig' },
+        });
+      expect(res.status).toBe(401);
+      expect(res.body.error).toMatch(/Invalid admin signature/);
+    });
+
+    it('recovers correct signer from a valid EIP-191 signature', async () => {
+      const wallet = ethers.Wallet.createRandom();
+      const issuedAt = Date.now();
+      const addresses = [wallet.address];
+      const message = buildMessage(FAKE_ELECTION, addresses, issuedAt);
+      const signature = await wallet.signMessage(message);
+
+      const res = await request(adminApp)
+        .post('/api/admin/voter-list')
+        .send({ electionAddress: FAKE_ELECTION, addresses, auth: { issuedAt, signature } });
+
+      // Without RPC the endpoint returns 503 but includes recovered address
+      expect(res.status).toBe(503);
+      expect(res.body.recovered.toLowerCase()).toBe(wallet.address.toLowerCase());
     });
   });
 }); 

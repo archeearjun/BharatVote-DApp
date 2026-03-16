@@ -7,20 +7,46 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const axios = require('axios');
 const { ethers } = require('ethers');
 const { MerkleTree } = require('merkletreejs');
 
 const app = express();
-app.use(cors({ origin: '*', methods: ['GET', 'POST', 'OPTIONS'], allowedHeaders: ['Content-Type', 'Authorization'] }));
-app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  if (req.method === 'OPTIONS') return res.sendStatus(204);
-  next();
+
+// Security headers
+app.use(helmet());
+
+// CORS — restrict to frontend origin in production; allow all in local dev
+const CORS_ORIGIN = process.env.CORS_ORIGIN || (process.env.NODE_ENV === 'production' ? null : '*');
+app.use(cors({
+  origin: CORS_ORIGIN,
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
+
+// Body parsing with size limit
+app.use(express.json({ limit: '1mb' }));
+
+// General rate limiter: 120 req / 1 min per IP
+const generalLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' },
 });
-app.use(express.json());
+app.use(generalLimiter);
+
+// Stricter limiter for admin endpoints: 10 req / 1 min per IP
+const adminLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many admin requests, please try again later.' },
+});
 
 const PORT = process.env.PORT || 3000;
 const PRIVATE_KEY = process.env.PRIVATE_KEY; // Admin Private Key
@@ -146,12 +172,18 @@ const eligibleVoters = Array.from(
   )
 );
 
+// Serialise all eligible-voter file writes through a promise chain to prevent
+// concurrent /api/join calls from corrupting the JSON file.
+let _voterWriteChain = Promise.resolve();
 const saveEligibleVoters = () => {
-  try {
-    fs.writeFileSync(ELIGIBLE_VOTERS_PATH, JSON.stringify(eligibleVoters, null, 2));
-  } catch (e) {
-    console.warn('Failed to persist eligible voters file', e?.message || e);
-  }
+  _voterWriteChain = _voterWriteChain.then(() => {
+    try {
+      fs.writeFileSync(ELIGIBLE_VOTERS_PATH, JSON.stringify(eligibleVoters, null, 2));
+    } catch (e) {
+      console.warn('Failed to persist eligible voters file', e?.message || e);
+    }
+  });
+  return _voterWriteChain;
 };
 
 // --- 2. SETUP BLOCKCHAIN CONNECTION ---
@@ -426,7 +458,9 @@ const verifyAllowlistUploadAuth = async ({ electionAddress, addresses, auth }) =
     return { ok: false, status: 401, error: 'Missing admin signature' };
   }
 
-  if (Math.abs(Date.now() - issuedAt) > ADMIN_ALLOWLIST_SIGNATURE_TTL_MS) {
+  const serverNow = Date.now();
+  // Reject future-dated tokens and tokens older than TTL; allow small backward skew only
+  if (issuedAt > serverNow + 30_000 || serverNow - issuedAt > ADMIN_ALLOWLIST_SIGNATURE_TTL_MS) {
     return { ok: false, status: 401, error: 'Admin signature expired. Please sign again.' };
   }
 
@@ -1083,8 +1117,8 @@ app.get('/api/merkle-proof/:address', (req, res) => {
   return res.json({ proof });
 });
 
-// 2.2 Admin allowlist upload (main elections)
-app.post('/api/admin/voter-list', (req, res) => {
+// 2.2 Admin allowlist upload (main elections) — strict rate limit
+app.post('/api/admin/voter-list', adminLimiter, (req, res) => {
   const electionAddress = String(req.body?.electionAddress || '').trim();
   if (!electionAddress || !ethers.isAddress(electionAddress)) {
     return res.status(400).json({ error: 'Valid electionAddress is required' });
@@ -1352,6 +1386,11 @@ app.post('/api/join', async (req, res) => {
       return res.status(500).json({ error: error?.message || 'Onboarding failed' });
     }
   });
+});
+
+// Health check — no rate limit needed, used by uptime monitors
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok', ts: Date.now() });
 });
 
 app.listen(PORT, () => {
