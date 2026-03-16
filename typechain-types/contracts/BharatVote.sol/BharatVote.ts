@@ -59,6 +59,8 @@ export interface BharatVoteInterface extends Interface {
       | "initialize"
       | "merkleRoot"
       | "name"
+      | "pause"
+      | "paused"
       | "phase"
       | "removeCandidate"
       | "resetElection"
@@ -66,6 +68,7 @@ export interface BharatVoteInterface extends Interface {
       | "setMerkleRoot"
       | "startReveal"
       | "tally"
+      | "unpause"
   ): FunctionFragment;
 
   getEvent(
@@ -75,8 +78,10 @@ export interface BharatVoteInterface extends Interface {
       | "CandidateRemoved"
       | "ElectionReset"
       | "Initialized"
+      | "Paused"
       | "PhaseChanged"
       | "TallyFinalized"
+      | "Unpaused"
       | "VoteCommitted"
       | "VoteRevealed"
   ): EventFragment;
@@ -148,6 +153,8 @@ export interface BharatVoteInterface extends Interface {
     values?: undefined
   ): string;
   encodeFunctionData(functionFragment: "name", values?: undefined): string;
+  encodeFunctionData(functionFragment: "pause", values?: undefined): string;
+  encodeFunctionData(functionFragment: "paused", values?: undefined): string;
   encodeFunctionData(functionFragment: "phase", values?: undefined): string;
   encodeFunctionData(
     functionFragment: "removeCandidate",
@@ -170,6 +177,7 @@ export interface BharatVoteInterface extends Interface {
     values?: undefined
   ): string;
   encodeFunctionData(functionFragment: "tally", values: [BigNumberish]): string;
+  encodeFunctionData(functionFragment: "unpause", values?: undefined): string;
 
   decodeFunctionResult(
     functionFragment: "addCandidate",
@@ -220,6 +228,8 @@ export interface BharatVoteInterface extends Interface {
   decodeFunctionResult(functionFragment: "initialize", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "merkleRoot", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "name", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "pause", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "paused", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "phase", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "removeCandidate",
@@ -239,6 +249,7 @@ export interface BharatVoteInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "tally", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "unpause", data: BytesLike): Result;
 }
 
 export namespace AllCandidatesClearedEvent {
@@ -298,6 +309,16 @@ export namespace InitializedEvent {
   export type LogDescription = TypedLogDescription<Event>;
 }
 
+export namespace PausedEvent {
+  export type InputTuple = [];
+  export type OutputTuple = [];
+  export interface OutputObject {}
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
+
 export namespace PhaseChangedEvent {
   export type InputTuple = [newPhase: BigNumberish];
   export type OutputTuple = [newPhase: bigint];
@@ -316,6 +337,16 @@ export namespace TallyFinalizedEvent {
   export interface OutputObject {
     finalTally: bigint[];
   }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
+
+export namespace UnpausedEvent {
+  export type InputTuple = [];
+  export type OutputTuple = [];
+  export interface OutputObject {}
   export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
   export type Filter = TypedDeferredTopicFilter<Event>;
   export type Log = TypedEventLog<Event>;
@@ -455,6 +486,10 @@ export interface BharatVote extends BaseContract {
 
   name: TypedContractMethod<[], [string], "view">;
 
+  pause: TypedContractMethod<[], [void], "nonpayable">;
+
+  paused: TypedContractMethod<[], [boolean], "view">;
+
   phase: TypedContractMethod<[], [bigint], "view">;
 
   removeCandidate: TypedContractMethod<
@@ -476,6 +511,8 @@ export interface BharatVote extends BaseContract {
   startReveal: TypedContractMethod<[], [void], "nonpayable">;
 
   tally: TypedContractMethod<[_id: BigNumberish], [bigint], "view">;
+
+  unpause: TypedContractMethod<[], [void], "nonpayable">;
 
   getFunction<T extends ContractMethod = ContractMethod>(
     key: string | FunctionFragment
@@ -561,6 +598,12 @@ export interface BharatVote extends BaseContract {
     nameOrSignature: "name"
   ): TypedContractMethod<[], [string], "view">;
   getFunction(
+    nameOrSignature: "pause"
+  ): TypedContractMethod<[], [void], "nonpayable">;
+  getFunction(
+    nameOrSignature: "paused"
+  ): TypedContractMethod<[], [boolean], "view">;
+  getFunction(
     nameOrSignature: "phase"
   ): TypedContractMethod<[], [bigint], "view">;
   getFunction(
@@ -585,6 +628,9 @@ export interface BharatVote extends BaseContract {
   getFunction(
     nameOrSignature: "tally"
   ): TypedContractMethod<[_id: BigNumberish], [bigint], "view">;
+  getFunction(
+    nameOrSignature: "unpause"
+  ): TypedContractMethod<[], [void], "nonpayable">;
 
   getEvent(
     key: "AllCandidatesCleared"
@@ -622,6 +668,13 @@ export interface BharatVote extends BaseContract {
     InitializedEvent.OutputObject
   >;
   getEvent(
+    key: "Paused"
+  ): TypedContractEvent<
+    PausedEvent.InputTuple,
+    PausedEvent.OutputTuple,
+    PausedEvent.OutputObject
+  >;
+  getEvent(
     key: "PhaseChanged"
   ): TypedContractEvent<
     PhaseChangedEvent.InputTuple,
@@ -634,6 +687,13 @@ export interface BharatVote extends BaseContract {
     TallyFinalizedEvent.InputTuple,
     TallyFinalizedEvent.OutputTuple,
     TallyFinalizedEvent.OutputObject
+  >;
+  getEvent(
+    key: "Unpaused"
+  ): TypedContractEvent<
+    UnpausedEvent.InputTuple,
+    UnpausedEvent.OutputTuple,
+    UnpausedEvent.OutputObject
   >;
   getEvent(
     key: "VoteCommitted"
@@ -706,6 +766,17 @@ export interface BharatVote extends BaseContract {
       InitializedEvent.OutputObject
     >;
 
+    "Paused()": TypedContractEvent<
+      PausedEvent.InputTuple,
+      PausedEvent.OutputTuple,
+      PausedEvent.OutputObject
+    >;
+    Paused: TypedContractEvent<
+      PausedEvent.InputTuple,
+      PausedEvent.OutputTuple,
+      PausedEvent.OutputObject
+    >;
+
     "PhaseChanged(uint8)": TypedContractEvent<
       PhaseChangedEvent.InputTuple,
       PhaseChangedEvent.OutputTuple,
@@ -726,6 +797,17 @@ export interface BharatVote extends BaseContract {
       TallyFinalizedEvent.InputTuple,
       TallyFinalizedEvent.OutputTuple,
       TallyFinalizedEvent.OutputObject
+    >;
+
+    "Unpaused()": TypedContractEvent<
+      UnpausedEvent.InputTuple,
+      UnpausedEvent.OutputTuple,
+      UnpausedEvent.OutputObject
+    >;
+    Unpaused: TypedContractEvent<
+      UnpausedEvent.InputTuple,
+      UnpausedEvent.OutputTuple,
+      UnpausedEvent.OutputObject
     >;
 
     "VoteCommitted(address,bytes32)": TypedContractEvent<

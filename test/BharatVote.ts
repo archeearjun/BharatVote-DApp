@@ -489,4 +489,133 @@ describe("BharatVote", () => {
         .withArgs(voter1.address, commitTwo);
     });
   });
+
+  describe("Emergency Reset", () => {
+    it("allows admin to emergency reset from commit phase", async () => {
+      await vote.connect(admin).addCandidate("Alice");
+      await expect(vote.connect(admin).emergencyReset())
+        .to.emit(vote, "ElectionReset");
+      expect(await vote.phase()).to.equal(COMMIT_PHASE);
+    });
+
+    it("allows admin to emergency reset from reveal phase", async () => {
+      await vote.connect(admin).addCandidate("Alice");
+      await vote.connect(admin).startReveal();
+      expect(await vote.phase()).to.equal(REVEAL_PHASE);
+      await expect(vote.connect(admin).emergencyReset())
+        .to.emit(vote, "ElectionReset");
+      expect(await vote.phase()).to.equal(COMMIT_PHASE);
+    });
+
+    it("increments electionRound on emergency reset", async () => {
+      const roundBefore = await vote.electionRound();
+      await vote.connect(admin).emergencyReset();
+      expect(await vote.electionRound()).to.equal(roundBefore + 1n);
+    });
+
+    it("blocks non-admin from emergency reset", async () => {
+      await expect(
+        vote.connect(voter1).emergencyReset()
+      ).to.be.revertedWithCustomError(vote, "NotAdmin");
+    });
+  });
+
+  describe("Clear All Candidates", () => {
+    it("allows admin to clear candidates in finished phase", async () => {
+      await vote.connect(admin).addCandidate("Alice");
+      await vote.connect(admin).addCandidate("Bob");
+      await vote.connect(admin).startReveal();
+      await vote.connect(admin).finishElection();
+
+      await expect(vote.connect(admin).clearAllCandidates())
+        .to.emit(vote, "AllCandidatesCleared");
+
+      expect(await vote.candidateCount()).to.equal(0);
+    });
+
+    it("blocks clearing candidates outside finished phase", async () => {
+      await vote.connect(admin).addCandidate("Alice");
+      await expect(
+        vote.connect(admin).clearAllCandidates()
+      ).to.be.revertedWithCustomError(vote, "WrongPhase");
+    });
+
+    it("blocks non-admin from clearing candidates", async () => {
+      await vote.connect(admin).startReveal();
+      await vote.connect(admin).finishElection();
+      await expect(
+        vote.connect(voter1).clearAllCandidates()
+      ).to.be.revertedWithCustomError(vote, "NotAdmin");
+    });
+  });
+
+  describe("Pause / Unpause", () => {
+    it("admin can pause and unpause", async () => {
+      await expect(vote.connect(admin).pause()).to.emit(vote, "Paused");
+      expect(await vote.paused()).to.be.true;
+      await expect(vote.connect(admin).unpause()).to.emit(vote, "Unpaused");
+      expect(await vote.paused()).to.be.false;
+    });
+
+    it("blocks commitVote when paused", async () => {
+      await vote.connect(admin).addCandidate("Alice");
+      await vote.connect(admin).pause();
+
+      const proof = merkleTree.getProof(
+        Buffer.from(solidityPackedKeccak256(['address'], [voter1.address.toLowerCase()]).substring(2), 'hex')
+      ).map(x => '0x' + x.data.toString('hex'));
+
+      const fakeCommit = ethers.keccak256(ethers.toUtf8Bytes("test"));
+      await expect(
+        vote.connect(voter1).commitVote(fakeCommit, proof)
+      ).to.be.revertedWithCustomError(vote, "ElectionPaused");
+    });
+
+    it("blocks revealVote when paused", async () => {
+      await vote.connect(admin).addCandidate("Alice");
+
+      const candidateId = 0;
+      const salt = "test-salt";
+      const saltBytes32 = ethers.keccak256(ethers.toUtf8Bytes(salt));
+      const commitHash = ethers.solidityPackedKeccak256(
+        ['uint256', 'bytes32'],
+        [BigInt(candidateId), saltBytes32]
+      );
+
+      const proof = merkleTree.getProof(
+        Buffer.from(solidityPackedKeccak256(['address'], [voter1.address.toLowerCase()]).substring(2), 'hex')
+      ).map(x => '0x' + x.data.toString('hex'));
+
+      await vote.connect(voter1).commitVote(commitHash, proof);
+      await vote.connect(admin).startReveal();
+      await vote.connect(admin).pause();
+
+      await expect(
+        vote.connect(voter1).revealVote(BigInt(candidateId), saltBytes32)
+      ).to.be.revertedWithCustomError(vote, "ElectionPaused");
+    });
+
+    it("allows commitVote after unpause", async () => {
+      await vote.connect(admin).addCandidate("Alice");
+      await vote.connect(admin).pause();
+      await vote.connect(admin).unpause();
+
+      const proof = merkleTree.getProof(
+        Buffer.from(solidityPackedKeccak256(['address'], [voter1.address.toLowerCase()]).substring(2), 'hex')
+      ).map(x => '0x' + x.data.toString('hex'));
+
+      const salt = "unpause-test";
+      const saltBytes32 = ethers.keccak256(ethers.toUtf8Bytes(salt));
+      const commitHash = ethers.solidityPackedKeccak256(['uint256', 'bytes32'], [0n, saltBytes32]);
+
+      await expect(vote.connect(voter1).commitVote(commitHash, proof))
+        .to.emit(vote, "VoteCommitted");
+    });
+
+    it("blocks non-admin from pausing", async () => {
+      await expect(
+        vote.connect(voter1).pause()
+      ).to.be.revertedWithCustomError(vote, "NotAdmin");
+    });
+  });
 });

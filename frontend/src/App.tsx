@@ -397,6 +397,18 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
     };
   }, [account, chainId, contract, fetchCandidates, isConnected]);
 
+  // Phase polling fallback: re-read phase every 30s in case event listeners drop
+  useEffect(() => {
+    if (!contract) return;
+    const id = setInterval(async () => {
+      try {
+        const p = await contract.phase();
+        setPhase(Number(p));
+      } catch {}
+    }, 30_000);
+    return () => clearInterval(id);
+  }, [contract]);
+
   // Enable Enter/Space key to trigger connect on the connect screen
   useEffect(() => {
     const shouldEnableHotkey = !account || !contract;

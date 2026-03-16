@@ -21,7 +21,8 @@ interface KycPageProps {
 }
 
 const OTP_LENGTH = 6;
-const SANDBOX_OTP = '123456';
+// Sandbox bypass only available in local dev builds (import.meta.env.DEV is false in production)
+const SANDBOX_OTP = import.meta.env.DEV ? '123456' : null;
 
 const KycPage: React.FC<KycPageProps> = ({ account, electionAddress, onVerified }) => {
   const { t } = useI18n();
@@ -152,10 +153,12 @@ const KycPage: React.FC<KycPageProps> = ({ account, electionAddress, onVerified 
       return;
     }
 
-    if (otpString !== SANDBOX_OTP) {
+    if (!SANDBOX_OTP || otpString !== SANDBOX_OTP) {
       setToast({
         type: 'error',
-        message: 'The OTP code did not match. Please check the sandbox code and try again.',
+        message: SANDBOX_OTP
+          ? 'The OTP code did not match. Please check the sandbox code and try again.'
+          : 'OTP verification is not available in this environment.',
       });
       return;
     }

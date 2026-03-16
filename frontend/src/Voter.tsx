@@ -81,7 +81,9 @@ const Voter: React.FC<VoterProps> = ({
 
   const persistRecoverySnapshot = useCallback((candidateId: number, nextSalt: string, commitHash?: string | null) => {
     try {
-      sessionStorage.setItem(
+      // Use localStorage (not sessionStorage) so the snapshot survives tab close.
+      // The voter needs their salt to reveal — losing it means they can't reveal.
+      localStorage.setItem(
         recoveryStorageKey,
         JSON.stringify({
           candidateId,
@@ -95,7 +97,7 @@ const Voter: React.FC<VoterProps> = ({
 
   const clearRecoverySnapshot = useCallback(() => {
     try {
-      sessionStorage.removeItem(recoveryStorageKey);
+      localStorage.removeItem(recoveryStorageKey);
     } catch {}
     setHasRecoverySnapshot(false);
   }, [recoveryStorageKey]);
@@ -175,7 +177,7 @@ const Voter: React.FC<VoterProps> = ({
 
   useEffect(() => {
     try {
-      const raw = sessionStorage.getItem(recoveryStorageKey);
+      const raw = localStorage.getItem(recoveryStorageKey);
       if (!raw) {
         setHasRecoverySnapshot(false);
         return;
