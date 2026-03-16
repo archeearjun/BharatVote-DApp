@@ -18,13 +18,48 @@ const app = express();
 // Security headers
 app.use(helmet());
 
-// CORS — restrict to frontend origin in production; allow all in local dev
-const CORS_ORIGIN = process.env.CORS_ORIGIN || (process.env.NODE_ENV === 'production' ? null : '*');
-app.use(cors({
-  origin: CORS_ORIGIN,
+// CORS — allow the deployed frontend by default, plus explicit configured origins.
+const DEFAULT_ALLOWED_ORIGINS = [
+  'https://bharat-vote-d-app.vercel.app',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://localhost:4173',
+  'http://127.0.0.1:4173',
+];
+
+const rawCorsOrigin = String(process.env.CORS_ORIGIN || '').trim();
+const allowAnyOrigin = rawCorsOrigin === '*' || (!rawCorsOrigin && process.env.NODE_ENV !== 'production');
+const configuredOrigins = rawCorsOrigin
+  ? rawCorsOrigin
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean)
+  : [];
+const allowedOrigins = new Set(
+  allowAnyOrigin
+    ? []
+    : (configuredOrigins.length > 0 ? configuredOrigins : DEFAULT_ALLOWED_ORIGINS).map((origin) => origin.toLowerCase())
+);
+
+const corsOptions = {
+  origin(origin, callback) {
+    if (allowAnyOrigin || !origin) {
+      callback(null, true);
+      return;
+    }
+
+    if (allowedOrigins.has(String(origin).toLowerCase())) {
+      callback(null, true);
+      return;
+    }
+
+    callback(new Error(`Origin not allowed by CORS: ${origin}`));
+  },
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-}));
+};
+
+app.use(cors(corsOptions));
 
 // Body parsing with size limit
 app.use(express.json({ limit: '1mb' }));

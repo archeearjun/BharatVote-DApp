@@ -87,7 +87,11 @@ export default function LandingPage() {
       navigate(`/election/${demoElectionAddress}`);
     } catch (err) {
       console.error(err);
-      const message = err instanceof Error ? err.message : "Failed to join demo.";
+      let message = err instanceof Error ? err.message : "Failed to join demo.";
+      if (message === "Failed to fetch" || /NetworkError/i.test(message)) {
+        message =
+          "Could not reach the BharatVote backend. Please try again in a moment. If this keeps happening, the backend CORS or deployment configuration needs attention.";
+      }
       setDemoError(message);
     } finally {
       setIsJoiningDemo(false);
