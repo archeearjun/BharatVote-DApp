@@ -71,9 +71,12 @@ const Voter: React.FC<VoterProps> = ({
   const [showCommitModal, setShowCommitModal] = useState(false);
   const previousPhaseRef = useRef<number | null>(null);
   const previousRefreshSignalRef = useRef(refreshSignal);
+  const commitPreparationRequestRef = useRef(0);
 
   const [isEligible, setIsEligible] = useState(false);
   const [isFetchingProof, setIsFetchingProof] = useState(false);
+  const [preparedCommitProof, setPreparedCommitProof] = useState<string[] | null>(null);
+  const [preparedCommitProofError, setPreparedCommitProofError] = useState<string | null>(null);
   const [hasRecoverySnapshot, setHasRecoverySnapshot] = useState(false);
   const [recoverySnapshot, setRecoverySnapshot] = useState<RecoverySnapshot | null>(null);
   const [electionRound, setElectionRound] = useState<number | null>(null);
@@ -192,47 +195,126 @@ const Voter: React.FC<VoterProps> = ({
     return payload;
   }, [account, isDemoElection, readBackendError]);
 
+  const fetchEligibilityProof = useCallback(async () => {
+    if (!account) {
+      throw new Error('Wallet not connected. Please connect your wallet.');
+    }
+
+    if (isDemoElection) {
+      await ensureDemoEnrollmentReady();
+    }
+
+    const proofUrl = new URL(`${BACKEND_URL}/api/merkle-proof/${encodeURIComponent(account)}`);
+    if (electionAddress) {
+      proofUrl.searchParams.set('electionAddress', electionAddress);
+    }
+
+    let response = await fetch(proofUrl.toString());
+    if (isDemoElection && !response.ok) {
+      await ensureDemoEnrollmentReady();
+      response = await fetch(proofUrl.toString());
+    }
+
+    if (!response.ok) {
+      throw new Error(await readBackendError(response));
+    }
+
+    const proofData = await response.json();
+    const proof = Array.isArray(proofData) ? proofData : proofData.proof;
+    if (!Array.isArray(proof)) {
+      throw new Error('Invalid Merkle proof payload from backend.');
+    }
+
+    return proof.map((entry) => String(entry));
+  }, [account, electionAddress, ensureDemoEnrollmentReady, isDemoElection, readBackendError]);
+
   useEffect(() => {
     const checkEligibility = async () => {
+      const requestId = ++commitPreparationRequestRef.current;
+      const canPrepareCommit = Boolean(contract) && phase === 0 && !hasVoted;
+
       if (!account) {
         setIsEligible(false);
+        setPreparedCommitProof(null);
+        setPreparedCommitProofError(null);
+        setIsFetchingProof(false);
         return;
       }
-      try {
-        // Demo mode: auto-register strangers via backend so they are included in the Merkle root.
-        if (isDemoElection) {
-          await ensureDemoEnrollmentReady();
-        }
-        const proofUrl = new URL(`${BACKEND_URL}/api/merkle-proof/${encodeURIComponent(account)}`);
-        if (electionAddress) {
-          proofUrl.searchParams.set('electionAddress', electionAddress);
-        }
-        const resp = await fetch(proofUrl.toString());
-        if (resp.ok) {
-          setIsEligible(true);
-        } else {
-          setIsEligible(false);
+
+      if (canPrepareCommit) {
+        setIsFetchingProof(true);
+      } else {
+        setPreparedCommitProof(null);
+        setPreparedCommitProofError(null);
+        setIsFetchingProof(false);
       }
-    } catch (err) {
-      console.warn('Failed to check voter eligibility', err);
-      setIsEligible(false);
-    }
+
+      try {
+        const proof = await fetchEligibilityProof();
+        if (requestId !== commitPreparationRequestRef.current) {
+          return;
+        }
+
+        setIsEligible(true);
+
+        if (!canPrepareCommit || !contract) {
+          return;
+        }
+
+        const onChainRoot = await contract.merkleRoot();
+        const computedRoot = computeMerkleRootFromProof(account, proof);
+        if (requestId !== commitPreparationRequestRef.current) {
+          return;
+        }
+
+        if (String(computedRoot).toLowerCase() !== String(onChainRoot).toLowerCase()) {
+          setPreparedCommitProof(null);
+          setPreparedCommitProofError(
+            'Eligibility sync is out of date (your Merkle proof does not match the contract). Please re-join the demo or ask the admin to sync the Merkle root.'
+          );
+          return;
+        }
+
+        setPreparedCommitProof(proof);
+        setPreparedCommitProofError(null);
+      } catch (err) {
+        if (requestId !== commitPreparationRequestRef.current) {
+          return;
+        }
+        console.warn('Failed to check voter eligibility', err);
+        setIsEligible(false);
+        setPreparedCommitProof(null);
+        setPreparedCommitProofError(
+          canPrepareCommit
+            ? err instanceof Error
+              ? err.message
+              : 'Failed to prepare eligibility proof.'
+            : null
+        );
+      } finally {
+        if (requestId === commitPreparationRequestRef.current) {
+          setIsFetchingProof(false);
+        }
+      }
     };
 
     checkEligibility();
     checkVoteStatus();
     refreshElectionRound();
-  }, [account, contract, electionAddress, ensureDemoEnrollmentReady, isDemoElection, refreshElectionRound]);
+  }, [account, contract, fetchEligibilityProof, hasVoted, phase, refreshElectionRound, refreshSignal]);
 
   useEffect(() => {
     setSelectedCandidateId(null);
     setSalt('');
     setVoteHash(null);
+    setPreparedCommitProof(null);
+    setPreparedCommitProofError(null);
     setRecoverySnapshot(null);
     setHasRecoverySnapshot(false);
     setHasVoted(false);
     setHasRevealed(false);
     setIsEligible(false);
+    setIsFetchingProof(false);
     setIsSaltVisible(false);
     setShowCommitModal(false);
     setError(null);
@@ -353,46 +435,20 @@ const Voter: React.FC<VoterProps> = ({
       setError('Wallet not connected or contract unavailable');
       return;
     }
-      if (!account) {
-        setError('Wallet not connected. Please connect your wallet.');
-        return;
-      }
+    if (!account) {
+      setError('Wallet not connected. Please connect your wallet.');
+      return;
+    }
 
     setIsCommitting(true);
-    setIsFetchingProof(true);
     setError(null);
 
     try {
       const { commitHash } = await hashVote(selectedCandidateId, salt.trim());
-
-      // Demo mode: ensure the backend has registered this voter (so they become eligible on-chain).
-      if (isDemoElection) {
-        await ensureDemoEnrollmentReady();
-      }
-
-      const proofUrl = new URL(`${BACKEND_URL}/api/merkle-proof/${encodeURIComponent(account)}`);
-      if (electionAddress) {
-        proofUrl.searchParams.set('electionAddress', electionAddress);
-      }
-      let resp = await fetch(proofUrl.toString());
-      // If this is demo mode and the voter wasn't eligible yet, retry once after a join call.
-      if (isDemoElection && !resp.ok) {
-        await ensureDemoEnrollmentReady();
-        resp = await fetch(proofUrl.toString());
-      }
-      if (!resp.ok) {
-        const errText = await resp.text();
-        throw new Error(`Failed to get Merkle proof: ${errText || resp.statusText}`);
-      }
-      const proofData = await resp.json();
-      const proof = Array.isArray(proofData) ? proofData : proofData.proof;
-      // Note: an empty proof is valid for a single-leaf Merkle tree.
-      if (!Array.isArray(proof)) {
-        throw new Error('Invalid Merkle proof payload from backend.');
-      }
-
-      // Preflight eligibility check: verify the backend proof matches the contract's merkleRoot.
-      try {
+      let proof = preparedCommitProof;
+      if (!proof) {
+        setIsFetchingProof(true);
+        proof = await fetchEligibilityProof();
         const onChainRoot = await contract.merkleRoot();
         const computedRoot = computeMerkleRootFromProof(account, proof);
         if (String(computedRoot).toLowerCase() !== String(onChainRoot).toLowerCase()) {
@@ -400,8 +456,8 @@ const Voter: React.FC<VoterProps> = ({
             'Eligibility sync is out of date (your Merkle proof does not match the contract). Please re-join the demo or ask the admin to sync the Merkle root.'
           );
         }
-      } catch (e) {
-        if (e instanceof Error) throw e;
+        setPreparedCommitProof(proof);
+        setPreparedCommitProofError(null);
       }
 
       const tx = await contract.commitVote(commitHash, proof);
@@ -465,6 +521,8 @@ const Voter: React.FC<VoterProps> = ({
       setIsSaltVisible(false);
       setShowCommitModal(false);
       setVoteHash(null);
+      setPreparedCommitProof(null);
+      setPreparedCommitProofError(null);
       setHasVoted(false);
       setHasRevealed(false);
       setError(null);
@@ -505,13 +563,11 @@ const Voter: React.FC<VoterProps> = ({
         throw new Error('You have already revealed your vote. You cannot reveal again.');
       }
 
-      let storedHash = voteHash;
-      try {
-        const onchainCommit: string = await contract.commits(account);
-        if (onchainCommit) storedHash = onchainCommit;
-      } catch (readErr) {
-        console.warn('Failed to read on-chain commit hash before reveal', readErr);
-      }
+      const storedHash =
+        voteHash ||
+        (typeof recoverySnapshot?.commitHash === 'string' && recoverySnapshot.commitHash
+          ? recoverySnapshot.commitHash
+          : null);
 
       const { commitHash: expectedCommitHash } = await hashVote(selectedCandidateId, salt.trim());
       
@@ -661,6 +717,8 @@ const Voter: React.FC<VoterProps> = ({
     selectedCandidateId !== null &&
     selectedCandidateIsActive &&
     !!salt.trim() &&
+    !!preparedCommitProof &&
+    !isFetchingProof &&
     !isCommitting &&
     !hasVoted &&
     phase === 0 &&
@@ -671,6 +729,10 @@ const Voter: React.FC<VoterProps> = ({
     !!salt.trim() &&
     !isRevealing &&
     hasVoted &&
+    Boolean(
+      voteHash ||
+        (typeof recoverySnapshot?.commitHash === 'string' && recoverySnapshot.commitHash)
+    ) &&
     !hasRevealed &&
     phase === 1;
   const hasDownloadableRecoveryDetails =
@@ -685,6 +747,9 @@ const Voter: React.FC<VoterProps> = ({
     if (selectedCandidateId === null) return 'Select a candidate to commit';
     if (!selectedCandidateIsActive) return 'Select an active candidate for the current round';
     if (!isDemoElection && !isEligible) return 'You are not in the eligible voter list';
+    if (isFetchingProof && !preparedCommitProof) return 'Preparing your wallet authorization request';
+    if (preparedCommitProofError) return preparedCommitProofError;
+    if (!preparedCommitProof) return 'Preparing your wallet authorization request';
     return null;
   })();
 
@@ -692,6 +757,9 @@ const Voter: React.FC<VoterProps> = ({
     if (phase !== 1) return 'Reveal is only available during the reveal phase';
     if (!hasVoted) return 'Commit your vote before revealing';
     if (hasRevealed) return 'You have already revealed your vote';
+    if (!voteHash && !(typeof recoverySnapshot?.commitHash === 'string' && recoverySnapshot.commitHash)) {
+      return 'Refreshing your committed vote details. Try again in a moment.';
+    }
     if (!salt.trim()) return 'Enter the exact password/salt you used to commit';
     if (selectedCandidateId === null) return 'Select the candidate you committed';
     if (!selectedCandidateIsActive) return 'The selected candidate is not active in this round';
@@ -1080,7 +1148,11 @@ const Voter: React.FC<VoterProps> = ({
             >
               <span className="inline-flex items-center gap-2">
                 {isFetchingProof && <Loader2 className="w-4 h-4 animate-spin" />}
-                {isCommitting ? t('voter.submitting') : t('voter.commitVote')}
+                {isCommitting
+                  ? 'Confirm in MetaMask...'
+                  : isFetchingProof && !preparedCommitProof
+                    ? 'Preparing authorization...'
+                    : t('voter.commitVote')}
               </span>
             </button>
             {!canCommit && commitDisabledReason && (
@@ -1332,7 +1404,7 @@ const Voter: React.FC<VoterProps> = ({
               >
               <span className="inline-flex items-center gap-2">
                 {isRevealing && <Loader2 className="w-4 h-4 animate-spin" />}
-                {isRevealing ? t('voter.revealing') : t('voter.revealVote')}
+                {isRevealing ? 'Confirm in MetaMask...' : t('voter.revealVote')}
               </span>
               </button>
             </div>

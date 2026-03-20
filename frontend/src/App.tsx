@@ -803,6 +803,7 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
                  }}
                  onMerkleRootUpdated={(root) => {
                    setContractMerkleRoot(root);
+                   setVoterRefreshSignal((prev) => prev + 1);
                  }}
                   onError={(error: string) => setToast({ type: 'error', message: error })}
                   onPhaseChange={() => {

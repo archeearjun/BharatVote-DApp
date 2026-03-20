@@ -22,8 +22,12 @@ interface KycPageProps {
 }
 
 const OTP_LENGTH = 6;
-// Sandbox bypass only available in local dev builds (import.meta.env.DEV is false in production)
-const SANDBOX_OTP = import.meta.env.DEV ? '123456' : null;
+// Sandbox OTP is available in local dev by default and can also be configured explicitly via VITE_SANDBOX_OTP.
+const CONFIGURED_SANDBOX_OTP =
+  typeof import.meta.env.VITE_SANDBOX_OTP === 'string' && import.meta.env.VITE_SANDBOX_OTP.trim()
+    ? import.meta.env.VITE_SANDBOX_OTP.trim()
+    : null;
+const SANDBOX_OTP = CONFIGURED_SANDBOX_OTP || (import.meta.env.DEV ? '123456' : null);
 
 const KycPage: React.FC<KycPageProps> = ({ account, electionAddress, eligibilityRoot, onVerified }) => {
   const { t } = useI18n();
@@ -98,9 +102,15 @@ const KycPage: React.FC<KycPageProps> = ({ account, electionAddress, eligibility
         throw new Error('This wallet does not match the verified voter record for this election.');
       }
 
+      if (!SANDBOX_OTP) {
+        throw new Error(
+          'OTP verification is not configured in this build. Set VITE_SANDBOX_OTP for sandbox testing or integrate a real OTP provider.'
+        );
+      }
+
       setStep(1);
       setOtpVisible(true);
-      setToast({ type: 'success', message: t('kyc.voterIdVerified') });
+      setToast({ type: 'success', message: 'Voter ID verified. Use the sandbox OTP shown below to continue.' });
     } catch (error: unknown) {
       setToast({
         type: 'error',
@@ -279,6 +289,9 @@ const KycPage: React.FC<KycPageProps> = ({ account, electionAddress, eligibility
                   />
                   <p className="mt-2 text-sm text-slate-500">
                     {t('kyc.voterIdHelper')}
+                  </p>
+                  <p className="mt-2 text-sm text-slate-500">
+                    Enter the exact voter ID string for this wallet, not a numeric row like <code className="rounded bg-slate-100 px-1">1</code>.
                   </p>
                 </div>
 
