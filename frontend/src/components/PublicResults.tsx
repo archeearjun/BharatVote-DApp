@@ -281,6 +281,10 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
       const withVotes: Candidate[] = [];
       for (const c of fetched) {
         const idNum = Number(c.id ?? c[0] ?? 0);
+        const isActive = Boolean(c.isActive ?? c[2] ?? true);
+        if (!isActive) {
+          continue;
+        }
         const name = c.name ?? c[1] ?? `Candidate ${idNum}`;
         let votes = 0;
         try {
@@ -500,7 +504,13 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
     ((demoAnalytics?.committedCount ?? 0) > 0 ||
       (demoAnalytics?.revealedCount ?? 0) > 0 ||
       Object.keys(demoAnalytics?.candidateVotes || {}).length > 0);
-  const useBackendForDisplay = useBackendAnalytics && backendHasData;
+  const backendIndexCaughtUp =
+    useBackendAnalytics &&
+    typeof demoAnalytics?.lastProcessedBlock === 'number' &&
+    typeof demoAnalytics?.latestKnownBlock === 'number' &&
+    demoAnalytics.lastProcessedBlock >= demoAnalytics.latestKnownBlock;
+  const backendIndexLagging = useBackendAnalytics && backendHasData && !backendIndexCaughtUp;
+  const useBackendForDisplay = useBackendAnalytics && backendHasData && backendIndexCaughtUp;
   const dataSourceLabel = !isDemoElection || mode !== 'allTime'
     ? 'On-chain (live)'
     : useBackendForDisplay
@@ -522,6 +532,26 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
     return Array.from(analyticsCandidateVotes.values()).reduce((sum, value) => sum + value, 0);
   }, [analyticsCandidateVotes]);
   const allTimeVotesCast = allTimeRevealed ?? allTimeTotalRevealedVotes;
+  const displayedCandidates = useMemo(() => {
+    if (!isDemoElection || mode !== 'allTime') return candidates;
+
+    const merged = new Map<number, Candidate>();
+    candidates.forEach((candidate) => {
+      merged.set(candidate.id, candidate);
+    });
+
+    analyticsCandidateVotes.forEach((_votes, id) => {
+      if (!merged.has(id)) {
+        merged.set(id, {
+          id,
+          name: `Candidate Slot #${id}`,
+          voteCount: 0,
+        });
+      }
+    });
+
+    return Array.from(merged.values()).sort((a, b) => a.id - b.id);
+  }, [analyticsCandidateVotes, candidates, isDemoElection, mode]);
 
   return (
     <div className="card-premium p-6 space-y-4">
@@ -586,7 +616,7 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="p-4 rounded-lg bg-slate-50 border border-slate-200">
           <p className="text-xs uppercase tracking-wide text-slate-600">Candidates</p>
-          <p className="text-3xl font-bold text-slate-900 mt-1">{candidates.length}</p>
+          <p className="text-3xl font-bold text-slate-900 mt-1">{displayedCandidates.length}</p>
         </div>
         <div className="p-4 rounded-lg bg-slate-50 border border-slate-200">
           <p className="text-xs uppercase tracking-wide text-slate-600">{mode === 'allTime' ? 'Votes Cast (All-Time Revealed)' : 'Votes Revealed (Current)'}</p>
@@ -611,6 +641,11 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
                 ? 'Counts are indexed by the demo backend (persists while backend is live).'
                 : 'Counts are computed from on-chain events (persists across resets).'}
             </div>
+            {backendIndexLagging && (
+              <div className="mt-1 text-xs text-amber-800">
+                Backend indexing is behind the latest known block, so this view is staying on on-chain scan data until the index catches up.
+              </div>
+            )}
             {!useBackendForDisplay && allTimeScanError && (
               <div className="mt-1 text-xs text-amber-800">
                 Event scan issue: <span className="font-mono">{allTimeScanError}</span>
@@ -650,22 +685,25 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
           <div className="text-sm text-slate-500">{t('publicResults.loading')}</div>
         )}
 
-        {!isLoading && candidates.length === 0 && (
+        {!isLoading && displayedCandidates.length === 0 && (
           <div className="flex items-center gap-2 text-sm text-slate-600">
             <BarChart3 className="w-4 h-4 text-slate-400" />
             {t('publicResults.noCandidates')}
           </div>
         )}
 
-        {!isLoading && candidates.length > 0 && (
+        {!isLoading && displayedCandidates.length > 0 && (
           <div className="space-y-4">
-            {candidates.map((c) => {
+            {displayedCandidates.map((c) => {
               const voteCount = mode === 'allTime'
                 ? (analyticsCandidateVotes.get(c.id) ?? 0)
                 : c.voteCount;
               const pctBase = mode === 'allTime' ? allTimeTotalRevealedVotes : totalVotes;
               const pct = pctBase === 0 ? '0%' : `${((voteCount / pctBase) * 100).toFixed(1)}%`;
-              const displayName = getCandidateDisplayName(contractAddress || publicContractAddress || '', c.id, lang, c.name);
+              const displayName =
+                isDemoElection && mode === 'allTime'
+                  ? `Candidate Slot #${c.id}`
+                  : getCandidateDisplayName(contractAddress || publicContractAddress || '', c.id, lang, c.name);
 
               return (
               <div key={c.id} className="space-y-1">

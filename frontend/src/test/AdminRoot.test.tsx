@@ -35,8 +35,8 @@ describe("Admin merkle root helpers", () => {
       <Admin
         contract={mockContract as any}
         phase={0}
-        backendMerkleRoot="0x01"
-        contractMerkleRoot="0x02"
+        backendMerkleRoot={`0x${"b".repeat(64)}`}
+        contractMerkleRoot={`0x${"c".repeat(64)}`}
         onError={() => {}}
         onPhaseChange={() => {}}
       />

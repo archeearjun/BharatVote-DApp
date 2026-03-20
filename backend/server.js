@@ -147,8 +147,16 @@ const ADMIN_ALLOWLIST_SIGNATURE_TTL_MS = (() => {
   return Number.isFinite(parsed) && parsed >= 10000 ? parsed : 300000;
 })();
 const ELECTION_ADMIN_ABI = ['function admin() view returns (address)'];
+const ELECTION_READ_ABI = [
+  'function admin() view returns (address)',
+  'function merkleRoot() view returns (bytes32)',
+  'function phase() view returns (uint8)',
+];
+const ZERO_HASH = ethers.ZeroHash.toLowerCase();
 
 const sanitizeVoterId = (id) => (typeof id === 'string' ? id.replace(/[^\w-]/g, '').slice(0, 64) : '');
+const hasUsableMerkleRoot = (root) =>
+  typeof root === 'string' && ethers.isHexString(root, 32) && root.toLowerCase() !== ZERO_HASH;
 
 const kycData = (() => {
   try {
@@ -577,6 +585,25 @@ const getElectionTree = (electionAddress) => {
   if (!electionAddress) return null;
   const key = String(electionAddress).toLowerCase();
   return electionTrees.get(key) || null;
+};
+
+const readElectionState = async (electionAddress) => {
+  if (!provider) {
+    throw new Error('RPC provider not configured for election state reads');
+  }
+
+  const electionRead = new ethers.Contract(electionAddress, ELECTION_READ_ABI, provider);
+  const [admin, merkleRootOnChain, phase] = await Promise.all([
+    electionRead.admin(),
+    electionRead.merkleRoot(),
+    electionRead.phase(),
+  ]);
+
+  return {
+    admin: ethers.getAddress(admin),
+    merkleRoot: String(merkleRootOnChain),
+    phase: Number(phase),
+  };
 };
 
 loadElectionAllowlists();
@@ -1055,7 +1082,27 @@ app.get('/api/kyc', (req, res) => {
       });
     }
 
+    const record = kycData.find((r) => String(r?.voterId || '').toUpperCase() === voterId.toUpperCase());
+    if (!record) {
+      return res.json({ eligible: false });
+    }
+
     const normalized = ethers.getAddress(address);
+    const recordAddress = typeof record?.address === 'string' && ethers.isAddress(record.address)
+      ? ethers.getAddress(record.address)
+      : null;
+
+    if (!recordAddress) {
+      return res.status(500).json({ eligible: false, error: 'KYC record is malformed for this voter.' });
+    }
+
+    if (recordAddress.toLowerCase() !== normalized.toLowerCase()) {
+      return res.status(403).json({
+        eligible: false,
+        error: 'This wallet does not match the verified voter record for this election.',
+      });
+    }
+
     const isEligible = allowlist.addresses.some(
       (entry) => String(entry).toLowerCase() === normalized.toLowerCase()
     );
@@ -1064,7 +1111,7 @@ app.get('/api/kyc', (req, res) => {
       return res.json({ eligible: false });
     }
 
-    return res.json({ eligible: true, address: normalized, voterId });
+    return res.json({ eligible: true, address: normalized, voterId: record.voterId });
   }
 
   // Fallback to static mock data when no election context is provided.
@@ -1077,7 +1124,7 @@ app.get('/api/kyc', (req, res) => {
 });
 
 // 1. Get Root (Frontend checks this against contract)
-app.get('/api/merkle-root', (req, res) => {
+app.get('/api/merkle-root', async (req, res) => {
   const electionAddress = req.query?.electionAddress ? String(req.query.electionAddress).trim() : '';
   if (electionAddress) {
     if (!ethers.isAddress(electionAddress)) {
@@ -1093,12 +1140,26 @@ app.get('/api/merkle-root', (req, res) => {
       return res.status(404).json({ error: 'No allowlist uploaded for this election' });
     }
 
-    return res.json({
+    const response = {
       root: allowlist.merkleRoot,
       merkleRoot: allowlist.merkleRoot,
       electionAddress: ethers.getAddress(electionAddress),
       count: allowlist.addresses?.length || 0,
-    });
+    };
+
+    try {
+      const state = await readElectionState(electionAddress);
+      return res.json({
+        ...response,
+        onChainMerkleRoot: state.merkleRoot,
+        phase: state.phase,
+        rootsAligned:
+          hasUsableMerkleRoot(state.merkleRoot) &&
+          state.merkleRoot.toLowerCase() === String(allowlist.merkleRoot).toLowerCase(),
+      });
+    } catch {
+      return res.json(response);
+    }
   }
 
   // Backward-compatible demo root fallback.
@@ -1167,9 +1228,30 @@ app.post('/api/admin/voter-list', adminLimiter, (req, res) => {
   const auth = req.body?.auth;
 
   verifyAllowlistUploadAuth({ electionAddress, addresses, auth })
-    .then((verification) => {
+    .then(async (verification) => {
       if (!verification.ok) {
         return res.status(verification.status).json({ error: verification.error });
+      }
+
+      const nextAllowlist = buildElectionTree(verification.normalizedAddresses);
+      const state = await readElectionState(electionAddress);
+
+      if (state.phase !== 0) {
+        return res.status(409).json({
+          error: 'The voter list can only be changed during the commit phase before the active on-chain root is finalized.',
+          phase: state.phase,
+        });
+      }
+
+      if (
+        hasUsableMerkleRoot(state.merkleRoot) &&
+        state.merkleRoot.toLowerCase() !== nextAllowlist.merkleRoot.toLowerCase()
+      ) {
+        return res.status(409).json({
+          error: 'This election already has an active on-chain eligibility root for the current round. Start a new round before replacing the voter list.',
+          currentMerkleRoot: state.merkleRoot,
+          nextMerkleRoot: nextAllowlist.merkleRoot,
+        });
       }
 
       const { count, merkleRoot: root } = setElectionAllowlist(
@@ -1191,7 +1273,7 @@ app.post('/api/admin/voter-list', adminLimiter, (req, res) => {
 });
 
 // 2.3 Admin allowlist summary
-app.get('/api/admin/voter-list/:electionAddress', (req, res) => {
+app.get('/api/admin/voter-list/:electionAddress', async (req, res) => {
   const electionAddress = String(req.params?.electionAddress || '').trim();
   if (!electionAddress || !ethers.isAddress(electionAddress)) {
     return res.status(400).json({ error: 'Valid electionAddress is required' });
@@ -1202,11 +1284,25 @@ app.get('/api/admin/voter-list/:electionAddress', (req, res) => {
     return res.status(404).json({ error: 'No allowlist uploaded for this election' });
   }
 
-  return res.json({
+  const response = {
     electionAddress: ethers.getAddress(electionAddress),
     count: allowlist.addresses?.length || 0,
     merkleRoot: allowlist.merkleRoot,
-  });
+  };
+
+  try {
+    const state = await readElectionState(electionAddress);
+    return res.json({
+      ...response,
+      onChainMerkleRoot: state.merkleRoot,
+      phase: state.phase,
+      rootsAligned:
+        hasUsableMerkleRoot(state.merkleRoot) &&
+        state.merkleRoot.toLowerCase() === String(allowlist.merkleRoot).toLowerCase(),
+    });
+  } catch {
+    return res.json(response);
+  }
 });
 
 // 2.5 Demo status (timer + current phase). Safe for public access.
@@ -1334,10 +1430,26 @@ app.post('/api/join', async (req, res) => {
         saveEligibleVoters();
         listChanged = true;
         console.log(`✅ User added! New Root: ${merkleRoot}`);
+      } else {
+        console.log('ℹ️ User already in list.');
+      }
 
+      if (provider && adminWallet) {
         sync = await syncDemoElectionMerkleRootIfConfigured({ onlyIfChanged: true });
-        if (!sync?.synced) {
-          removeDemoEligibleVoter(normalized);
+
+        if (sync?.pending) {
+          return res.status(202).json({
+            pending: true,
+            error: 'Demo eligibility is still syncing to the contract. Wait a few seconds and try again.',
+            merkleRoot,
+            sync,
+          });
+        }
+
+        if (!sync?.synced && sync?.reason !== 'already_synced') {
+          if (listChanged) {
+            removeDemoEligibleVoter(normalized);
+          }
           return res.status(503).json({
             error:
               'Demo eligibility sync failed (cannot update on-chain merkleRoot). Check RPC_URL/PRIVATE_KEY and demo admin permissions.',
@@ -1345,8 +1457,6 @@ app.post('/api/join', async (req, res) => {
             sync,
           });
         }
-      } else {
-        console.log('ℹ️ User already in list.');
       }
 
       if (provider && adminWallet) {

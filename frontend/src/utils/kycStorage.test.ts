@@ -30,4 +30,21 @@ describe("kycStorage", () => {
 
     expect(lower).toBe(upper);
   });
+
+  it("invalidates stored verification when the eligibility root changes", () => {
+    const rootA = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const rootB = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+
+    setStoredKycVerification(account, electionA, "VOTER-A", rootA);
+
+    expect(getStoredKycVerification(account, electionA, rootA)).toEqual({
+      isVerified: true,
+      voterId: "VOTER-A",
+    });
+
+    expect(getStoredKycVerification(account, electionA, rootB)).toEqual({
+      isVerified: false,
+      voterId: null,
+    });
+  });
 });

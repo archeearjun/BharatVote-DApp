@@ -58,4 +58,8 @@ export function setCandidateLabels(contractAddress: string, id: number, labels: 
   localStorage.setItem(storageKey(contractAddress), JSON.stringify(all));
 }
 
+export function clearCandidateLabels(contractAddress: string): void {
+  localStorage.removeItem(storageKey(contractAddress));
+}
+
 

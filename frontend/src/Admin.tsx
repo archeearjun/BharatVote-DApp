@@ -3,7 +3,7 @@ import { ethers } from "ethers";
 import { PHASE_LABELS, ERROR_MESSAGES, COMMIT_PHASE, REVEAL_PHASE, FINISH_PHASE, CANDIDATE_MESSAGES, SUCCESS_MESSAGES, BACKEND_URL } from "./constants";
 import { useI18n } from './i18n';
 import type { BharatVote } from "@typechain/contracts/BharatVote";
-import { getCandidateDisplayName, setCandidateLabels } from './utils/candidateLabels';
+import { clearCandidateLabels, getCandidateDisplayName, setCandidateLabels } from './utils/candidateLabels';
 import type { Candidate } from "./types/candidates";
 import { 
   Plus,
@@ -32,6 +32,7 @@ interface AdminProps {
   electionAddress?: string;
   isDemoElection?: boolean;
   onAllowlistUpdated?: (info: { count: number; merkleRoot: string }) => void;
+  onMerkleRootUpdated?: (root: string) => void;
   onError?: (error: string) => void;
   onPhaseChange?: () => void;
 }
@@ -66,6 +67,7 @@ export default function Admin({
   electionAddress,
   isDemoElection,
   onAllowlistUpdated,
+  onMerkleRootUpdated,
   onError,
   onPhaseChange,
 }: AdminProps) {
@@ -80,16 +82,25 @@ export default function Admin({
   const [confirmAction, setConfirmAction] = useState<DestructiveAction>(null);
   const [confirmText, setConfirmText] = useState('');
   const { t, lang } = useI18n();
+  const backendRootReady =
+    Boolean(backendMerkleRoot) &&
+    ethers.isHexString(backendMerkleRoot!, 32) &&
+    backendMerkleRoot!.toLowerCase() !== ethers.ZeroHash.toLowerCase();
+  const contractRootReady =
+    Boolean(contractMerkleRoot) &&
+    ethers.isHexString(contractMerkleRoot!, 32) &&
+    contractMerkleRoot!.toLowerCase() !== ethers.ZeroHash.toLowerCase();
   const rootsAligned =
     Boolean(contract) &&
-    Boolean(contractMerkleRoot) &&
-    Boolean(backendMerkleRoot) &&
+    backendRootReady &&
+    contractRootReady &&
     backendMerkleRoot!.toLowerCase() === contractMerkleRoot!.toLowerCase();
   const rootsMismatch =
     Boolean(contract) &&
-    Boolean(contractMerkleRoot) &&
-    Boolean(backendMerkleRoot) &&
-    backendMerkleRoot!.toLowerCase() !== contractMerkleRoot!.toLowerCase();
+    ((backendRootReady !== contractRootReady) ||
+      (backendRootReady &&
+        contractRootReady &&
+        backendMerkleRoot!.toLowerCase() !== contractMerkleRoot!.toLowerCase()));
 
   const fetchCandidates = useCallback(async () => {
     if (!contract) return;
@@ -317,6 +328,12 @@ export default function Admin({
 
   const handlePhaseAdvance = async () => {
     if (!contract || phase === FINISH_PHASE) return;
+    if (!isDemoElection && !rootsAligned) {
+      const message = 'Sync the prepared voter list to the contract before advancing the election phase.';
+      setState(prev => ({ ...prev, error: message, success: null }));
+      onError?.(message);
+      return;
+    }
     setState(prev => ({ ...prev, loading: true, error: null, success: null }));
 
     try {
@@ -446,6 +463,10 @@ export default function Admin({
     try {
       const tx = await contract.clearAllCandidates();
       await tx.wait();
+      const contractAddress = ((contract as any)?.target as string) || ((contract as any)?.address as string) || '';
+      if (contractAddress) {
+        clearCandidateLabels(contractAddress);
+      }
       setState(prev => ({
         ...prev,
         success: SUCCESS_MESSAGES.CANDIDATES_CLEARED,
@@ -637,16 +658,14 @@ export default function Admin({
       await tx.wait();
 
       setState(prev => ({ ...prev, success: "Merkle root updated on-chain", loading: false }));
-      const mode = (import.meta as any)?.env?.MODE;
-      if (mode !== 'test') {
-        setTimeout(() => window.location.reload(), 600);
-      }
+      setState(prev => ({ ...prev, merkleRoot: root }));
+      onMerkleRootUpdated?.(root);
     } catch (err: any) {
       const message = extractErrorMessage(err);
       setState(prev => ({ ...prev, error: message, loading: false }));
       onError?.(message);
     }
-  }, [contract, fetchMerkleRoot, onError, extractErrorMessage]);
+  }, [contract, fetchMerkleRoot, onError, extractErrorMessage, onMerkleRootUpdated]);
 
   const handleAllowlistUpload = useCallback(async () => {
     if (!electionAddress || !ethers.isAddress(electionAddress)) {
@@ -655,6 +674,14 @@ export default function Admin({
     }
     if (isDemoElection) {
       setAllowlistError('Demo election uses open enrollment. No allowlist needed.');
+      return;
+    }
+    if (phase !== COMMIT_PHASE) {
+      setAllowlistError('The voter list can only be changed during the commit phase before the active on-chain root is finalized.');
+      return;
+    }
+    if (rootsAligned) {
+      setAllowlistError('An eligibility root is already active on-chain for this round. Start a new round before replacing the voter list.');
       return;
     }
 
@@ -714,7 +741,7 @@ export default function Admin({
     } finally {
       setAllowlistLoading(false);
     }
-  }, [allowlistInput, contract?.runner, electionAddress, fetchAllowlistSummary, isDemoElection, onAllowlistUpdated, parseAllowlistEntries]);
+  }, [allowlistInput, contract?.runner, electionAddress, fetchAllowlistSummary, isDemoElection, onAllowlistUpdated, parseAllowlistEntries, phase, rootsAligned]);
 
   const handleAllowlistFile = async (file: File | null) => {
     if (!file) return;

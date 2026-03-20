@@ -69,11 +69,25 @@ const Voter: React.FC<VoterProps> = ({
   const [isEligible, setIsEligible] = useState(false);
   const [isFetchingProof, setIsFetchingProof] = useState(false);
   const [hasRecoverySnapshot, setHasRecoverySnapshot] = useState(false);
-  const recoveryStorageKey = useMemo(() => {
-    const scope = electionAddress ? String(electionAddress).toLowerCase() : 'default';
-    return `bv_vote_recovery_${scope}_${String(account).toLowerCase()}`;
-  }, [account, electionAddress]);
+  const [electionRound, setElectionRound] = useState<number | null>(null);
   const contractAddress = ((contract as any)?.target as string) || ((contract as any)?.address as string) || '';
+  const recoveryStorageKey = useMemo(() => {
+    const scope = electionAddress
+      ? String(electionAddress).toLowerCase()
+      : contractAddress
+        ? String(contractAddress).toLowerCase()
+        : 'default';
+    const roundScope = Number.isFinite(electionRound) ? String(electionRound) : 'unknown';
+    return `bv_vote_recovery_${scope}_${roundScope}_${String(account).toLowerCase()}`;
+  }, [account, contractAddress, electionAddress, electionRound]);
+  const activeCandidates = useMemo(
+    () => candidates.filter((candidate: any) => Boolean(candidate?.isActive)),
+    [candidates]
+  );
+  const selectedCandidateIsActive = useMemo(() => {
+    if (selectedCandidateId === null) return false;
+    return activeCandidates.some((candidate: any) => Number(candidate.id) === selectedCandidateId);
+  }, [activeCandidates, selectedCandidateId]);
 
   const phases = [
     { id: 0, label: t('voter.commit'), description: t('voter.submitEncryptedVote'), icon: Lock },
@@ -112,6 +126,62 @@ const Voter: React.FC<VoterProps> = ({
     navigate('/');
   }, [electionAddress, navigate]);
 
+  const readBackendError = useCallback(async (response: Response) => {
+    try {
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        const data = await response.json();
+        return String(data?.error || data?.message || '').trim() || `Request failed with status ${response.status}`;
+      }
+      const text = await response.text();
+      return text.trim() || `Request failed with status ${response.status}`;
+    } catch {
+      return `Request failed with status ${response.status}`;
+    }
+  }, []);
+
+  const refreshElectionRound = useCallback(async () => {
+    if (!contract?.electionRound) {
+      setElectionRound(null);
+      return;
+    }
+    try {
+      const round = await contract.electionRound();
+      setElectionRound(Number(round));
+    } catch (err) {
+      console.warn('Failed to read election round', err);
+      setElectionRound(null);
+    }
+  }, [contract]);
+
+  const ensureDemoEnrollmentReady = useCallback(async () => {
+    if (!isDemoElection || !account) return null;
+
+    const response = await fetch(`${BACKEND_URL}/api/join`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address: account }),
+    });
+
+    let payload: any = null;
+    try {
+      payload = await response.clone().json();
+    } catch {}
+
+    if (!response.ok) {
+      throw new Error(payload?.error || (await readBackendError(response)));
+    }
+
+    if (response.status === 202 || payload?.pending || payload?.sync?.pending) {
+      throw new Error(
+        payload?.error ||
+          'Demo eligibility is still syncing to the contract. Wait a few seconds, then try again.'
+      );
+    }
+
+    return payload;
+  }, [account, isDemoElection, readBackendError]);
+
   useEffect(() => {
     const checkEligibility = async () => {
       if (!account) {
@@ -121,11 +191,7 @@ const Voter: React.FC<VoterProps> = ({
       try {
         // Demo mode: auto-register strangers via backend so they are included in the Merkle root.
         if (isDemoElection) {
-          await fetch(`${BACKEND_URL}/api/join`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ address: account }),
-          });
+          await ensureDemoEnrollmentReady();
         }
         const proofUrl = new URL(`${BACKEND_URL}/api/merkle-proof/${encodeURIComponent(account)}`);
         if (electionAddress) {
@@ -145,9 +211,24 @@ const Voter: React.FC<VoterProps> = ({
 
     checkEligibility();
     checkVoteStatus();
-  }, [contract, account, electionAddress, isDemoElection]);
+    refreshElectionRound();
+  }, [account, contract, electionAddress, ensureDemoEnrollmentReady, isDemoElection, refreshElectionRound]);
 
-  const checkVoteStatus = async () => {
+  useEffect(() => {
+    setSelectedCandidateId(null);
+    setSalt('');
+    setVoteHash(null);
+    setHasRecoverySnapshot(false);
+    setHasVoted(false);
+    setHasRevealed(false);
+    setIsEligible(false);
+    setIsSaltVisible(false);
+    setShowCommitModal(false);
+    setError(null);
+    setSuccess(null);
+  }, [account, contractAddress, electionAddress]);
+
+  const checkVoteStatus = useCallback(async () => {
     if (!contract || !account) {
       return;
     }
@@ -175,12 +256,15 @@ const Voter: React.FC<VoterProps> = ({
     } catch (err) {
       console.warn('Failed to refresh vote status', err);
     }
-  };
+  }, [account, clearRecoverySnapshot, contract, onStatusChange]);
 
   useEffect(() => {
     try {
       const raw = localStorage.getItem(recoveryStorageKey);
       if (!raw) {
+        setSelectedCandidateId(null);
+        setSalt('');
+        setVoteHash(null);
         setHasRecoverySnapshot(false);
         return;
       }
@@ -203,9 +287,24 @@ const Voter: React.FC<VoterProps> = ({
 
       setHasRecoverySnapshot(true);
     } catch {
+      clearRecoverySnapshot();
+      setSelectedCandidateId(null);
+      setSalt('');
+      setVoteHash(null);
       setHasRecoverySnapshot(false);
     }
-  }, [recoveryStorageKey]);
+  }, [clearRecoverySnapshot, recoveryStorageKey]);
+
+  useEffect(() => {
+    if (selectedCandidateId === null) return;
+    if (!candidates.length) return;
+    if (selectedCandidateIsActive) return;
+
+    setSelectedCandidateId(null);
+    if (!hasVoted) {
+      setError('Your previously selected candidate is no longer active in this round. Please choose an active candidate.');
+    }
+  }, [candidates.length, hasVoted, selectedCandidateId, selectedCandidateIsActive]);
 
   const generateSalt = () => {
     return ethers.hexlify(ethers.randomBytes(16)).slice(2);
@@ -241,6 +340,10 @@ const Voter: React.FC<VoterProps> = ({
       setError('Select a candidate and enter a salt (secret phrase) before committing.');
       return;
     }
+    if (!selectedCandidateIsActive) {
+      setError('The selected candidate is not active in the current round. Refresh the page and choose an active candidate.');
+      return;
+    }
     if (!contract) {
       setError('Wallet not connected or contract unavailable');
       return;
@@ -259,13 +362,7 @@ const Voter: React.FC<VoterProps> = ({
 
       // Demo mode: ensure the backend has registered this voter (so they become eligible on-chain).
       if (isDemoElection) {
-        try {
-          await fetch(`${BACKEND_URL}/api/join`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ address: account }),
-          });
-        } catch {}
+        await ensureDemoEnrollmentReady();
       }
 
       const proofUrl = new URL(`${BACKEND_URL}/api/merkle-proof/${encodeURIComponent(account)}`);
@@ -275,14 +372,8 @@ const Voter: React.FC<VoterProps> = ({
       let resp = await fetch(proofUrl.toString());
       // If this is demo mode and the voter wasn't eligible yet, retry once after a join call.
       if (isDemoElection && !resp.ok) {
-        try {
-          await fetch(`${BACKEND_URL}/api/join`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ address: account }),
-          });
-          resp = await fetch(proofUrl.toString());
-        } catch {}
+        await ensureDemoEnrollmentReady();
+        resp = await fetch(proofUrl.toString());
       }
       if (!resp.ok) {
         const errText = await resp.text();
@@ -379,13 +470,18 @@ const Voter: React.FC<VoterProps> = ({
     }
 
     checkVoteStatus();
+    refreshElectionRound();
     previousPhaseRef.current = phase;
     previousRefreshSignalRef.current = refreshSignal;
-  }, [clearRecoverySnapshot, phase, refreshSignal]);
+  }, [checkVoteStatus, clearRecoverySnapshot, phase, refreshElectionRound, refreshSignal]);
 
   const handleRevealVote = async () => {
     if (selectedCandidateId === null || !salt.trim()) {
       setError('Select the same candidate and enter the exact salt you used when committing.');
+      return;
+    }
+    if (!selectedCandidateIsActive) {
+      setError('The selected candidate is not active in the current round.');
       return;
     }
 
@@ -502,7 +598,7 @@ const Voter: React.FC<VoterProps> = ({
   };
 
   const moveCandidateSelection = (currentId: number, direction: 1 | -1) => {
-    const ids = candidates.map((candidate: any) => Number(candidate.id)).filter((id: number) => Number.isFinite(id));
+    const ids = activeCandidates.map((candidate: any) => Number(candidate.id)).filter((id: number) => Number.isFinite(id));
     if (!ids.length) return;
     const currentIndex = ids.indexOf(currentId);
     const safeIndex = currentIndex >= 0 ? currentIndex : 0;
@@ -530,12 +626,20 @@ const Voter: React.FC<VoterProps> = ({
   // Make the action buttons clickable as soon as inputs are present; we surface errors if prerequisites are missing
   const canCommit =
     selectedCandidateId !== null &&
+    selectedCandidateIsActive &&
     !!salt.trim() &&
     !isCommitting &&
     !hasVoted &&
     phase === 0 &&
     (isDemoElection || isEligible);
-  const canReveal = selectedCandidateId !== null && !!salt.trim() && !isRevealing && hasVoted && !hasRevealed && phase === 1;
+  const canReveal =
+    selectedCandidateId !== null &&
+    selectedCandidateIsActive &&
+    !!salt.trim() &&
+    !isRevealing &&
+    hasVoted &&
+    !hasRevealed &&
+    phase === 1;
 
   const commitDisabledReason = (() => {
     if (phase !== 0) return 'Commit is only available during the commit phase';
@@ -543,6 +647,7 @@ const Voter: React.FC<VoterProps> = ({
     if (hasVoted) return 'You have already committed a vote';
     if (!salt.trim()) return 'Enter a password/salt to secure your vote';
     if (selectedCandidateId === null) return 'Select a candidate to commit';
+    if (!selectedCandidateIsActive) return 'Select an active candidate for the current round';
     if (!isDemoElection && !isEligible) return 'You are not in the eligible voter list';
     return null;
   })();
@@ -553,6 +658,7 @@ const Voter: React.FC<VoterProps> = ({
     if (hasRevealed) return 'You have already revealed your vote';
     if (!salt.trim()) return 'Enter the exact password/salt you used to commit';
     if (selectedCandidateId === null) return 'Select the candidate you committed';
+    if (!selectedCandidateIsActive) return 'The selected candidate is not active in this round';
     return null;
   })();
 
@@ -737,7 +843,7 @@ const Voter: React.FC<VoterProps> = ({
                   aria-label="Select candidate"
                   className="grid grid-cols-1 gap-3"
                 >
-                  {candidates.map((c:any) => {
+                  {activeCandidates.map((c:any) => {
                     const candidateId = Number(c.id);
                     const isSelected = selectedCandidateId === candidateId;
                     const displayName = getCandidateDisplayName(contractAddress, candidateId, lang, c.name);
@@ -761,7 +867,7 @@ const Voter: React.FC<VoterProps> = ({
 
                     const isFocusable =
                       selectedCandidateId === null
-                        ? candidateId === Number(candidates[0]?.id)
+                        ? candidateId === Number(activeCandidates[0]?.id)
                         : isSelected;
                     
                     return (
@@ -838,6 +944,11 @@ const Voter: React.FC<VoterProps> = ({
                     );
                   })}
                 </div>
+                {activeCandidates.length === 0 && (
+                  <p className="text-sm text-slate-500">
+                    No active candidates are available in this round yet.
+                  </p>
+                )}
               </div>
             </div>
 
@@ -1024,7 +1135,7 @@ const Voter: React.FC<VoterProps> = ({
                   aria-label="Select candidate"
                   className="grid grid-cols-1 gap-3"
                 >
-                  {candidates.map((c:any) => {
+                  {activeCandidates.map((c:any) => {
                     const candidateId = Number(c.id);
                     const isSelected = selectedCandidateId === candidateId;
                     const displayName = getCandidateDisplayName(contractAddress, candidateId, lang, c.name);
@@ -1048,7 +1159,7 @@ const Voter: React.FC<VoterProps> = ({
 
                     const isFocusable =
                       selectedCandidateId === null
-                        ? candidateId === Number(candidates[0]?.id)
+                        ? candidateId === Number(activeCandidates[0]?.id)
                         : isSelected;
                     
                     return (
@@ -1125,6 +1236,11 @@ const Voter: React.FC<VoterProps> = ({
                     );
                   })}
                 </div>
+                {activeCandidates.length === 0 && (
+                  <p className="text-sm text-slate-500">
+                    No active candidates are available in this round.
+                  </p>
+                )}
                 
                 {/* Helper text */}
                 <p className="text-xs text-slate-500 mt-4 flex items-start gap-2">

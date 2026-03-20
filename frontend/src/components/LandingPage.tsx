@@ -64,21 +64,19 @@ export default function LandingPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ address: userAddress }),
       });
+      const payload = await resp.json().catch(() => null);
       if (!resp.ok) {
         let message = `Failed to join demo (${resp.status})`;
-        try {
-          const contentType = resp.headers.get('content-type') || '';
-          if (contentType.includes('application/json')) {
-            const data = await resp.json();
-            message = data?.error || JSON.stringify(data);
-          } else {
-            const text = await resp.text();
-            if (text) message = text;
-          }
-        } catch {
-          // ignore
+        if (payload?.error) {
+          message = payload.error;
         }
         throw new Error(message);
+      }
+      if (resp.status === 202 || payload?.pending || payload?.sync?.pending) {
+        throw new Error(
+          payload?.error ||
+            'Demo eligibility is still syncing to the contract. Wait a few seconds and press Join Demo Election again.'
+        );
       }
 
       // Skip KYC gate for demo users, scoped to the demo election only.

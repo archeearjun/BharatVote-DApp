@@ -18,13 +18,6 @@ const FaceRecognition: React.FC<FaceRecognitionProps> = ({ onVerified, children 
   const loadModels = useCallback(async () => {
     if (isTestEnv) return;
 
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      setReady(true);
-      setError(null);
-      return;
-    } catch {}
-
     const localUrl = `${window.location.origin}/models`;
     const cdnUrl = 'https://justadudewhohacks.github.io/face-api.js/models';
 
@@ -44,8 +37,8 @@ const FaceRecognition: React.FC<FaceRecognitionProps> = ({ onVerified, children 
         setReady(true);
         setError(null);
       } catch {
-        setReady(true);
-        setError(null);
+        setReady(false);
+        setError('Face verification models could not be loaded. Please retry or contact the election administrator.');
       }
     }
   }, [isTestEnv]);
@@ -69,7 +62,6 @@ const FaceRecognition: React.FC<FaceRecognitionProps> = ({ onVerified, children 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
-      setError(null);
     } catch {
       setError('Camera access is required for this verification step.');
     }
@@ -103,17 +95,18 @@ const FaceRecognition: React.FC<FaceRecognitionProps> = ({ onVerified, children 
       let faceDetected = false;
 
       try {
-        if (faceApi?.nets?.tinyFaceDetector) {
+        if (faceApi?.nets?.tinyFaceDetector && faceApi?.TinyFaceDetectorOptions) {
           const detection = await faceApi.detectSingleFace(
             videoRef.current,
             new faceApi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 })
           );
           faceDetected = Boolean(detection);
         } else {
-          faceDetected = true;
+          setError('Face verification is not available because the detection model is not ready.');
+          faceDetected = false;
         }
       } catch {
-        faceDetected = true;
+        faceDetected = false;
       }
 
       consecutive = faceDetected ? consecutive + 1 : 0;

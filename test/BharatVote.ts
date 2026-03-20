@@ -427,6 +427,8 @@ describe("BharatVote", () => {
         .to.emit(vote, "ElectionReset");
       
       expect(await vote.phase()).to.equal(COMMIT_PHASE);
+      expect(await vote.merkleRoot()).to.equal(ethers.ZeroHash);
+      expect(await vote.paused()).to.equal(false);
     });
 
     it("blocks reset before election is finished", async () => {
@@ -479,6 +481,7 @@ describe("BharatVote", () => {
       await vote.connect(admin).startReveal();
       await vote.connect(admin).finishElection();
       await vote.connect(admin).resetElection();
+      await vote.connect(admin).setMerkleRoot(merkleRoot);
 
       let [committed, revealed] = await vote.getVoterStatus(voter1.address);
       expect(committed).to.be.false;
@@ -505,6 +508,8 @@ describe("BharatVote", () => {
       await expect(vote.connect(admin).emergencyReset())
         .to.emit(vote, "ElectionReset");
       expect(await vote.phase()).to.equal(COMMIT_PHASE);
+      expect(await vote.merkleRoot()).to.equal(ethers.ZeroHash);
+      expect(await vote.paused()).to.equal(false);
     });
 
     it("increments electionRound on emergency reset", async () => {

@@ -1,6 +1,6 @@
 import { useEffect, Suspense, lazy, useState, useMemo, useCallback } from "react";
 import { Routes, Route, Navigate, useLocation, useParams } from "react-router-dom";
-import eligibleVoters from "../../eligibleVoters.json";
+import { ethers } from "ethers";
 import MainContainer from './components/MainContainer';
 import Header from './components/Header';
 import Toast from './components/Toast';
@@ -31,6 +31,7 @@ import BlogIndexPage from "./pages/BlogIndexPage";
 import BlogPostPage from "./pages/BlogPostPage";
 import FaqPage from "./pages/FaqPage";
 import { getStoredKycVerification, setStoredKycVerification } from "./utils/kycStorage";
+import { clearCandidateLabels } from "./utils/candidateLabels";
 
 const AdminPanel = lazy(() => import('./Admin'));
 const Voter = lazy(() => import('./Voter'));
@@ -56,6 +57,8 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
   // Merkle roots: backend and contract for readiness alignment
   const [backendMerkleRoot, setBackendMerkleRoot] = useState<string | null>(null);
   const [contractMerkleRoot, setContractMerkleRoot] = useState<string | null>(null);
+  const [backendRootLoaded, setBackendRootLoaded] = useState(false);
+  const [contractRootLoaded, setContractRootLoaded] = useState(false);
   const [backendAllowlistCount, setBackendAllowlistCount] = useState<number | null>(null);
   // State to force a refresh of the tally component
   const [tallyRefreshKey, setTallyRefreshKey] = useState<number>(0);
@@ -73,9 +76,17 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
     if (!demoElectionAddress || !electionAddress) return false;
     return String(demoElectionAddress).toLowerCase() === String(electionAddress).toLowerCase();
   }, [demoElectionAddress, electionAddress]);
-  const totalEligibleVoters = (eligibleVoters as string[])?.length || 0;
-  const eligibleCountForTally = isDemoElection ? undefined : backendAllowlistCount ?? totalEligibleVoters;
+  const eligibleCountForTally = isDemoElection ? undefined : backendAllowlistCount ?? undefined;
   const expectedChainId = getExpectedChainId();
+  const hasUsableMerkleRoot = useCallback((root?: string | null) => {
+    return Boolean(root && ethers.isHexString(root, 32) && String(root).toLowerCase() !== ethers.ZeroHash.toLowerCase());
+  }, []);
+  const backendRootReady = hasUsableMerkleRoot(backendMerkleRoot);
+  const contractRootReady = hasUsableMerkleRoot(contractMerkleRoot);
+  const eligibilityRootsAligned =
+    backendRootReady &&
+    contractRootReady &&
+    String(backendMerkleRoot).toLowerCase() === String(contractMerkleRoot).toLowerCase();
 
   // Demo convenience: bypass KYC gate for demo election even if user deep-links to /election/:address.
   useEffect(() => {
@@ -97,7 +108,11 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
       return;
     }
 
-    const { isVerified, voterId } = getStoredKycVerification(account, electionAddress);
+    const { isVerified, voterId } = getStoredKycVerification(
+      account,
+      electionAddress,
+      isDemoElection ? null : contractMerkleRoot
+    );
 
     if (isVerified) {
       setIsKycVerified(true);
@@ -107,7 +122,7 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
 
     setIsKycVerified(false);
     setVerifiedVoterId(null);
-  }, [account, electionAddress]);
+  }, [account, contractMerkleRoot, electionAddress, isDemoElection]);
 
   const fetchCandidates = useCallback(async () => {
     if (!contract) {
@@ -131,11 +146,13 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
         for (let i = 0; i < Number(count); i++) {
           try {
             const candidate = await contract.candidates(i);
+            const id = Number(candidate.id ?? candidate[0] ?? i);
+            const name = candidate.candidateName ?? candidate.name ?? candidate[1] ?? `Candidate ${id}`;
+            const isActive = Boolean(candidate.isActive ?? candidate[2] ?? true);
             candidatesList.push({
-              id: i,
-              name: candidate.name,
-              voteCount: Number(candidate.voteCount),
-              isActive: true
+              id,
+              name,
+              isActive
             });
           } catch {}
         }
@@ -152,6 +169,7 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
   useEffect(() => {
     const fetchBackendRoot = async () => {
       try {
+        setBackendRootLoaded(false);
         setBackendMerkleRoot(null);
         const base = import.meta.env.VITE_BACKEND_URL || BACKEND_URL;
         const url = new URL(`${base}/api/merkle-root`);
@@ -164,6 +182,8 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
         }
       } catch (err) {
         console.warn('Failed to fetch backend merkle root', err);
+      } finally {
+        setBackendRootLoaded(true);
       }
     };
     fetchBackendRoot();
@@ -194,12 +214,19 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
   // Fetch contract merkle root when contract is ready
   useEffect(() => {
     const readContractRoot = async () => {
-      if (!contract) return;
+      if (!contract) {
+        setContractMerkleRoot(null);
+        setContractRootLoaded(false);
+        return;
+      }
       try {
+        setContractRootLoaded(false);
         const root = await contract.merkleRoot();
         setContractMerkleRoot(root);
       } catch (err) {
         console.warn('Failed to read contract merkle root', err);
+      } finally {
+        setContractRootLoaded(true);
       }
     };
     readContractRoot();
@@ -343,6 +370,10 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
             contract.on('CandidateAdded', refreshCandidates);
             contract.on('CandidateRemoved', refreshCandidates);
             contract.on('AllCandidatesCleared', async () => {
+              const contractAddress = ((contract as any)?.target as string) || ((contract as any)?.address as string) || '';
+              if (contractAddress) {
+                clearCandidateLabels(contractAddress);
+              }
               setCandidates([]);
               await fetchCandidates();
             });
@@ -351,6 +382,10 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
               setCandidates([]);
               setPhase(0);
               setVoterRefreshSignal((prev) => prev + 1);
+              try {
+                const root = await contract.merkleRoot();
+                setContractMerkleRoot(root);
+              } catch {}
               await fetchCandidates();
             });
           }
@@ -361,6 +396,8 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
               const p = await contract.phase();
               setPhase(Number(p));
               setVoterRefreshSignal((prev) => prev + 1);
+              const root = await contract.merkleRoot();
+              setContractMerkleRoot(root);
               await fetchCandidates();
             } catch {}
           };
@@ -653,16 +690,61 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
   }
 
   if (!isAdmin && !isKycVerified) {
+    if (!isDemoElection && (!backendRootLoaded || !contractRootLoaded)) {
+      return (
+        <div className="min-h-screen bg-gradient-subtle font-sans">
+          <div className="flex items-center justify-center min-h-screen px-4">
+            <div className="card-premium p-8 text-center max-w-md w-full">
+              <div className="flex justify-center mb-6">
+                <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center">
+                  <RefreshCw className="w-8 h-8 text-slate-600 animate-spin" />
+                </div>
+              </div>
+              <h2 className="text-xl font-semibold text-slate-900 mb-3">Preparing voter verification</h2>
+              <p className="text-slate-600">
+                Loading the current eligibility root from the backend and the contract before verification can begin.
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (!isDemoElection && (!backendRootReady || !contractRootReady || !eligibilityRootsAligned)) {
+      return (
+        <div className="min-h-screen bg-gradient-subtle font-sans">
+          <div className="flex items-center justify-center min-h-screen px-4">
+            <div className="card-premium p-8 text-center max-w-xl w-full">
+              <div className="flex justify-center mb-6">
+                <div className="w-16 h-16 bg-warning-50 rounded-2xl flex items-center justify-center">
+                  <AlertTriangle className="w-8 h-8 text-warning-600" />
+                </div>
+              </div>
+              <h2 className="text-xl font-semibold text-slate-900 mb-3">Election not ready for voter verification</h2>
+              <p className="text-slate-600">
+                Main-election verification only starts after the prepared voter list is synced to the contract. Ask the admin to upload and sync the current eligibility list before continuing.
+              </p>
+              <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4 text-left text-sm text-slate-600">
+                <p><span className="font-semibold text-slate-900">Backend root:</span> {backendMerkleRoot || 'Not prepared yet'}</p>
+                <p className="mt-2"><span className="font-semibold text-slate-900">Contract root:</span> {contractMerkleRoot || 'Not synced yet'}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <KycPage
         account={account}
         electionAddress={electionAddress}
+        eligibilityRoot={contractMerkleRoot}
         onVerified={(voterId: string) => {
           setIsKycVerified(true);
           setVerifiedVoterId(voterId);
           
           if (account) {
-            setStoredKycVerification(account, electionAddress, voterId);
+            setStoredKycVerification(account, electionAddress, voterId, contractMerkleRoot);
           }
         }}
       />
@@ -719,6 +801,9 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
                      setBackendMerkleRoot(info.merkleRoot);
                    }
                  }}
+                 onMerkleRootUpdated={(root) => {
+                   setContractMerkleRoot(root);
+                 }}
                   onError={(error: string) => setToast({ type: 'error', message: error })}
                   onPhaseChange={() => {
                     contract.phase().then((p: any) => setPhase(Number(p)));
@@ -728,6 +813,8 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
                     try {
                       const p2 = await contract.phase();
                       setPhase(Number(p2));
+                      const root = await contract.merkleRoot();
+                      setContractMerkleRoot(root);
                     } catch {}
                   }, 0);
                 }}

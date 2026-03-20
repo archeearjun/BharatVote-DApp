@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useI18n } from './i18n';
 import {
   AlertTriangle,
@@ -40,11 +40,7 @@ const Tally: React.FC<TallyProps> = ({ contract, phase, refreshTrigger, eligible
     { id: 2, label: t('tally.finished'), description: t('tally.resultsFinalized') },
   ];
 
-  useEffect(() => {
-    fetchResults();
-  }, [contract, phase, refreshTrigger]);
-
-  const fetchResults = async () => {
+  const fetchResults = useCallback(async () => {
     if (!contract) return;
 
     setIsLoading(true);
@@ -73,7 +69,19 @@ const Tally: React.FC<TallyProps> = ({ contract, phase, refreshTrigger, eligible
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [contract, t]);
+
+  useEffect(() => {
+    fetchResults();
+  }, [fetchResults, phase, refreshTrigger]);
+
+  useEffect(() => {
+    if (!contract) return;
+    const id = window.setInterval(() => {
+      fetchResults();
+    }, 15000);
+    return () => window.clearInterval(id);
+  }, [contract, fetchResults]);
 
   const getTopCandidates = () => {
     if (candidates.length === 0 || totalVotes === 0) return [] as Candidate[];

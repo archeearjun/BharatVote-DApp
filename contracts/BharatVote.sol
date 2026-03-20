@@ -147,6 +147,8 @@ contract BharatVote is Initializable {
     function resetElection() external onlyAdmin {
         if (phase != 2) revert CanOnlyResetAfterFinish(); // 2: Finished
         phase = 0; // 0: Commit
+        paused = false;
+        merkleRoot = bytes32(0);
         electionRound += 1;
 
         emit ElectionReset();
@@ -168,6 +170,8 @@ contract BharatVote is Initializable {
     // Emergency reset function - can be called from any phase
     function emergencyReset() external onlyAdmin {
         phase = 0; // 0: Commit
+        paused = false;
+        merkleRoot = bytes32(0);
         electionRound += 1;
 
         emit ElectionReset();

@@ -17,6 +17,7 @@ import {
 interface KycPageProps {
   account: string;
   electionAddress?: string;
+  eligibilityRoot?: string | null;
   onVerified: (voterId: string) => void;
 }
 
@@ -24,7 +25,7 @@ const OTP_LENGTH = 6;
 // Sandbox bypass only available in local dev builds (import.meta.env.DEV is false in production)
 const SANDBOX_OTP = import.meta.env.DEV ? '123456' : null;
 
-const KycPage: React.FC<KycPageProps> = ({ account, electionAddress, onVerified }) => {
+const KycPage: React.FC<KycPageProps> = ({ account, electionAddress, eligibilityRoot, onVerified }) => {
   const { t } = useI18n();
   const [step, setStep] = useState(0);
   const [voterId, setVoterId] = useState('');
@@ -174,7 +175,7 @@ const KycPage: React.FC<KycPageProps> = ({ account, electionAddress, onVerified 
     setToast({ type: 'success', message: t('kyc.faceVerified') });
     setTimeout(() => {
       try {
-        setStoredKycVerification(account, electionAddress, voterId);
+        setStoredKycVerification(account, electionAddress, voterId, eligibilityRoot);
       } catch {}
       onVerified(voterId);
     }, 1200);
