@@ -37,6 +37,12 @@ interface VoterProps {
   onStatusChange?: (status: { committed: boolean; revealed: boolean }) => void;
 }
 
+interface RecoverySnapshot {
+  candidateId?: number;
+  salt?: string;
+  commitHash?: string | null;
+}
+
 const Voter: React.FC<VoterProps> = ({
   contract,
   phase,
@@ -69,6 +75,7 @@ const Voter: React.FC<VoterProps> = ({
   const [isEligible, setIsEligible] = useState(false);
   const [isFetchingProof, setIsFetchingProof] = useState(false);
   const [hasRecoverySnapshot, setHasRecoverySnapshot] = useState(false);
+  const [recoverySnapshot, setRecoverySnapshot] = useState<RecoverySnapshot | null>(null);
   const [electionRound, setElectionRound] = useState<number | null>(null);
   const contractAddress = ((contract as any)?.target as string) || ((contract as any)?.address as string) || '';
   const recoveryStorageKey = useMemo(() => {
@@ -96,17 +103,19 @@ const Voter: React.FC<VoterProps> = ({
   ];
 
   const persistRecoverySnapshot = useCallback((candidateId: number, nextSalt: string, commitHash?: string | null) => {
+    const snapshot: RecoverySnapshot = {
+      candidateId,
+      salt: nextSalt,
+      commitHash: commitHash || null,
+    };
     try {
       // Use localStorage (not sessionStorage) so the snapshot survives tab close.
       // The voter needs their salt to reveal — losing it means they can't reveal.
       localStorage.setItem(
         recoveryStorageKey,
-        JSON.stringify({
-          candidateId,
-          salt: nextSalt,
-          commitHash: commitHash || null,
-        })
+        JSON.stringify(snapshot)
       );
+      setRecoverySnapshot(snapshot);
       setHasRecoverySnapshot(true);
     } catch {}
   }, [recoveryStorageKey]);
@@ -115,6 +124,7 @@ const Voter: React.FC<VoterProps> = ({
     try {
       localStorage.removeItem(recoveryStorageKey);
     } catch {}
+    setRecoverySnapshot(null);
     setHasRecoverySnapshot(false);
   }, [recoveryStorageKey]);
 
@@ -218,6 +228,7 @@ const Voter: React.FC<VoterProps> = ({
     setSelectedCandidateId(null);
     setSalt('');
     setVoteHash(null);
+    setRecoverySnapshot(null);
     setHasRecoverySnapshot(false);
     setHasVoted(false);
     setHasRevealed(false);
@@ -262,36 +273,30 @@ const Voter: React.FC<VoterProps> = ({
     try {
       const raw = localStorage.getItem(recoveryStorageKey);
       if (!raw) {
-        setSelectedCandidateId(null);
-        setSalt('');
-        setVoteHash(null);
+        setRecoverySnapshot(null);
         setHasRecoverySnapshot(false);
         return;
       }
 
-      const parsed = JSON.parse(raw) as {
-        candidateId?: number;
-        salt?: string;
-        commitHash?: string | null;
-      };
+      const parsed = JSON.parse(raw) as RecoverySnapshot;
+      const normalizedSnapshot =
+        typeof parsed?.candidateId === 'number' && typeof parsed?.salt === 'string'
+          ? {
+              candidateId: parsed.candidateId,
+              salt: parsed.salt,
+              commitHash: typeof parsed.commitHash === 'string' ? parsed.commitHash : null,
+            }
+          : null;
 
-      if (typeof parsed.candidateId === 'number' && selectedCandidateId === null) {
-        setSelectedCandidateId(parsed.candidateId);
-      }
-      if (typeof parsed.salt === 'string' && !salt) {
-        setSalt(parsed.salt);
-      }
-      if (typeof parsed.commitHash === 'string' && !voteHash) {
-        setVoteHash(parsed.commitHash);
+      if (!normalizedSnapshot) {
+        clearRecoverySnapshot();
+        return;
       }
 
+      setRecoverySnapshot(normalizedSnapshot);
       setHasRecoverySnapshot(true);
     } catch {
       clearRecoverySnapshot();
-      setSelectedCandidateId(null);
-      setSalt('');
-      setVoteHash(null);
-      setHasRecoverySnapshot(false);
     }
   }, [clearRecoverySnapshot, recoveryStorageKey]);
 
@@ -446,6 +451,8 @@ const Voter: React.FC<VoterProps> = ({
     const resetOrReopenedCommit = phase === 0 && (refreshChanged || (previousPhase !== null && previousPhase !== 0));
 
     if (enteredReveal) {
+      setSelectedCandidateId(null);
+      setSalt('');
       setIsSaltVisible(false);
       setShowCommitModal(false);
       setError(null);
@@ -544,8 +551,34 @@ const Voter: React.FC<VoterProps> = ({
     setSalt(generateSalt());
   };
 
+  const restoreRecoverySnapshot = useCallback(() => {
+    if (!recoverySnapshot || typeof recoverySnapshot.candidateId !== 'number' || typeof recoverySnapshot.salt !== 'string') {
+      setError('No saved recovery details are available in this browser for the current round.');
+      return;
+    }
+
+    setSelectedCandidateId(recoverySnapshot.candidateId);
+    setSalt(recoverySnapshot.salt);
+    if (typeof recoverySnapshot.commitHash === 'string' && recoverySnapshot.commitHash) {
+      setVoteHash(recoverySnapshot.commitHash);
+    }
+    setError(null);
+    setSuccess('Saved recovery details restored from this browser.');
+  }, [recoverySnapshot]);
+
   const handleDownloadRecoveryFile = useCallback(() => {
-    if (selectedCandidateId === null || !salt.trim()) {
+    const recoveryCandidateId =
+      selectedCandidateId !== null
+        ? selectedCandidateId
+        : typeof recoverySnapshot?.candidateId === 'number'
+          ? recoverySnapshot.candidateId
+          : null;
+    const recoverySalt =
+      salt.trim() || (typeof recoverySnapshot?.salt === 'string' ? recoverySnapshot.salt.trim() : '');
+    const recoveryCommitHash =
+      voteHash || (typeof recoverySnapshot?.commitHash === 'string' ? recoverySnapshot.commitHash : null);
+
+    if (recoveryCandidateId === null || !recoverySalt) {
       setError('Select a candidate and enter your password before downloading recovery details.');
       return;
     }
@@ -559,9 +592,9 @@ const Voter: React.FC<VoterProps> = ({
       `Exported: ${new Date().toISOString()}`,
       `Election: ${electionAddress || 'N/A'}`,
       `Wallet: ${account}`,
-      `Candidate ID: ${selectedCandidateId}`,
-      `Password: ${salt.trim()}`,
-      `Commit Hash: ${voteHash || 'Pending until commit transaction confirms'}`,
+      `Candidate ID: ${recoveryCandidateId}`,
+      `Password: ${recoverySalt}`,
+      `Commit Hash: ${recoveryCommitHash || 'Pending until commit transaction confirms'}`,
       '',
       'Keep this file private. You need the exact same password and candidate ID during reveal.',
     ].join('\n');
@@ -576,7 +609,7 @@ const Voter: React.FC<VoterProps> = ({
     document.body.removeChild(link);
     URL.revokeObjectURL(downloadUrl);
     setSuccess('Recovery file downloaded. Keep it private until you complete reveal.');
-  }, [account, electionAddress, salt, selectedCandidateId, voteHash]);
+  }, [account, electionAddress, recoverySnapshot, salt, selectedCandidateId, voteHash]);
 
   const toggleSaltVisibility = () => {
     setIsSaltVisible((prev) => !prev);
@@ -640,6 +673,9 @@ const Voter: React.FC<VoterProps> = ({
     hasVoted &&
     !hasRevealed &&
     phase === 1;
+  const hasDownloadableRecoveryDetails =
+    (selectedCandidateId !== null && !!salt.trim()) ||
+    (typeof recoverySnapshot?.candidateId === 'number' && typeof recoverySnapshot?.salt === 'string' && !!recoverySnapshot.salt.trim());
 
   const commitDisabledReason = (() => {
     if (phase !== 0) return 'Commit is only available during the commit phase';
@@ -1106,14 +1142,24 @@ const Voter: React.FC<VoterProps> = ({
                 {t('voter.revealPasswordHint')}
               </p>
               {hasRecoverySnapshot && (
-                <p className="mt-2 text-xs text-slate-500">
-                  {t('voter.recoveryAvailable')}
-                </p>
+                <div className="mt-3 space-y-2">
+                  <p className="text-xs text-slate-500">
+                    {t('voter.recoveryAvailable')}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={restoreRecoverySnapshot}
+                    className="btn-secondary text-sm"
+                    title="Restore saved recovery details from this browser"
+                  >
+                    Restore Saved Details
+                  </button>
+                </div>
               )}
               <button
                 type="button"
                 onClick={handleDownloadRecoveryFile}
-                disabled={selectedCandidateId === null || !salt.trim()}
+                disabled={!hasDownloadableRecoveryDetails}
                 className="btn-secondary mt-3 text-sm"
                 title="Download your recovery details"
               >
