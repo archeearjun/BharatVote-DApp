@@ -94,6 +94,34 @@ describe('KycPage', () => {
     })
   })
 
+  it('verifies election-scoped access by wallet without requiring a voter ID', async () => {
+    mockFetchResponse({
+      eligible: true,
+      address: '0x01bad59740664445Fd489315E14F4300639c253b',
+      voterId: '0x01bad59740664445Fd489315E14F4300639c253b',
+      verificationMode: 'wallet_allowlist',
+    })
+
+    renderWithI18n(
+      <KycPage
+        {...mockProps}
+        electionAddress="0x1111111111111111111111111111111111111111"
+      />
+    )
+
+    expect(screen.queryByLabelText(/voter id/i)).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /verify wallet/i }))
+
+    await waitFor(() => {
+      const callUrl = (fetch as any).mock.calls?.[0]?.[0] as string
+      expect(callUrl).toContain('/api/kyc?')
+      expect(callUrl).toContain(`address=${mockProps.account}`)
+      expect(callUrl).toContain('electionAddress=0x1111111111111111111111111111111111111111')
+      expect(callUrl).not.toContain('voter_id=')
+    })
+  })
+
   it('handles KYC validation failure for invalid voter ID', async () => {
     const user = userEvent.setup()
     

@@ -22,17 +22,19 @@ interface KycPageProps {
 }
 
 const OTP_LENGTH = 6;
-// Sandbox OTP is available in local dev by default and can also be configured explicitly via VITE_SANDBOX_OTP.
+// Demo OTP is available by default and can be overridden explicitly via VITE_SANDBOX_OTP.
 const CONFIGURED_SANDBOX_OTP =
   typeof import.meta.env.VITE_SANDBOX_OTP === 'string' && import.meta.env.VITE_SANDBOX_OTP.trim()
     ? import.meta.env.VITE_SANDBOX_OTP.trim()
     : null;
-const SANDBOX_OTP = CONFIGURED_SANDBOX_OTP || (import.meta.env.DEV ? '123456' : null);
+const SANDBOX_OTP = CONFIGURED_SANDBOX_OTP || '123456';
 
 const KycPage: React.FC<KycPageProps> = ({ account, electionAddress, eligibilityRoot, onVerified }) => {
   const { t } = useI18n();
+  const isElectionScopedVerification = Boolean(electionAddress);
   const [step, setStep] = useState(0);
   const [voterId, setVoterId] = useState('');
+  const [verifiedIdentity, setVerifiedIdentity] = useState('');
   const [otp, setOtp] = useState(Array.from({ length: OTP_LENGTH }, () => ''));
   const [otpVisible, setOtpVisible] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -40,8 +42,9 @@ const KycPage: React.FC<KycPageProps> = ({ account, electionAddress, eligibility
   const [faceVisible, setFaceVisible] = useState(false);
   const otpInputRefs = useRef<Array<HTMLInputElement | null>>([]);
 
-  const steps = [t('kyc.epic'), t('kyc.otp'), t('kyc.complete')];
+  const steps = [isElectionScopedVerification ? 'Wallet' : t('kyc.epic'), t('kyc.otp'), t('kyc.complete')];
   const shortAccount = `${account.slice(0, 6)}...${account.slice(-4)}`;
+  const resolvedIdentity = verifiedIdentity || voterId || account;
 
   const resetOtp = () => {
     setOtp(Array.from({ length: OTP_LENGTH }, () => ''));
@@ -49,16 +52,18 @@ const KycPage: React.FC<KycPageProps> = ({ account, electionAddress, eligibility
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!voterId.trim()) return;
+    if (!isElectionScopedVerification && !voterId.trim()) return;
 
     setLoading(true);
     try {
-      if (voterId.length < 6) {
+      if (!isElectionScopedVerification && voterId.length < 6) {
         throw new Error('Voter ID must be at least 6 characters');
       }
 
       const kycUrl = new URL(`${BACKEND_URL}/api/kyc`);
-      kycUrl.searchParams.set('voter_id', voterId);
+      if (!isElectionScopedVerification) {
+        kycUrl.searchParams.set('voter_id', voterId);
+      }
       if (account) {
         kycUrl.searchParams.set('address', account);
       }
@@ -88,7 +93,11 @@ const KycPage: React.FC<KycPageProps> = ({ account, electionAddress, eligibility
 
       const kycResult = await response.json();
       if (!kycResult.eligible) {
-        throw new Error('Voter ID not found in electoral rolls. Please check your Voter ID.');
+        throw new Error(
+          isElectionScopedVerification
+            ? (kycResult.error || 'This wallet is not approved for this election. Ask the admin to upload the correct voter list.')
+            : 'Voter ID not found in electoral rolls. Please check your Voter ID.'
+        );
       }
 
       const expectedAddress = kycResult.address?.toLowerCase();
@@ -102,15 +111,22 @@ const KycPage: React.FC<KycPageProps> = ({ account, electionAddress, eligibility
         throw new Error('This wallet does not match the verified voter record for this election.');
       }
 
-      if (!SANDBOX_OTP) {
-        throw new Error(
-          'OTP verification is not configured in this build. Set VITE_SANDBOX_OTP for sandbox testing or integrate a real OTP provider.'
-        );
-      }
+      setVerifiedIdentity(
+        String(
+          kycResult.voterId ||
+            (isElectionScopedVerification ? account : voterId) ||
+            account
+        )
+      );
 
       setStep(1);
       setOtpVisible(true);
-      setToast({ type: 'success', message: 'Voter ID verified. Use the sandbox OTP shown below to continue.' });
+      setToast({
+        type: 'success',
+        message: isElectionScopedVerification
+          ? 'Wallet verified against the election voter list. Use the demo OTP shown below to continue.'
+          : 'Voter ID verified. Use the demo OTP shown below to continue.',
+      });
     } catch (error: unknown) {
       setToast({
         type: 'error',
@@ -185,9 +201,9 @@ const KycPage: React.FC<KycPageProps> = ({ account, electionAddress, eligibility
     setToast({ type: 'success', message: t('kyc.faceVerified') });
     setTimeout(() => {
       try {
-        setStoredKycVerification(account, electionAddress, voterId, eligibilityRoot);
+        setStoredKycVerification(account, electionAddress, resolvedIdentity, eligibilityRoot);
       } catch {}
-      onVerified(voterId);
+      onVerified(resolvedIdentity);
     }, 1200);
   };
 
@@ -218,7 +234,9 @@ const KycPage: React.FC<KycPageProps> = ({ account, electionAddress, eligibility
                 </div>
               </div>
               <div className="mt-4 grid gap-2 text-sm text-slate-600 sm:grid-cols-3">
-                <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">{t('kyc.step.verifyId')}</div>
+                <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+                  {isElectionScopedVerification ? '1. Verify wallet' : t('kyc.step.verifyId')}
+                </div>
                 <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">{t('kyc.step.confirmOtp')}</div>
                 <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">{t('kyc.step.faceCheck')}</div>
               </div>
@@ -266,45 +284,59 @@ const KycPage: React.FC<KycPageProps> = ({ account, electionAddress, eligibility
             ) : (
               <form onSubmit={handleSendOtp} className="space-y-6">
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 text-left">
-                  <p className="text-sm font-semibold text-slate-900">{t('kyc.verifyIdentityTitle')}</p>
+                  <p className="text-sm font-semibold text-slate-900">
+                    {isElectionScopedVerification ? 'Verify wallet access' : t('kyc.verifyIdentityTitle')}
+                  </p>
                   <p className="mt-2 text-sm leading-6 text-slate-600">
-                    {t('kyc.verifyIdentityDescription')}
+                    {isElectionScopedVerification
+                      ? 'For admin-controlled elections, BharatVote verifies the connected wallet against the uploaded voter list. No separate voter ID lookup is required.'
+                      : t('kyc.verifyIdentityDescription')}
                   </p>
                 </div>
 
-                <div className="text-left">
-                  <label htmlFor="epic" className="mb-2 block text-sm font-medium text-slate-700">
-                    {t('kyc.enterVoterId')}
-                  </label>
-                  <input
-                    id="epic"
-                    type="text"
-                    value={voterId}
-                    onChange={(e) => setVoterId(e.target.value.toUpperCase())}
-                    placeholder={t('kyc.voterIdPlaceholder')}
-                    maxLength={15}
-                    autoFocus
-                    className="input-base w-full text-center font-mono"
-                    disabled={loading}
-                  />
-                  <p className="mt-2 text-sm text-slate-500">
-                    {t('kyc.voterIdHelper')}
-                  </p>
-                  <p className="mt-2 text-sm text-slate-500">
-                    Enter the exact voter ID string for this wallet, not a numeric row like <code className="rounded bg-slate-100 px-1">1</code>.
-                  </p>
-                </div>
+                {isElectionScopedVerification ? (
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-left">
+                    <p className="text-sm font-medium text-slate-900">Connected wallet</p>
+                    <p className="mt-2 font-mono text-sm text-slate-700 break-all">{account}</p>
+                    <p className="mt-3 text-sm text-slate-500">
+                      The admin-uploaded allowlist contains wallet addresses only. If this wallet is approved for the election, continue and use the demo OTP <code className="rounded bg-slate-200 px-1">{SANDBOX_OTP}</code>.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="text-left">
+                    <label htmlFor="epic" className="mb-2 block text-sm font-medium text-slate-700">
+                      {t('kyc.enterVoterId')}
+                    </label>
+                    <input
+                      id="epic"
+                      type="text"
+                      value={voterId}
+                      onChange={(e) => setVoterId(e.target.value.toUpperCase())}
+                      placeholder={t('kyc.voterIdPlaceholder')}
+                      maxLength={15}
+                      autoFocus
+                      className="input-base w-full text-center font-mono"
+                      disabled={loading}
+                    />
+                    <p className="mt-2 text-sm text-slate-500">
+                      {t('kyc.voterIdHelper')}
+                    </p>
+                    <p className="mt-2 text-sm text-slate-500">
+                      Enter the exact voter ID string for this wallet, not a numeric row like <code className="rounded bg-slate-100 px-1">1</code>.
+                    </p>
+                  </div>
+                )}
 
-                <button type="submit" disabled={!voterId.trim() || loading} className="btn-primary w-full">
+                <button type="submit" disabled={(!isElectionScopedVerification && !voterId.trim()) || loading} className="btn-primary w-full">
                   {loading ? (
                     <div className="flex items-center justify-center gap-2">
                       <div className="spinner h-4 w-4" />
-                      {t('kyc.verifyingVoterRecord')}
+                      {isElectionScopedVerification ? 'Checking voter-list access...' : t('kyc.verifyingVoterRecord')}
                     </div>
                   ) : (
                     <div className="flex items-center justify-center gap-2">
                       <Phone className="h-4 w-4" />
-                      {t('kyc.continueToOtp')}
+                      {isElectionScopedVerification ? 'Verify Wallet' : t('kyc.continueToOtp')}
                     </div>
                   )}
                 </button>
@@ -325,13 +357,11 @@ const KycPage: React.FC<KycPageProps> = ({ account, electionAddress, eligibility
               <div>
                 <h3 className="mb-2 text-lg font-semibold text-slate-900">{t('kyc.otpVerificationTitle')}</h3>
                 <p className="mb-2 text-sm text-slate-600">
-                  {t('kyc.otpVerificationDescription')}
+                  Enter the 6-digit demo OTP shown below to continue.
                 </p>
-                {SANDBOX_OTP && (
-                  <div className="rounded-lg bg-slate-50 p-2 text-xs text-slate-500">
-                    <strong>{t('kyc.sandboxCodeLabel')}</strong> {t('kyc.sandboxCodeHint')} <code className="rounded bg-slate-200 px-1">{SANDBOX_OTP}</code>.
-                  </div>
-                )}
+                <div className="rounded-lg bg-slate-50 p-2 text-xs text-slate-500">
+                  <strong>{t('kyc.sandboxCodeLabel')}</strong> {t('kyc.sandboxCodeHint')} <code className="rounded bg-slate-200 px-1">{SANDBOX_OTP}</code>.
+                </div>
               </div>
 
               <div className="flex justify-center gap-2">
@@ -363,6 +393,7 @@ const KycPage: React.FC<KycPageProps> = ({ account, electionAddress, eligibility
                     setOtpVisible(false);
                     setStep(0);
                     resetOtp();
+                    setVerifiedIdentity('');
                   }}
                   className="btn-secondary flex-1"
                 >
@@ -386,7 +417,7 @@ const KycPage: React.FC<KycPageProps> = ({ account, electionAddress, eligibility
                 <button
                   type="button"
                   className="font-medium text-slate-700 underline hover:text-slate-900"
-                  onClick={() => setToast({ type: 'success', message: t('kyc.verificationCodeResent') })}
+                  onClick={() => setToast({ type: 'success', message: `Verification code resent. Use the same demo OTP: ${SANDBOX_OTP}.` })}
                 >
                   {t('otp.resendOTP')}
                 </button>

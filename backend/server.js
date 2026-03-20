@@ -1057,10 +1057,6 @@ app.get('/api/kyc', (req, res) => {
   const electionAddress = req.query?.electionAddress ? String(req.query.electionAddress).trim() : '';
   const address = req.query?.address ? String(req.query.address).trim() : '';
 
-  if (!voterId) {
-    return res.status(400).json({ eligible: false, error: 'voter_id is required' });
-  }
-
   if (electionAddress) {
     if (!ethers.isAddress(electionAddress)) {
       return res.status(400).json({ eligible: false, error: 'Invalid election address' });
@@ -1082,36 +1078,28 @@ app.get('/api/kyc', (req, res) => {
       });
     }
 
-    const record = kycData.find((r) => String(r?.voterId || '').toUpperCase() === voterId.toUpperCase());
-    if (!record) {
-      return res.json({ eligible: false });
-    }
-
     const normalized = ethers.getAddress(address);
-    const recordAddress = typeof record?.address === 'string' && ethers.isAddress(record.address)
-      ? ethers.getAddress(record.address)
-      : null;
-
-    if (!recordAddress) {
-      return res.status(500).json({ eligible: false, error: 'KYC record is malformed for this voter.' });
-    }
-
-    if (recordAddress.toLowerCase() !== normalized.toLowerCase()) {
-      return res.status(403).json({
-        eligible: false,
-        error: 'This wallet does not match the verified voter record for this election.',
-      });
-    }
-
     const isEligible = allowlist.addresses.some(
       (entry) => String(entry).toLowerCase() === normalized.toLowerCase()
     );
 
     if (!isEligible) {
-      return res.json({ eligible: false });
+      return res.json({
+        eligible: false,
+        error: 'This wallet is not in the uploaded voter list for this election.',
+      });
     }
 
-    return res.json({ eligible: true, address: normalized, voterId: record.voterId });
+    return res.json({
+      eligible: true,
+      address: normalized,
+      voterId: voterId || normalized,
+      verificationMode: 'wallet_allowlist',
+    });
+  }
+
+  if (!voterId) {
+    return res.status(400).json({ eligible: false, error: 'voter_id is required' });
   }
 
   // Fallback to static mock data when no election context is provided.
