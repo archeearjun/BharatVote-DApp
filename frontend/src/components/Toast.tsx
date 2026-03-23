@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from 'react';
 
+const TOAST_VISIBLE_MS = 3000;
+const TOAST_EXIT_ANIMATION_MS = 300;
+
 interface ToastProps {
   type: 'success' | 'error';
   message: string;
@@ -18,8 +21,8 @@ const Toast: React.FC<ToastProps> = ({ type, message, isVisible, onClose }) => {
       setShow(true);
       const timer = setTimeout(() => {
         setShow(false);
-        setTimeout(onClose, 300); // Wait for animation
-      }, 3000);
+        setTimeout(onClose, TOAST_EXIT_ANIMATION_MS); // Wait for animation
+      }, TOAST_VISIBLE_MS);
       return () => clearTimeout(timer);
     }
   }, [isVisible, onClose]);
