@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useI18n } from '../i18n';
 import { getExpectedChainId } from '@/utils/chain';
-import { 
+import {
   Languages,
   Shield,
   User,
@@ -11,6 +11,9 @@ import {
   CheckSquare,
   Sparkles
 } from 'lucide-react';
+
+const SEPOLIA_CHAIN_ID = 11155111;
+const LOCALHOST_CHAIN_ID = 31337;
 
 interface HeaderProps {
   account?: string;
@@ -91,9 +94,9 @@ const Header: React.FC<HeaderProps> = ({
   const getNetworkLabel = (id?: number | null) => {
     if (id === null || id === undefined) return 'Network';
     switch (Number(id)) {
-      case 11155111:
+      case SEPOLIA_CHAIN_ID:
         return 'Sepolia';
-      case 31337:
+      case LOCALHOST_CHAIN_ID:
         return 'Localhost';
       default:
         return `Chain ${id}`;
