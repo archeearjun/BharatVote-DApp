@@ -1,7 +1,8 @@
 export const MAX_NAME_BYTES = 100;
+const UTF8_ENCODER = new TextEncoder();
 
 export function getUtf8ByteLength(value: string) {
-  return new TextEncoder().encode(value).length;
+  return UTF8_ENCODER.encode(value).length;
 }
 
 export function getNameLengthError(value: string, label: string) {
