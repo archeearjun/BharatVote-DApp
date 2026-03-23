@@ -1,14 +1,16 @@
 import { ethers } from 'ethers';
 
+const ABI_WORD_HEX_LENGTH = 64;
+
 export function decodeVoteRevealedChoiceFromLogData(
   data: string,
   abiCoder: ethers.AbiCoder
 ): number | null {
   if (!data || data === '0x') return null;
   const hex = data.startsWith('0x') ? data.slice(2) : data;
-  if (hex.length % 64 !== 0) return null;
+  if (hex.length % ABI_WORD_HEX_LENGTH !== 0) return null;
 
-  const wordCount = hex.length / 64;
+  const wordCount = hex.length / ABI_WORD_HEX_LENGTH;
 
   try {
     if (wordCount >= 2) {
@@ -26,4 +28,3 @@ export function decodeVoteRevealedChoiceFromLogData(
     return null;
   }
 }
-
