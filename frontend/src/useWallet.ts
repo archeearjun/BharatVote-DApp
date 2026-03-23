@@ -5,16 +5,19 @@ import { WALLET_ERRORS, CONTRACT_ERRORS } from "./constants";
 import { getElectionContract } from "@/utils/contract";
 import { getChainConfig, getExpectedChainId } from "@/utils/chain";
 
+function stripWrappedQuotes(value: string): string {
+  return (value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))
+    ? value.slice(1, -1)
+    : value;
+}
+
 function normalizeChainId(chainId: unknown): number | null {
   if (typeof chainId === "bigint") return Number(chainId);
   if (typeof chainId === "number") return Number.isFinite(chainId) ? chainId : null;
   if (typeof chainId === "string") {
     const trimmed = chainId.trim();
     if (!trimmed) return null;
-    const cleaned =
-      (trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))
-        ? trimmed.slice(1, -1)
-        : trimmed;
+    const cleaned = stripWrappedQuotes(trimmed);
     const parsed = cleaned.startsWith("0x") || cleaned.startsWith("0X")
       ? Number.parseInt(cleaned, 16)
       : Number.parseInt(cleaned, 10);
