@@ -37,6 +37,10 @@ const AdminPanel = lazy(() => import('./Admin'));
 const Voter = lazy(() => import('./Voter'));
 const Tally = lazy(() => import('./Tally'));
 
+function getContractAddress(contract: any): string {
+  return ((contract as any)?.target as string) || ((contract as any)?.address as string) || '';
+}
+
 /**
  * Main application component.
  * Manages global state such as wallet connection, admin status, and election phase.
@@ -370,7 +374,7 @@ function ElectionUI({ electionAddress }: { electionAddress: string }) {
             contract.on('CandidateAdded', refreshCandidates);
             contract.on('CandidateRemoved', refreshCandidates);
             contract.on('AllCandidatesCleared', async () => {
-              const contractAddress = ((contract as any)?.target as string) || ((contract as any)?.address as string) || '';
+              const contractAddress = getContractAddress(contract);
               if (contractAddress) {
                 clearCandidateLabels(contractAddress);
               }
