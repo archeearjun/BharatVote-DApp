@@ -11,6 +11,8 @@ import {
 } from 'lucide-react';
 import { getCandidateDisplayName } from './utils/candidateLabels';
 
+const RESULTS_POLL_INTERVAL_MS = 15000;
+
 interface TallyProps {
   contract: any;
   phase: number;
@@ -79,7 +81,7 @@ const Tally: React.FC<TallyProps> = ({ contract, phase, refreshTrigger, eligible
     if (!contract) return;
     const id = window.setInterval(() => {
       fetchResults();
-    }, 15000);
+    }, RESULTS_POLL_INTERVAL_MS);
     return () => window.clearInterval(id);
   }, [contract, fetchResults]);
 
