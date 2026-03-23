@@ -1,3 +1,6 @@
+const DEFAULT_SEPOLIA_CHAIN_ID = 11155111;
+const DEFAULT_SEPOLIA_RPC_URL = "https://rpc.sepolia.org";
+
 function unquote(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) return trimmed;
@@ -20,7 +23,7 @@ export function parseChainId(value: string | undefined | null, fallbackDecimal: 
 }
 
 export function getExpectedChainId(): number {
-  return parseChainId(import.meta.env.VITE_CHAIN_ID as string | undefined, 11155111);
+  return parseChainId(import.meta.env.VITE_CHAIN_ID as string | undefined, DEFAULT_SEPOLIA_CHAIN_ID);
 }
 
 type AddEthereumChainParameter = {
@@ -40,11 +43,11 @@ function toHexChainId(chainId: number): string {
 }
 
 export function getChainConfig(chainId: number): AddEthereumChainParameter | null {
-  if (chainId === 11155111) {
+  if (chainId === DEFAULT_SEPOLIA_CHAIN_ID) {
     const rpcUrl =
       (import.meta.env.VITE_SEPOLIA_RPC_URL as string | undefined) ||
       (import.meta.env.VITE_RPC_URL as string | undefined) ||
-      "https://rpc.sepolia.org";
+      DEFAULT_SEPOLIA_RPC_URL;
 
     return {
       chainId: toHexChainId(chainId),
