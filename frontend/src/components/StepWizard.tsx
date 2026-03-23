@@ -1,6 +1,10 @@
 import React from 'react';
 import { Check } from 'lucide-react';
 
+function clampStep(value: number, stepCount: number): number {
+  return Math.min(Math.max(value, 0), Math.max(stepCount - 1, 0));
+}
+
 interface WizardStep {
   id: number;
   title: string;
@@ -14,7 +18,7 @@ interface StepWizardProps {
 }
 
 const StepWizard: React.FC<StepWizardProps> = ({ steps, currentStep, lockedReason }) => {
-  const clampedStep = Math.min(Math.max(currentStep, 0), Math.max(steps.length - 1, 0));
+  const clampedStep = clampStep(currentStep, steps.length);
   const resolvedSteps = steps.map((step, idx) => {
     const status = idx < clampedStep ? 'complete' : idx === clampedStep ? 'current' : 'upcoming';
     const isLocked = Boolean(lockedReason) && idx > clampedStep;
