@@ -1,6 +1,7 @@
 export type LangCode = 'en' | 'hi' | 'ta';
 
 type CandidateLabelMap = Record<string, Partial<Record<LangCode, string>>>; // key: candidateId as string
+const CANDIDATE_LABELS_STORAGE_PREFIX = 'bv_candidate_labels_';
 
 const builtInCandidateLabels: Record<string, Partial<Record<LangCode, string>>> = {
   'Team Pineapple 🍍': {
@@ -21,7 +22,8 @@ const builtInCandidateLabels: Record<string, Partial<Record<LangCode, string>>> 
   },
 };
 
-const storageKey = (contractAddress: string) => `bv_candidate_labels_${contractAddress?.toLowerCase() || 'unknown'}`;
+const storageKey = (contractAddress: string) =>
+  `${CANDIDATE_LABELS_STORAGE_PREFIX}${contractAddress?.toLowerCase() || 'unknown'}`;
 
 export function getAllLabels(contractAddress: string): CandidateLabelMap {
   try {
