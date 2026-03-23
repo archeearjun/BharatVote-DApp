@@ -1,13 +1,15 @@
 import { ethers } from "ethers";
 
+const DEFAULT_KYC_SCOPE = "global";
+
 function normalizeScope(value?: string) {
-  if (!value) return "global";
+  if (!value) return DEFAULT_KYC_SCOPE;
 
   try {
     return ethers.getAddress(value).toLowerCase();
   } catch {
     const normalized = String(value).trim().toLowerCase();
-    return normalized || "global";
+    return normalized || DEFAULT_KYC_SCOPE;
   }
 }
 
