@@ -3,6 +3,7 @@ import { BACKEND_URL } from "@/constants";
 
 const DEMO_STATUS_POLL_MS = 5000;
 const DEMO_TICK_KICK_THROTTLE_MS = 20000;
+const MAX_STATUS_ERROR_LENGTH = 260;
 
 type DemoStatus = {
   enabled?: boolean;
@@ -105,7 +106,9 @@ export default function DemoTimerBanner({
     typeof status?.timeRemainingMs === "number" ? formatMs(status.timeRemainingMs) : null;
 
   const lastError =
-    status?.lastError && status.lastError.length > 260 ? `${status.lastError.slice(0, 260)}…` : status?.lastError;
+    status?.lastError && status.lastError.length > MAX_STATUS_ERROR_LENGTH
+      ? `${status.lastError.slice(0, MAX_STATUS_ERROR_LENGTH)}…`
+      : status?.lastError;
 
   const waitingForFirst =
     status?.enabled &&
