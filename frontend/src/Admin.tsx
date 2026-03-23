@@ -49,6 +49,10 @@ interface AdminState {
 
 type DestructiveAction = 'reset' | 'clear' | 'emergency' | null;
 
+function hasUsableRoot(root?: string | null): boolean {
+  return Boolean(root) && ethers.isHexString(root!, 32) && root!.toLowerCase() !== ethers.ZeroHash.toLowerCase();
+}
+
 const initialState: AdminState = {
   candidateName: "",
   candidates: [],
@@ -82,14 +86,8 @@ export default function Admin({
   const [confirmAction, setConfirmAction] = useState<DestructiveAction>(null);
   const [confirmText, setConfirmText] = useState('');
   const { t, lang } = useI18n();
-  const backendRootReady =
-    Boolean(backendMerkleRoot) &&
-    ethers.isHexString(backendMerkleRoot!, 32) &&
-    backendMerkleRoot!.toLowerCase() !== ethers.ZeroHash.toLowerCase();
-  const contractRootReady =
-    Boolean(contractMerkleRoot) &&
-    ethers.isHexString(contractMerkleRoot!, 32) &&
-    contractMerkleRoot!.toLowerCase() !== ethers.ZeroHash.toLowerCase();
+  const backendRootReady = hasUsableRoot(backendMerkleRoot);
+  const contractRootReady = hasUsableRoot(contractMerkleRoot);
   const rootsAligned =
     Boolean(contract) &&
     backendRootReady &&
