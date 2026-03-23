@@ -1,6 +1,8 @@
 import { ethers } from "ethers";
 import allowlistAuthSpec from "./allowlistAuthSpec.json";
 
+const ALLOWLIST_MESSAGE_SEPARATOR = "\n";
+
 export function normalizeAllowlistAddresses(addresses: string[]) {
   return Array.from(
     new Set(
@@ -30,5 +32,5 @@ export function buildAllowlistUploadMessage(
     `${allowlistAuthSpec.fields.election}: ${normalizedElectionAddress}`,
     `${allowlistAuthSpec.fields.addressesHash}: ${addressesHash}`,
     `${allowlistAuthSpec.fields.issuedAt}: ${issuedAt}`,
-  ].join("\n");
+  ].join(ALLOWLIST_MESSAGE_SEPARATOR);
 }
