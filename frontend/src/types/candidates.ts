@@ -1,5 +1,7 @@
 import type { BharatVoteContract } from "./contracts";
 
+type ErrorHandler = (message: string) => void;
+
 /**
  * Props for the Candidates component
  */
@@ -9,7 +11,7 @@ export interface CandidatesProps {
   /** Whether the current user has admin privileges */
   isAdmin?: boolean;
   /** Callback for error handling */
-  onError?: (message: string) => void;
+  onError?: ErrorHandler;
 }
 
 /**
