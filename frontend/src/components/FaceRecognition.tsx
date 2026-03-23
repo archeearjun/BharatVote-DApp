@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertTriangle, Camera, CheckCircle2, ScanFace } from 'lucide-react';
 
 let faceApi: any;
+const LOCAL_MODELS_PATH = '/models';
+const CDN_MODELS_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
 
 interface FaceRecognitionProps {
   onVerified: () => void;
@@ -18,8 +20,7 @@ const FaceRecognition: React.FC<FaceRecognitionProps> = ({ onVerified, children 
   const loadModels = useCallback(async () => {
     if (isTestEnv) return;
 
-    const localUrl = `${window.location.origin}/models`;
-    const cdnUrl = 'https://justadudewhohacks.github.io/face-api.js/models';
+    const localUrl = `${window.location.origin}${LOCAL_MODELS_PATH}`;
 
     try {
       if (!faceApi) {
@@ -33,7 +34,7 @@ const FaceRecognition: React.FC<FaceRecognitionProps> = ({ onVerified, children 
         if (!faceApi) {
           faceApi = await import('face-api.js');
         }
-        await faceApi.nets.tinyFaceDetector.loadFromUri(cdnUrl);
+        await faceApi.nets.tinyFaceDetector.loadFromUri(CDN_MODELS_URL);
         setReady(true);
         setError(null);
       } catch {
