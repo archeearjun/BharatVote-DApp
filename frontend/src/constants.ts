@@ -1,7 +1,8 @@
 // Contract address is loaded from deployment artifacts; remove hard-coded default
 //export const CONTRACT_ADDRESS = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
 // Backend API URL for Merkle proof
-export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
+const LOCAL_BACKEND_URL = "http://localhost:3000";
+export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || LOCAL_BACKEND_URL;
 
 // Phase constants - using numbers instead of enum for consistency with contract
 export type Phase = 0 | 1 | 2;
