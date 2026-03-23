@@ -6,6 +6,8 @@ import CreateElection from "./CreateElection";
 import MainContainer from "./MainContainer";
 import { setStoredKycVerification } from "@/utils/kycStorage";
 
+const LOCAL_BACKEND_URL = 'http://localhost:3000';
+
 export default function LandingPage() {
   const navigate = useNavigate();
   const [addressInput, setAddressInput] = useState("");
@@ -58,7 +60,7 @@ export default function LandingPage() {
         return;
       }
 
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || LOCAL_BACKEND_URL;
       const resp = await fetch(`${backendUrl}/api/join`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
