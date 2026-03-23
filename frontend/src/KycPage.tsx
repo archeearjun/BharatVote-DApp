@@ -28,6 +28,7 @@ const CONFIGURED_SANDBOX_OTP =
     ? import.meta.env.VITE_SANDBOX_OTP.trim()
     : null;
 const SANDBOX_OTP = CONFIGURED_SANDBOX_OTP || '123456';
+const createEmptyOtp = () => Array.from({ length: OTP_LENGTH }, () => '');
 
 const KycPage: React.FC<KycPageProps> = ({ account, electionAddress, eligibilityRoot, onVerified }) => {
   const { t } = useI18n();
@@ -35,7 +36,7 @@ const KycPage: React.FC<KycPageProps> = ({ account, electionAddress, eligibility
   const [step, setStep] = useState(0);
   const [voterId, setVoterId] = useState('');
   const [verifiedIdentity, setVerifiedIdentity] = useState('');
-  const [otp, setOtp] = useState(Array.from({ length: OTP_LENGTH }, () => ''));
+  const [otp, setOtp] = useState(createEmptyOtp);
   const [otpVisible, setOtpVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -47,7 +48,7 @@ const KycPage: React.FC<KycPageProps> = ({ account, electionAddress, eligibility
   const resolvedIdentity = verifiedIdentity || voterId || account;
 
   const resetOtp = () => {
-    setOtp(Array.from({ length: OTP_LENGTH }, () => ''));
+    setOtp(createEmptyOtp());
   };
 
   const handleSendOtp = async (e: React.FormEvent) => {
