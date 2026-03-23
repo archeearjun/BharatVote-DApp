@@ -43,6 +43,10 @@ interface RecoverySnapshot {
   commitHash?: string | null;
 }
 
+function getContractAddress(contract: any): string {
+  return ((contract as any)?.target as string) || ((contract as any)?.address as string) || '';
+}
+
 const Voter: React.FC<VoterProps> = ({
   contract,
   phase,
@@ -80,7 +84,7 @@ const Voter: React.FC<VoterProps> = ({
   const [hasRecoverySnapshot, setHasRecoverySnapshot] = useState(false);
   const [recoverySnapshot, setRecoverySnapshot] = useState<RecoverySnapshot | null>(null);
   const [electionRound, setElectionRound] = useState<number | null>(null);
-  const contractAddress = ((contract as any)?.target as string) || ((contract as any)?.address as string) || '';
+  const contractAddress = getContractAddress(contract);
   const recoveryStorageKey = useMemo(() => {
     const scope = electionAddress
       ? String(electionAddress).toLowerCase()
