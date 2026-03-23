@@ -34,6 +34,11 @@ describe('KycPage', () => {
     </I18nProvider>
   )
 
+  const getOtpInputs = () =>
+    screen.getAllByRole('textbox').filter((input) =>
+      input.getAttribute('maxLength') === '1'
+    )
+
   it('renders the KYC form correctly', () => {
     renderWithI18n(<KycPage {...mockProps} />)
     
@@ -206,9 +211,7 @@ describe('KycPage', () => {
     })
 
     // Find OTP inputs
-    const otpInputs = screen.getAllByRole('textbox').filter(input => 
-      input.getAttribute('maxLength') === '1'
-    )
+    const otpInputs = getOtpInputs()
     
     expect(otpInputs).toHaveLength(6)
   })
@@ -235,9 +238,7 @@ describe('KycPage', () => {
     })
 
     // Enter correct OTP for VOTER1
-    const otpInputs = screen.getAllByRole('textbox').filter(input => 
-      input.getAttribute('maxLength') === '1'
-    )
+    const otpInputs = getOtpInputs()
     
     // Enter OTP: 123456
     await user.type(otpInputs[0], '1')
