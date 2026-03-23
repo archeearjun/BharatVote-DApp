@@ -92,6 +92,7 @@ const DEMO_ELECTION_ADDRESS =
   process.env.DEMO_ELECTION_ADDRESS ||
   process.env.DEMO_ELECTION_CONTRACT ||
   '';
+const parseIntegerEnv = (name, fallback) => Number.parseInt(String(process.env[name] || String(fallback)), 10);
 
 const DEMO_SYNC_WAIT_CONFIRMATIONS = (() => {
   // In serverless environments (e.g. Vercel), waiting for confirmations frequently exceeds function timeouts.
@@ -123,14 +124,14 @@ const DEMO_TX_WAIT_TIMEOUT_MS = (() => {
 const DEMO_AUTOPHASE_ENABLED = String(process.env.DEMO_AUTOPHASE_ENABLED || '').toLowerCase() === 'true';
 const DEMO_AUTORESET_ENABLED = String(process.env.DEMO_AUTORESET_ENABLED || 'true').toLowerCase() !== 'false';
 const DEMO_START_MODE = String(process.env.DEMO_START_MODE || 'on_first_join'); // 'on_first_join' | 'immediate'
-const DEMO_COMMIT_SECONDS = Number.parseInt(String(process.env.DEMO_COMMIT_SECONDS || '120'), 10);
-const DEMO_REVEAL_SECONDS = Number.parseInt(String(process.env.DEMO_REVEAL_SECONDS || '120'), 10);
-const DEMO_RESET_GRACE_SECONDS = Number.parseInt(String(process.env.DEMO_RESET_GRACE_SECONDS || '15'), 10);
-const DEMO_POLL_INTERVAL_MS = Number.parseInt(String(process.env.DEMO_POLL_INTERVAL_MS || '5000'), 10);
+const DEMO_COMMIT_SECONDS = parseIntegerEnv('DEMO_COMMIT_SECONDS', 120);
+const DEMO_REVEAL_SECONDS = parseIntegerEnv('DEMO_REVEAL_SECONDS', 120);
+const DEMO_RESET_GRACE_SECONDS = parseIntegerEnv('DEMO_RESET_GRACE_SECONDS', 15);
+const DEMO_POLL_INTERVAL_MS = parseIntegerEnv('DEMO_POLL_INTERVAL_MS', 5000);
 const DEMO_ANALYTICS_ENABLED = String(process.env.DEMO_ANALYTICS_ENABLED || 'true').toLowerCase() !== 'false';
-const DEMO_ANALYTICS_FROM_BLOCK = Number.parseInt(String(process.env.DEMO_ANALYTICS_FROM_BLOCK || '0'), 10);
-const DEMO_ANALYTICS_BATCH_SIZE = Number.parseInt(String(process.env.DEMO_ANALYTICS_BATCH_SIZE || '2000'), 10);
-const DEMO_ANALYTICS_MAX_REQUESTS = Number.parseInt(String(process.env.DEMO_ANALYTICS_MAX_REQUESTS || '3'), 10);
+const DEMO_ANALYTICS_FROM_BLOCK = parseIntegerEnv('DEMO_ANALYTICS_FROM_BLOCK', 0);
+const DEMO_ANALYTICS_BATCH_SIZE = parseIntegerEnv('DEMO_ANALYTICS_BATCH_SIZE', 2000);
+const DEMO_ANALYTICS_MAX_REQUESTS = parseIntegerEnv('DEMO_ANALYTICS_MAX_REQUESTS', 3);
 const DEMO_ANALYTICS_PATH = path.join(__dirname, 'demo-analytics.json');
 const UPSTASH_REDIS_REST_URL = process.env.UPSTASH_REDIS_REST_URL;
 const UPSTASH_REDIS_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
