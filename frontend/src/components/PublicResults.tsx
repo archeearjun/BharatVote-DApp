@@ -31,6 +31,16 @@ type DemoAnalytics = {
 const POLL_INTERVAL_MS = 15000;
 type ResultsMode = 'current' | 'allTime';
 
+function isSameDemoAnalyticsSnapshot(previous: DemoAnalytics | null, next: DemoAnalytics): boolean {
+  return Boolean(
+    previous &&
+    previous.committedCount === next.committedCount &&
+    previous.revealedCount === next.revealedCount &&
+    previous.lastProcessedBlock === next.lastProcessedBlock &&
+    JSON.stringify(previous.candidateVotes || {}) === JSON.stringify(next.candidateVotes || {})
+  );
+}
+
 const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoElection }) => {
   const { t, lang } = useI18n();
   const [candidates, setCandidates] = useState<Candidate[]>([]);
@@ -99,12 +109,7 @@ const PublicResults: React.FC<PublicResultsProps> = ({ contractAddress, isDemoEl
       }
       const data = (await resp.json()) as DemoAnalytics;
       const prev = demoAnalyticsRef.current;
-      const isSame =
-        prev &&
-        prev.committedCount === data.committedCount &&
-        prev.revealedCount === data.revealedCount &&
-        prev.lastProcessedBlock === data.lastProcessedBlock &&
-        JSON.stringify(prev.candidateVotes || {}) === JSON.stringify(data.candidateVotes || {});
+      const isSame = isSameDemoAnalyticsSnapshot(prev, data);
       if (!isSame) {
         demoAnalyticsRef.current = data;
         setDemoAnalytics(data);
