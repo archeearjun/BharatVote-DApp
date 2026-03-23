@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BACKEND_URL } from "@/constants";
 
+const DEMO_STATUS_POLL_MS = 5000;
+const DEMO_TICK_KICK_THROTTLE_MS = 20000;
+
 type DemoStatus = {
   enabled?: boolean;
   reasonDisabled?: string | null;
@@ -45,7 +48,6 @@ export default function DemoTimerBanner({
   const lastKickAtMsRef = useRef<number>(0);
 
   const show = enabled;
-  const pollMs = 5000;
 
   const callTick = async () => {
     try {
@@ -77,7 +79,7 @@ export default function DemoTimerBanner({
       if (canKick) {
         const now = Date.now();
         // Avoid a thundering herd: only kick once every 20s per client.
-        if (now - lastKickAtMsRef.current > 20000) {
+        if (now - lastKickAtMsRef.current > DEMO_TICK_KICK_THROTTLE_MS) {
           lastKickAtMsRef.current = now;
           await callTick();
         }
@@ -90,7 +92,7 @@ export default function DemoTimerBanner({
   useEffect(() => {
     if (!show) return;
     callStatus();
-    const id = window.setInterval(callStatus, pollMs);
+    const id = window.setInterval(callStatus, DEMO_STATUS_POLL_MS);
     return () => window.clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [show]);
